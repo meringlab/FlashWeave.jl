@@ -1,5 +1,15 @@
+__precompile__()
+
 module Cauocc
 
-# package code goes here
+include("statfuns.jl")
+include("misc.jl")
+include("contingency.jl")
+include("tests.jl")
+include("learning.jl")
 
-end # module
+using Cauocc.Learning
+
+export LGL, si_HITON_PC
+
+end
