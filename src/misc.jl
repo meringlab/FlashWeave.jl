@@ -1,8 +1,14 @@
 module Misc
 
-export TestResult, isdiscrete, is_zero_adjusted, is_mi_test, signed_weight, make_cum_levels!, level_map!, dict_to_adjmat
+export HitonState, TestResult, stop_reached, isdiscrete, is_zero_adjusted, is_mi_test, signed_weight, make_cum_levels!, level_map!, dict_to_adjmat, make_weights
 
 const inf_weight = 708.3964185322641
+
+type HitonState
+    phase :: String
+    state_results :: Dict{Int,Tuple{Float64,Float64}}
+    unchecked_vars :: Vector{Int}
+end
 
 type TestResult
     stat :: Float64
@@ -11,6 +17,7 @@ type TestResult
     suff_power :: Bool
 end
 
+stop_reached(start_time::Float64, time_limit::Float64) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
 isdiscrete(test_name::String) = test_name in ["mi", "mi_nz"]
 is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
@@ -33,6 +40,20 @@ function signed_weight(stat::Float64, pval::Float64, kind::String="logpval")
         weight *= sign_factor
     end
     weight
+end
+
+
+function make_weights(PC_dict, univar_nbrs, weight_type)
+    # create weights
+    nbr_dict = Dict{Union{Int, String},Float64}()
+    weight_kind = String(split(weight_type, "_")[2])
+    if startswith(weight_type, "uni")
+        nbr_dict = Dict([(nbr, signed_weight(univar_nbrs[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
+    else
+        nbr_dict = Dict([(nbr, signed_weight(PC_dict[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
+    end
+    
+    nbr_dict
 end
 
 
