@@ -118,13 +118,18 @@ function test(X::Int, Ys::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, test
     """Test all variables Ys for univariate association with X"""
        
     levels_x = levels[X]
-    max_level_y = maximum(levels[Ys])
-    cont_tab = zeros(Int, levels_x, max_level_y)
-    ni = zeros(Int, max_level_y)
-    nj = zeros(Int, max_level_y)
-    nz = is_zero_adjusted(test_name)
     
-    map(Y -> test(X, Y, data, test_name, hps, levels_x, levels[Y], cont_tab, ni, nj, nz), Ys)
+    if levels_x < 2
+        return [TestResult(0.0, 1.0, 0, false) for Y in Ys]
+    else
+        max_level_y = maximum(levels[Ys])
+        cont_tab = zeros(Int, levels_x, max_level_y)
+        ni = zeros(Int, max_level_y)
+        nj = zeros(Int, max_level_y)
+        nz = is_zero_adjusted(test_name)
+
+        return map(Y -> test(X, Y, data, test_name, hps, levels_x, levels[Y], cont_tab, ni, nj, nz), Ys)
+    end
 end
 
 

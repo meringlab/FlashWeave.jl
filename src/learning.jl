@@ -3,6 +3,7 @@ module Learning
 export LGL, si_HITON_PC
 
 using MultipleTesting
+using DistributedArrays
 using Cauocc.Tests
 using Cauocc.Misc
 using Cauocc.Statfuns
@@ -11,7 +12,8 @@ using Cauocc.StackChannels
 
 function interleaving_phase(T::Int, candidates::Vector{Int}, data,
     test_name::String, max_k::Int, alpha::Float64, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[],
-    prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0)
+    prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0,
+    whitelist::Set{Int}=Set{Int}())
         
     
     is_nz = is_zero_adjusted(test_name)
@@ -33,6 +35,12 @@ function interleaving_phase(T::Int, candidates::Vector{Int}, data,
             println("\tTesting candidate $candidate ($cand_index out of $n_candidates) conditioned on $TPC")
         end
             
+        if !isempty(whitelist) && candidate in whitelist
+            push!(TPC, candidate)
+            TPC_dict[candidate] = (NaN64, NaN64)
+            continue
+        end
+        
         if is_nz
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
@@ -65,7 +73,7 @@ end
 function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
     max_k::Int, alpha::Float64, fast_elim::Bool, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=[],
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::Vector{Int}=[],
-    time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0)
+    time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0, whitelist::Set{Int}=Set{Int}())
     
     is_nz = is_zero_adjusted(test_name)
     
@@ -94,6 +102,11 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
             println("\tTesting candidate $candidate ($cand_index out of $n_candidates) conditioned on $PC_nocand")
         end
         
+        if !isempty(whitelist) && candidate in whitelist
+            PC_dict[candidate] = (NaN64, NaN64)
+            continue
+        end
+            
         if is_nz
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
@@ -127,7 +140,7 @@ end
 
 
 function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hps::Int=5,
-    pwr::Float64=0.5, FDR::Bool=true, fast_elim::Bool=true, weight_type::String="cond_logpval",
+    pwr::Float64=0.5, FDR::Bool=true, fast_elim::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
     univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), univar_step::Bool=true,
     prev_state::HitonState=HitonState("S", Dict(), []), debug::Int=0, time_limit::Float64=0.0)
     """
@@ -212,7 +225,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
             end
             
             # interleaving phase
-            TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k, alpha, hps, pwr, levels, prev_TPC_dict, time_limit, start_time, debug)
+            TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k, alpha, hps, pwr, levels, prev_TPC_dict, time_limit, start_time, debug, whitelist)
             
             # set test stats of the initial candidate to its univariate association results
             if prev_state.phase == "S"
@@ -255,7 +268,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
             PC_unchecked = Int[]
             PC_candidates = collect(keys(TPC_dict))
         end
-        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha, fast_elim, hps, pwr, levels, prev_PC_dict, PC_unchecked, time_limit, start_time, debug)
+        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha, fast_elim, hps, pwr, levels, prev_PC_dict, PC_unchecked, time_limit, start_time, debug, whitelist)
             
         if !isempty(TPC_unchecked)
                 
@@ -294,10 +307,11 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
     :fast_elim => fast_elim, :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
     :time_limit => time_limit)
     
+    workers_local = workers_all_local()
     
     if global_univar
         # precompute univariate associations and sort variables (fewest neighbors first)
-        all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, FDR=FDR, parallel=parallel)
+        all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, FDR=FDR, parallel=parallel, workers_local=workers_local)
         var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
         target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
     else
@@ -338,10 +352,6 @@ end
 function pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz)
     adj_factor = nz ? 1 : 0
     
-    if levels[X] - adj_factor < 2
-        return
-    end
-    
     n_vars = size(data, 2)
     
     if nz
@@ -361,12 +371,23 @@ function pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz)
 end
 
 
-function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, hps::Int=5, FDR::Bool=true, parallel="single")
+function pw_univar_kernel(X, data, test_name, hps, levels, nz)
+    adj_factor = nz ? 1 : 0
     
-    function nbr_kernel(X, data, test_name, hps, levels, nz, n_vars)        
-
-        return zip(Ys, test_results)
+    n_vars = size(data, 2)
+    
+    if nz
+        sub_data = @view data[data[:, X] .!= 0, :]
+    else
+        sub_data = data
     end
+        
+    Ys = collect(X+1:n_vars)
+    test_results = test(X, Ys, sub_data, test_name, hps, levels) 
+end
+
+
+function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, hps::Int=5, FDR::Bool=true, parallel="single", workers_local::Bool=true)
     
     n_vars = size(data, 2)
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
@@ -383,15 +404,32 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, 
         end
         
     elseif startswith(parallel, "multi")
-        pvals = SharedArray(Float64, n_pairs)
-        stats = SharedArray(Float64, n_pairs)
-        @sync @parallel for X in 1:n_vars-1
-            for X in 1:n_vars-1
-                pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz)
+        # if worker processes are on the same machine, use local memory sharing via shared arrays
+        if workers_local   
+            shared_pvals = SharedArray(Float64, n_pairs)
+            shared_stats = SharedArray(Float64, n_pairs)
+            @sync @parallel for X in 1:n_vars-1
+                pw_univar_kernel!(X, data, shared_stats, shared_pvals, test_name, hps, levels, nz)
+            end
+            stats = shared_stats.s
+            pvals = shared_pvals.s
+        
+        # otherwise make workers store test results remotely and gather them in the end via network
+        else
+            @sync all_test_result_refs = [@spawn pw_univar_kernel(X, data, test_name, hps, levels, nz) for X in 1:n_vars-1]
+            all_test_results = map(fetch, all_test_result_refs)
+            pvals = zeros(Float64, n_pairs)
+            stats = zeros(Float64, n_pairs)
+          
+            i = 1
+            for test_res in all_test_results
+                for t in test_res
+                    stats[i] = t.stat
+                    pvals[i] = t.pval
+                    i += 1
+                end
             end
         end
-        stats = stats.s
-        pvals = pvals.s
         
     elseif startswith(parallel, "threads")
         pvals = zeros(Float64, n_pairs)
@@ -430,14 +468,14 @@ end
 function interleaved_worker(data, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
     while true
         try
-            target_var, univar_nbrs, prev_state = take!(shared_job_q)
+            target_var, univar_nbrs, prev_state, current_nbrs = take!(shared_job_q)
             
             # if kill signal
             if target_var == -1
                 return
             end
 
-            nbr_result = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, prev_state=prev_state, GLL_args...)
+            nbr_result = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, prev_state=prev_state, whitelist=current_nbrs, GLL_args...)
             put!(shared_result_q, (target_var, nbr_result))
         catch exc
             put!(shared_result_q, (target_var, exc))
@@ -454,7 +492,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, GL
     
     # initialize jobs
     for target_var in reverse(target_vars)
-        job = (target_var, all_univar_nbrs[target_var], HitonState("S", Dict(), []))
+        job = (target_var, all_univar_nbrs[target_var], HitonState("S", Dict(), []), Set{Int}())
         put!(shared_job_q, job)
     end
     
@@ -467,8 +505,8 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, GL
         target_var, nbr_result = take!(shared_result_q)
             
         if typeof(nbr_result) <: Tuple
-            num_unchecked = length(nbr_result[1].unchecked_vars)            
-            job = (target_var, nbr_result[2], nbr_result[1])
+            current_nbrs = graph_dict[target_var]
+            job = (target_var, nbr_result[2], nbr_result[1], Set(keys(current_nbrs)))
             put!(shared_job_q, job)
         elseif typeof(nbr_result) <: Dict
             nbr_dict = nbr_result
@@ -479,7 +517,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, GL
                 
             # kill workers if not needed anymore
             if remaining_jobs < n_workers
-                kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState("S", Dict(), []))
+                kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState("S", Dict(), []), Set{Int}())
                 put!(shared_job_q, kill_signal)
                 kill_signals_sent += 1
             end

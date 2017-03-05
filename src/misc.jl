@@ -1,6 +1,6 @@
 module Misc
 
-export HitonState, TestResult, stop_reached, isdiscrete, is_zero_adjusted, is_mi_test, signed_weight, make_cum_levels!, level_map!, dict_to_adjmat, make_weights
+export HitonState, TestResult, stop_reached, isdiscrete, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, dict_to_adjmat, make_weights
 
 const inf_weight = 708.3964185322641
 
@@ -24,6 +24,21 @@ is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
 is_mi_test(test_name::String) = test_name in ["mi", "mi_nz"]
 
 signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)
+
+
+function workers_all_local()
+    local_host = gethostname()
+    workers_local = true
+    
+    for worker_id in workers()
+        worker_host = remotecall_fetch(()->gethostname(), worker_id)
+        if worker_host != local_host
+            workers_local = false
+            break
+        end
+    end
+    workers_local
+end
 
 function signed_weight(stat::Float64, pval::Float64, kind::String="logpval")
     if kind == "stat"
