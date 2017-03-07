@@ -12,6 +12,7 @@ using Cauocc.StackChannels
 
 function interleaving_phase(T::Int, candidates::Vector{Int}, data,
     test_name::String, max_k::Int, alpha::Float64, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[],
+    data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
     prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0,
     whitelist::Set{Int}=Set{Int}())
         
@@ -41,13 +42,13 @@ function interleaving_phase(T::Int, candidates::Vector{Int}, data,
             continue
         end
         
-        if is_nz
+        if is_nz && !issparse(data)
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
             sub_data = data
         end
 
-        test_result = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps, pwr=pwr, levels=levels)
+        test_result = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps, pwr=pwr, levels=levels, data_row_inds=data_row_inds, data_nzero_vals=data_nzero_vals)
         
         if issig(test_result, alpha)
             push!(TPC, candidate)
@@ -72,6 +73,7 @@ end
 
 function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
     max_k::Int, alpha::Float64, fast_elim::Bool, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=[],
+    data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::Vector{Int}=[],
     time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0, whitelist::Set{Int}=Set{Int}())
     
@@ -94,7 +96,7 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
         end
         return PC_dict, Int[]
     end
-    
+        
     for (cand_index, candidate) in enumerate(PC_candidates)            
         PC_nocand = PC[PC .!= candidate]
         
@@ -107,13 +109,13 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
             continue
         end
             
-        if is_nz
+        if is_nz && !issparse(data)
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
             sub_data = data
         end
         
-        test_result = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps, levels=levels)
+        test_result = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps, levels=levels, data_row_inds=data_row_inds, data_nzero_vals=data_nzero_vals)
 
         if !issig(test_result, alpha)
             deleteat!(PC, findin(PC, candidate))
@@ -141,7 +143,8 @@ end
 
 function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hps::Int=5,
     pwr::Float64=0.5, FDR::Bool=true, fast_elim::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
-    univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), univar_step::Bool=true,
+    univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
+    univar_step::Bool=true,
     prev_state::HitonState=HitonState("S", Dict(), []), debug::Int=0, time_limit::Float64=0.0)
     """
     # prepare input
@@ -151,9 +154,25 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
         T = findfirst(header, target_var)   
     end
     """
+    if debug > 0
+        println("Finding neighbors for $T")
+    end
+    
     state = HitonState("S", Dict(), [])
     if is_zero_adjusted(test_name)
-        data = @view data[data[:, T] .!= 0, :]
+        if issparse(data)
+            data = data[data[:, T] .!= 0, :]
+        else
+            data = @view data[data[:, T] .!= 0, :]
+        end
+    end
+    
+    if issparse(data) && isdiscrete(test_name)
+        data_row_inds = rowvals(data)
+        data_nzero_vals = nonzeros(data)
+    else
+        data_row_inds = Int64[]
+        data_nzero_vals = Int64[]
     end
     
     test_variables = filter(x -> x != T, 1:size(data, 2))    
@@ -165,14 +184,16 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
     end
     
     if isdiscrete(test_name)
-        levels = map(x -> length(unique(data[:, x])), 1:size(data, 2))
+        if isempty(levels)
+            levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+        end
         
-         if levels[T] < 2
+        if levels[T] < 2
             return Dict{Int,Float64}()
         end
         
         if univar_step
-            univar_test_results = test(T, test_variables, data, test_name, hps, levels)
+            univar_test_results = test(T, test_variables, data, test_name, hps, levels, data_row_inds, data_nzero_vals)
         end
     else
         levels = Int[]
@@ -225,7 +246,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
             end
             
             # interleaving phase
-            TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k, alpha, hps, pwr, levels, prev_TPC_dict, time_limit, start_time, debug, whitelist)
+            TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k, alpha, hps, pwr, levels, data_row_inds, data_nzero_vals, prev_TPC_dict, time_limit, start_time, debug, whitelist)
             
             # set test stats of the initial candidate to its univariate association results
             if prev_state.phase == "S"
@@ -268,7 +289,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
             PC_unchecked = Int[]
             PC_candidates = collect(keys(TPC_dict))
         end
-        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha, fast_elim, hps, pwr, levels, prev_PC_dict, PC_unchecked, time_limit, start_time, debug, whitelist)
+        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha, fast_elim, hps, pwr, levels, data_row_inds, data_nzero_vals, prev_PC_dict, PC_unchecked, time_limit, start_time, debug, whitelist)
             
         if !isempty(TPC_unchecked)
                 
@@ -298,20 +319,42 @@ end
 
 
 function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hps::Int=5, pwr::Float64=0.5,
-    FDR::Bool=true, global_univar::Bool=true, parallel::String="single", fast_elim::Bool=true, weight_type::String="cond_logpval",
+    FDR::Bool=true, global_univar::Bool=true, parallel::String="single", fast_elim::Bool=true, weight_type::String="cond_logpval", verbose::Bool=true,
     debug::Int=0, time_limit::Float64=0.0, header::Vector{String}=String[])
     """
     parallel: 'single', 'multi_e', 'multi_il'
     """
+    if issparse(data)
+        warn("Sparse matrix support still produces slightly inaccurate results. Use at own risk!")
+    end
+    
     kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :pwr => pwr, :FDR => FDR,
     :fast_elim => fast_elim, :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
     :time_limit => time_limit)
     
     workers_local = workers_all_local()
     
+    if time_limit != 0.0 && parallel != "multi_il"
+        warn("Using time_limit without interleaved parallelism is not advised.")
+    end
+    
+    if isdiscrete(test_name)
+        if verbose
+            println("Computing levels..")
+        end
+        
+        levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+    else
+        levels = Int64[]
+    end
+    
     if global_univar
         # precompute univariate associations and sort variables (fewest neighbors first)
-        all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, FDR=FDR, parallel=parallel, workers_local=workers_local)
+        if verbose
+            println("Computing univariate associations..")
+        end
+        
+        all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, FDR=FDR, levels=levels, parallel=parallel, workers_local=workers_local)
         var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
         target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
     else
@@ -319,26 +362,36 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
         all_univar_nbrs = Dict([(x, Dict{Int,Tuple{Float64,Float64}}()) for x in target_vars])
     end
     
+    
+    if verbose
+        println("Running si_HITON_PC for each variable..")
+    end
+    
     if parallel == "single" || nprocs() == 1
-        nbr_dicts = [si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], kwargs...) for x in target_vars]
+        nbr_dicts = [si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, kwargs...) for x in target_vars]
         graph_dict = Dict([(target_var, nbr_dict) for (target_var, nbr_dict) in zip(target_vars, nbr_dicts)])
     else
         # embarassingly parallel
         if parallel == "multi_ep"
-            @sync nbr_dict_refs = [@spawn si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], kwargs...) for x in target_vars]
+            @sync nbr_dict_refs = [@spawn si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, kwargs...) for x in target_vars]
 
             nbr_dicts = map(fetch, nbr_dict_refs)
             graph_dict = Dict([(target_var, nbr_dict) for (target_var, nbr_dict) in zip(target_vars, nbr_dicts)])
             
         # interleaved parallelism
         elseif parallel == "multi_il"
-            graph_dict = interleaved_backend(target_vars, data, all_univar_nbrs, kwargs)
+            graph_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, kwargs)
         else
             error("'$parallel' not a valid parallel mode")
         end
         
     end
+    
             
+    if verbose
+        println("Postprocessing..")
+    end
+    
     if !isempty(header)
         graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
     end
@@ -349,19 +402,24 @@ end
 
 # SPECIALIZED FUNCTIONS AND TYPES
 
-function pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz)
+function pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals)
     adj_factor = nz ? 1 : 0
     
     n_vars = size(data, 2)
     
-    if nz
+    if nz && !issparse(data)
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
     end
         
     Ys = collect(X+1:n_vars)
-    test_results = test(X, Ys, sub_data, test_name, hps, levels)
+    
+    if isdiscrete(test_name)
+        test_results = test(X, Ys, sub_data, test_name, hps, levels, data_row_inds, data_nzero_vals)
+    else
+        test_results = test(X, Ys, sub_data, test_name)
+    end
     
     for (Y, test_res) in zip(Ys, test_results)
         pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
@@ -371,36 +429,44 @@ function pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz)
 end
 
 
-function pw_univar_kernel(X, data, test_name, hps, levels, nz)
+function pw_univar_kernel(X, data, test_name, hps, levels, nz, data_row_inds, data_nzero_vals)
     adj_factor = nz ? 1 : 0
     
     n_vars = size(data, 2)
     
-    if nz
+    if nz && !issparse(data)
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
     end
         
     Ys = collect(X+1:n_vars)
-    test_results = test(X, Ys, sub_data, test_name, hps, levels) 
+    test_results = test(X, Ys, sub_data, test_name, hps, levels, data_row_inds, data_nzero_vals) 
 end
 
 
-function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, hps::Int=5, FDR::Bool=true, parallel="single", workers_local::Bool=true)
+function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, hps::Int=5, FDR::Bool=true, levels::Vector{Int64}=Int64[], parallel="single", workers_local::Bool=true)
     
     n_vars = size(data, 2)
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
-    levels = map(x -> length(unique(data[:, x])), 1:size(data, 2))
+    #levels = map(x -> length(unique(data[:, x])), 1:size(data, 2))
     
     nz = is_zero_adjusted(test_name)
+    
+    if issparse(data) && isdiscrete(test_name)
+        data_row_inds = rowvals(data)
+        data_nzero_vals = nonzeros(data)
+    else
+        data_row_inds = Int64[]
+        data_nzero_vals = Int64[]
+    end
     
     if parallel == "single"
         pvals = zeros(Float64, n_pairs)
         stats = zeros(Float64, n_pairs)
         
         for X in 1:n_vars-1
-            pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz)
+            pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals)
         end
         
     elseif startswith(parallel, "multi")
@@ -409,14 +475,14 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, 
             shared_pvals = SharedArray(Float64, n_pairs)
             shared_stats = SharedArray(Float64, n_pairs)
             @sync @parallel for X in 1:n_vars-1
-                pw_univar_kernel!(X, data, shared_stats, shared_pvals, test_name, hps, levels, nz)
+                pw_univar_kernel!(X, data, shared_stats, shared_pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals)
             end
             stats = shared_stats.s
             pvals = shared_pvals.s
         
         # otherwise make workers store test results remotely and gather them in the end via network
         else
-            @sync all_test_result_refs = [@spawn pw_univar_kernel(X, data, test_name, hps, levels, nz) for X in 1:n_vars-1]
+            @sync all_test_result_refs = [@spawn pw_univar_kernel(X, data, test_name, hps, levels, nz, data_row_inds, data_nzero_vals) for X in 1:n_vars-1]
             all_test_results = map(fetch, all_test_result_refs)
             pvals = zeros(Float64, n_pairs)
             stats = zeros(Float64, n_pairs)
@@ -465,7 +531,7 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, 
 end
 
 
-function interleaved_worker(data, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
+function interleaved_worker(data, levels, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
     while true
         try
             target_var, univar_nbrs, prev_state, current_nbrs = take!(shared_job_q)
@@ -475,7 +541,7 @@ function interleaved_worker(data, shared_job_q::RemoteChannel, shared_result_q::
                 return
             end
 
-            nbr_result = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, prev_state=prev_state, whitelist=current_nbrs, GLL_args...)
+            nbr_result = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state, whitelist=current_nbrs, GLL_args...)
             put!(shared_result_q, (target_var, nbr_result))
         catch exc
             put!(shared_result_q, (target_var, exc))
@@ -485,7 +551,7 @@ function interleaved_worker(data, shared_job_q::RemoteChannel, shared_result_q::
 end
 
 
-function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, GLL_args)
+function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, GLL_args)
     n_workers = nprocs() - 1
     shared_job_q = RemoteChannel(() -> StackChannel{Tuple}(size(data, 2) * 2), 1)
     shared_result_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2)), 1)
@@ -496,7 +562,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, GL
         put!(shared_job_q, job)
     end
     
-    worker_returns = [@spawn interleaved_worker(data, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
+    worker_returns = [@spawn interleaved_worker(data, levels, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
     
     remaining_jobs = length(target_vars)
     graph_dict = Dict{Int,Dict{Int,Float64}}([(target_var, Dict{Int,Float64}()) for target_var in target_vars])

@@ -1,6 +1,6 @@
 module Misc
 
-export HitonState, TestResult, stop_reached, isdiscrete, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, dict_to_adjmat, make_weights
+export HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, dict_to_adjmat, make_weights
 
 const inf_weight = 708.3964185322641
 
@@ -17,6 +17,42 @@ type TestResult
     suff_power :: Bool
 end
 
+type IndexPair
+    min_ind :: Int64
+    sec_ind :: Int64
+end
+
+
+
+function get_levels(col_vec::SparseVector{Int64,Int64})
+    levels = length(unique(nonzeros(col_vec)))
+    add_zero = col_vec.n > length(col_vec.nzind) ? 1 : 0
+    levels + add_zero
+end
+
+
+function get_levels(col_vec::Vector{Int64})
+    length(unique(col_vec))
+end
+
+
+function min_sec_indices!(ind_pair::IndexPair, index_vec::Vector{Int64})
+    min_ind = 0
+    sec_ind = 0
+    
+    for ind in index_vec
+        if min_ind == 0 || ind < min_ind
+            sec_ind = min_ind
+            min_ind = ind
+        elseif sec_ind == 0 || ind < sec_ind
+            sec_ind = ind
+        end
+    end
+    ind_pair.min_ind = min_ind
+    ind_pair.sec_ind = sec_ind
+end
+
+
 stop_reached(start_time::Float64, time_limit::Float64) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
 isdiscrete(test_name::String) = test_name in ["mi", "mi_nz"]
@@ -24,21 +60,6 @@ is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
 is_mi_test(test_name::String) = test_name in ["mi", "mi_nz"]
 
 signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)
-
-
-function workers_all_local()
-    local_host = gethostname()
-    workers_local = true
-    
-    for worker_id in workers()
-        worker_host = remotecall_fetch(()->gethostname(), worker_id)
-        if worker_host != local_host
-            workers_local = false
-            break
-        end
-    end
-    workers_local
-end
 
 function signed_weight(stat::Float64, pval::Float64, kind::String="logpval")
     if kind == "stat"
@@ -55,6 +76,27 @@ function signed_weight(stat::Float64, pval::Float64, kind::String="logpval")
         weight *= sign_factor
     end
     weight
+end
+
+
+#function colsize(data::SparseMatrixCSC, col::Int)
+#    col_end_term = col < size(data, 2) ? data.colptr[col + 1] : nnz(data) + 1
+#    col_end_term - data.colptr[col]
+#end
+
+
+function workers_all_local()
+    local_host = gethostname()
+    workers_local = true
+    
+    for worker_id in workers()
+        worker_host = remotecall_fetch(()->gethostname(), worker_id)
+        if worker_host != local_host
+            workers_local = false
+            break
+        end
+    end
+    workers_local
 end
 
 
@@ -86,7 +128,7 @@ end
 function level_map!(Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, z::Vector{Int}, cum_levels::Vector{Int},
     z_map_arr::Vector{Int})
     fill!(z_map_arr, 0)
-    levels_z = 1
+    levels_z = 0
     
     for i in 1:size(data, 1)
         gfp_map = 1

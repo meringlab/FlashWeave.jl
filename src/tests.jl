@@ -18,7 +18,8 @@ sufficient_power(levels_x::Int, levels_y::Int, n_obs::Int, hps::Int) = (n_obs / 
 sufficient_power(levels_x::Int, levels_y::Int, levels_z::Int, n_obs::Int, hps::Int) = (n_obs / (levels_x * levels_y * levels_z)) > hps
 
 
-function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64}}, test_name::String)
+function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}},
+        test_name::String)
     
     if test_name == "fz"
         p_stat = pcor(X, Y, Zs, data)
@@ -29,17 +30,21 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float
 end
 
 
-function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, test_name::String,
-    hps::Int, levels_x::Int, levels_y::Int, cont_tab::Array{Int,3},
+function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC{Int64,Int64}},
+        test_name::String, hps::Int, levels_x::Int, levels_y::Int, cont_tab::Array{Int,3},
     z::Vector{Int}, ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int,1}, cum_levels::Vector{Int},
-    z_map_arr::Vector{Int}, nz::Bool=false)
+    z_map_arr::Vector{Int}, nz::Bool=false, data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
     """Test association between X and Y"""
     adj_factor = nz ? 1 : 0
     if levels_y - adj_factor < 2
         return TestResult(0.0, 1.0, 0.0, false)
     end
     
-    levels_z = contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr, nz)
+    if !issparse(data)
+        levels_z = contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr, nz)
+    else
+        levels_z = contingency_table!(X, Y, Zs, data, data_row_inds, data_nzero_vals, cont_tab, cum_levels, z_map_arr)
+    end
     
     if is_mi_test(test_name)
         if !sufficient_power(levels_x, levels_y, levels_z, size(data, 1), hps)
@@ -63,21 +68,26 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64
 end
 
 
-function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64}}, test_name::String, hps::Int,
-    levels_x::Int, levels_y::Int, cont_tab::Array{Int,2}, ni::Array{Int,1}, nj::Array{Int,1}, nz::Bool=false)
+function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC{Int64,Int64}}, test_name::String, hps::Int,
+    levels_x::Int, levels_y::Int, cont_tab::Array{Int,2}, ni::Array{Int,1}, nj::Array{Int,1}, nz::Bool=false,
+    data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
     
     adj_factor = nz ? 1 : 0
     if levels_y - adj_factor < 2
         return TestResult(0.0, 1.0, 0.0, false)
     end
     
-    if nz
+    if nz && !issparse(data)
         sub_data = @view data[data[:, Y] .!= 0, :]
     else
         sub_data = data
     end
     
-    contingency_table!(X, Y, sub_data, cont_tab, nz)
+    if !issparse(data)
+        contingency_table!(X, Y, sub_data, cont_tab, nz)
+    else
+        contingency_table!(X, Y, sub_data, data_row_inds, data_nzero_vals, cont_tab)
+    end
     
     if is_mi_test(test_name)
         if !sufficient_power(levels_x, levels_y, size(sub_data, 1), hps)
@@ -102,7 +112,7 @@ function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64}}, test_name::St
 end
 
 
-function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Float64}}, test_name::String)
+function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}}, test_name::String)
     
     if test_name == "fz"
         p_stat = cor(data[:, X], data[:, Y])
@@ -113,10 +123,10 @@ function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Float64}}, test_name::
 end
 
 
-function test(X::Int, Ys::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, test_name::String,
-    hps::Int, levels::Vector{Int})
+function test(X::Int, Ys::Vector{Int}, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC{Int64,Int64}}, test_name::String,
+    hps::Int, levels::Vector{Int}, data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
     """Test all variables Ys for univariate association with X"""
-       
+    
     levels_x = levels[X]
     
     if levels_x < 2
@@ -128,19 +138,20 @@ function test(X::Int, Ys::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, test
         nj = zeros(Int, max_level_y)
         nz = is_zero_adjusted(test_name)
 
-        return map(Y -> test(X, Y, data, test_name, hps, levels_x, levels[Y], cont_tab, ni, nj, nz), Ys)
+        return map(Y -> test(X, Y, data, test_name, hps, levels_x, levels[Y], cont_tab, ni, nj, nz, data_row_inds, data_nzero_vals), Ys)
     end
 end
 
 
-function test(X::Int, Ys::Array{Int, 1}, data::Union{SubArray,Matrix{Float64}}, test_name::String)
+function test(X::Int, Ys::Array{Int, 1}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}}, test_name::String)
     """Test all variables Ys for univariate association with X"""
     map(Y -> test(X, Y, data, test_name), Ys)
 end
 
 
 function test_subsets(X::Int, Y::Int, Z_total::Vector{Int}, data,
-    test_name::String, max_k::Int, alpha::Float64; hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[])
+    test_name::String, max_k::Int, alpha::Float64; hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[],
+    data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
     discrete_test = isdiscrete(test_name)
     num_tests = 0
@@ -168,7 +179,7 @@ function test_subsets(X::Int, Y::Int, Z_total::Vector{Int}, data,
             if discrete_test
                 make_cum_levels!(cum_levels, Zs, levels)
                 test_result = test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z,
-                                   ni, nj, nk, cum_levels, z_map_arr, nz)
+                                   ni, nj, nk, cum_levels, z_map_arr, nz, data_row_inds, data_nzero_vals)
             else
                 test_result = test(X, Y, Zs, data, test_name)
             end
