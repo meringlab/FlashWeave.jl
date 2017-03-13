@@ -43,7 +43,8 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64
     if !issparse(data)
         levels_z = contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr, nz)
     else
-        levels_z = contingency_table!(X, Y, Zs, data, data_row_inds, data_nzero_vals, cont_tab, cum_levels, z_map_arr)
+        Zs_tup = tuple(Zs...)
+        levels_z = contingency_table!(X, Y, Zs_tup, data, data_row_inds, data_nzero_vals, cont_tab, cum_levels, z_map_arr)
     end
     
     if is_mi_test(test_name)

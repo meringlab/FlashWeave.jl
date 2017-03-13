@@ -325,7 +325,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
     parallel: 'single', 'multi_e', 'multi_il'
     """
     if issparse(data)
-        warn("Sparse matrix support still produces slightly inaccurate results. Use at own risk!")
+        warn("Usage of sparse matrices still produces slightly inaccurate results. Use at own risk!")
     end
     
     kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :pwr => pwr, :FDR => FDR,
