@@ -1,6 +1,9 @@
 module Misc
 
-export HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, dict_to_adjmat, make_weights
+using LightGraphs
+using StatsBase
+
+export HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, dict_to_adjmat, make_weights
 
 const inf_weight = 708.3964185322641
 
@@ -148,6 +151,77 @@ function level_map!(Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, z::Vec
     
     levels_z
 end
+
+
+function print_network_stats(graph::LightGraphs.Graph)
+    n_nodes = nv(graph)
+    n_edges = ne(graph)
+    println("Current nodes/edges: $n_nodes / $n_edges")
+    println("Degree stats:")
+    println(summarystats(degree(graph)))
+end
+
+
+function maxweight(weight1::Float64, weight2::Float64)
+    sign1 = sign(weight1) 
+    sign2 = sign(weight2)
+    
+    if sign1 * sign2 < 0
+        warn("Opposite signs for the same edge detected. Arbitarily choosing one.")
+        return weight1
+    else
+        return maximum(abs([weight1, weight2])) * sign1
+    end
+end
+
+    
+function make_graph_symmetric(graph_dict::Dict{Int64,Dict{Int64,Float64}}, edge_merge_fun=maxweight)
+    checked_G = Graph(maximum(keys(graph_dict)))
+    for node1 in keys(graph_dict)
+        for node2 in keys(graph_dict[node1])
+            
+            if !has_edge(checked_G, node1, node2)
+                add_edge!(checked_G, node1, node2)
+                weight = graph_dict[node1][node2]
+
+                prev_weight = haskey(graph_dict[node1], node2) ? graph_dict[node1][node2] : 0.0
+
+                if prev_weight != 0.0 && !isnan(weight)
+                    weight = edge_merge_fun(weight, prev_weight)
+                end
+
+                graph_dict[node1][node2] = weight
+                graph_dict[node2][node1] = weight
+            end
+        end
+    end
+    
+    graph_dict
+end
+    
+
+#function dict_to_graph(graph_dict::Dict{Int64,Dict{Int64,Float64}}, edge_merge_fun=maxweight)
+#    max_key = maximum(keys(graph_dict))
+#    adj_mat = zeros(Float64, max_key, max_key)
+#    #graph = Graph(maximum(keys(graph_dict)))
+#    
+#    for node1 in keys(graph_dict)
+#        for node2 in keys(graph_dict[node1])
+#            weight = graph_dict[node1][node2]
+#            prev_weight = adj_mat[node1, node2]
+#            
+#            if prev_weight != 0.0 && !isnan(weight)
+#                weight = edge_merge_fun([weight, prev_weight])
+#            end
+#            
+#            adj_mat[node1, node2] = weight
+#            adj_mat[node2, node1] = weight
+#            
+#        end
+#    end
+#    
+#    Graph(adj_mat)
+#end 
 
 
 function dict_to_adjmat(graph_dict::Dict{Union{Int64,String},Dict{Union{Int64,String},Float64}})

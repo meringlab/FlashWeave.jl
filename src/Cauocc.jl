@@ -8,6 +8,7 @@ include("contingency.jl")
 include("tests.jl")
 include("stackchannels.jl")
 include("learning.jl")
+include("preprocessing.jl")
 
 using Cauocc.Learning
 

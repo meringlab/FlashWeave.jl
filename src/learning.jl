@@ -3,7 +3,8 @@ module Learning
 export LGL, si_HITON_PC
 
 using MultipleTesting
-using DistributedArrays
+using LightGraphs
+#using DistributedArrays
 using Cauocc.Tests
 using Cauocc.Misc
 using Cauocc.Statfuns
@@ -319,7 +320,7 @@ end
 
 
 function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hps::Int=5, pwr::Float64=0.5,
-    FDR::Bool=true, global_univar::Bool=true, parallel::String="single", fast_elim::Bool=true, weight_type::String="cond_logpval", verbose::Bool=true,
+    FDR::Bool=true, global_univar::Bool=true, parallel::String="single", fast_elim::Bool=true, weight_type::String="cond_logpval", verbose::Bool=true, update_interval=30.0, edge_merge_fun=maxweight,
     debug::Int=0, time_limit::Float64=0.0, header::Vector{String}=String[])
     """
     parallel: 'single', 'multi_e', 'multi_il'
@@ -380,7 +381,8 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
             
         # interleaved parallelism
         elseif parallel == "multi_il"
-            graph_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, kwargs)
+            graph_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs)
+            #graph = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs)
         else
             error("'$parallel' not a valid parallel mode")
         end
@@ -392,11 +394,15 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
         println("Postprocessing..")
     end
     
+    #graph = dict_to_graph(graph_dict)
+    graph_dict = make_graph_symmetric(graph_dict)
+    
     if !isempty(header)
         graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
     end
-    
     convert(Dict{Union{Int, String},Dict{Union{Int, String}, Float64}}, graph_dict)
+    
+    
 end
 
 
@@ -551,7 +557,7 @@ function interleaved_worker(data, levels, shared_job_q::RemoteChannel, shared_re
 end
 
 
-function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, GLL_args)
+function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, update_interval, GLL_args)
     n_workers = nprocs() - 1
     shared_job_q = RemoteChannel(() -> StackChannel{Tuple}(size(data, 2) * 2), 1)
     shared_result_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2)), 1)
@@ -566,18 +572,30 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
     
     remaining_jobs = length(target_vars)
     graph_dict = Dict{Int,Dict{Int,Float64}}([(target_var, Dict{Int,Float64}()) for target_var in target_vars])
+    
+    # this graph is just used for efficiently keeping track of and reporting graph stats during the run
+    graph = Graph(length(target_vars))
+    edge_set = Set{Tuple{Int64,Int64}}()
     kill_signals_sent = 0
+    start_time = time()
+    last_update_time = start_time
+    
     while remaining_jobs > 0
         target_var, nbr_result = take!(shared_result_q)
-            
-        if typeof(nbr_result) <: Tuple
-            current_nbrs = graph_dict[target_var]
-            job = (target_var, nbr_result[2], nbr_result[1], Set(keys(current_nbrs)))
+        
+        if isa(nbr_result, Tuple)#typeof(nbr_result) <: Tuple
+            #current_nbrs = graph_dict[target_var]
+            #job = (target_var, nbr_result[2], nbr_result[1], Set(keys(current_nbrs)))
+            target_nbrs = Set(neighbors(graph, target_var))
+            job = (target_var, nbr_result[2], nbr_result[1], target_nbrs)
             put!(shared_job_q, job)
-        elseif typeof(nbr_result) <: Dict
+        elseif isa(nbr_result, Dict)#typeof(nbr_result) <: Dict
             nbr_dict = nbr_result
             for nbr in keys(nbr_dict)
                 graph_dict[target_var][nbr] = nbr_dict[nbr]
+                #push!(edge_set, tuple(sort([target_var, nbr]))...)
+                #add_vertex!(graph, nbr)
+                add_edge!(graph, target_var, nbr)
             end
             remaining_jobs -= 1
                 
@@ -590,8 +608,17 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
         else
             throw(nbr_result)
         end
+        
+        # print network stats after each update interval
+        curr_time = time()
+        if curr_time - last_update_time > update_interval
+            println("\nTime passed: ", curr_time - start_time, ". Finished nodes: ", length(target_vars) - remaining_jobs, ". Remaining nodes: ", remaining_jobs)
+            print_network_stats(graph)
+            last_update_time = curr_time
+        end
     end
     
+    #graph
     graph_dict
 end
 
