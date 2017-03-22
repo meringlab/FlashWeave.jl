@@ -2,6 +2,7 @@ module Preprocessing
 
 export preprocess_data
 
+using StatsBase
 using Cauocc.Misc
 using Cauocc.Learning
 
@@ -102,16 +103,16 @@ function discretize(X::Matrix{Int64}; n_bins::Int64=3, nz::Bool=true)
 end
 
 
-function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0, clr_pseudo_count::Int64=1e-5, n_bins=3,
+function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0, clr_pseudo_count::Float64=1e-5, n_bins::Int64=3,
         verbose::Bool=true, skip_cols::Set{Int64}=Set{Int64}())
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
     
     unfilt_dims = size(data)
-    col_mask = var(data, 1)[:]
+    col_mask = var(data, 1)[:] .> 0.0
     data = data[:, col_mask]
-    row_mask = sum(data, 1)[:]
+    row_mask = sum(data, 2)[:] .> 0
     data = data[row_mask, :]
     
     if verbose
@@ -127,6 +128,13 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
         data = sign(data)
     elseif norm == "binned_nz"
         data = discretize(data, n_bins=n_bins, nz=true)
+        unreduced_vars = size(data, 2)
+        data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .>= n_bins)[:]]
+        
+        if verbose
+            println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
+        end
+            
     else
         error("$norm is no valid normalization method.")
     end

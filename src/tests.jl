@@ -33,35 +33,44 @@ end
 function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC{Int64,Int64}},
         test_name::String, hps::Int, levels_x::Int, levels_y::Int, cont_tab::Array{Int,3},
     z::Vector{Int}, ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int,1}, cum_levels::Vector{Int},
-    z_map_arr::Vector{Int}, nz::Bool=false, data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
+    z_map_arr::Vector{Int}, nz::Bool=false, data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
+    levels::Vector{Int64}=Int64[])
     """Test association between X and Y"""
-    adj_factor = nz ? 1 : 0
-    if levels_y - adj_factor < 2
-        return TestResult(0.0, 1.0, 0.0, false)
-    end
     
     if !issparse(data)
-        levels_z = contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr, nz)
+        levels_z = contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr)
     else
         Zs_tup = tuple(Zs...)
-        levels_z = contingency_table!(X, Y, Zs_tup, data, data_row_inds, data_nzero_vals, cont_tab, cum_levels, z_map_arr)
+        cont_levels = nz ? levels : nothing
+        levels_z = contingency_table!(X, Y, Zs_tup, data, data_row_inds, data_nzero_vals, cont_tab, cum_levels, z_map_arr,
+                                      cont_levels)
     end
     
+    if nz
+        sub_cont_tab = nz_adjust_cont_tab(levels_x, levels_y, cont_tab)
+        levels_x = size(sub_cont_tab, 1)
+        levels_y = size(sub_cont_tab, 2)
+    else
+        sub_cont_tab = cont_tab
+    end
+    
+    n_obs = sum(sub_cont_tab)
+    
     if is_mi_test(test_name)
-        if !sufficient_power(levels_x, levels_y, levels_z, size(data, 1), hps)
+        if !sufficient_power(levels_x, levels_y, levels_z, n_obs, hps)
             mi_stat = 0.0
             df = 0
             pval = 1.0
             suff_power = false
         else
-            mi_stat = mutual_information(cont_tab, levels_x, levels_y, levels_z, ni, nj, nk)
+            mi_stat = mutual_information(sub_cont_tab, levels_x, levels_y, levels_z, ni, nj, nk)
             
             df = adjust_df(ni, nj, levels_x, levels_y, levels_z)
             pval = mi_pval(mi_stat, df)
             suff_power = true
             
             # use oddsratio of 2x2 contingency table to determine edge sign
-            mi_sign = oddsratio(cont_tab) < 1.0 ? -1.0 : 1.0
+            mi_sign = oddsratio(sub_cont_tab) < 1.0 ? -1.0 : 1.0
             mi_stat *= mi_sign
         end
     end
@@ -72,41 +81,45 @@ end
 function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC{Int64,Int64}}, test_name::String, hps::Int,
     levels_x::Int, levels_y::Int, cont_tab::Array{Int,2}, ni::Array{Int,1}, nj::Array{Int,1}, nz::Bool=false,
     data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
-    
-    adj_factor = nz ? 1 : 0
-    if levels_y - adj_factor < 2
-        return TestResult(0.0, 1.0, 0.0, false)
-    end
-    
-    if nz && !issparse(data)
+        
+    if nz && !issparse(data) && (levels_y > 2)
         sub_data = @view data[data[:, Y] .!= 0, :]
     else
         sub_data = data
     end
     
     if !issparse(data)
-        contingency_table!(X, Y, sub_data, cont_tab, nz)
+        contingency_table!(X, Y, sub_data, cont_tab)
     else
         contingency_table!(X, Y, sub_data, data_row_inds, data_nzero_vals, cont_tab)
     end
     
+    if nz
+        sub_cont_tab = nz_adjust_cont_tab(levels_x, levels_y, cont_tab)
+        levels_x = size(sub_cont_tab, 1)
+        levels_y = size(sub_cont_tab, 2)
+    else
+        sub_cont_tab = cont_tab
+    end
+    
+    n_obs = sum(sub_cont_tab)
+    
     if is_mi_test(test_name)
-        if !sufficient_power(levels_x, levels_y, size(sub_data, 1), hps)
+        if !sufficient_power(levels_x, levels_y, n_obs, hps)
             mi_stat = 0.0
             df = 0
             pval = 1.0
             suff_power = false
         else
-            mi_stat = mutual_information(cont_tab, levels_x, levels_y, ni, nj)
+            mi_stat = mutual_information(sub_cont_tab, levels_x, levels_y, ni, nj)
             
             df = adjust_df(ni, nj, levels_x, levels_y)
             pval = mi_pval(mi_stat, df)
             suff_power = true
             
             # use oddsratio of 2x2 contingency table to determine edge sign
-            mi_sign = oddsratio(cont_tab) < 1.0 ? -1.0 : 1.0
+            mi_sign = oddsratio(sub_cont_tab) < 1.0 ? -1.0 : 1.0
             mi_stat *= mi_sign
-            #println("$X $Y $mi_stat $pval $df")
         end
     end
     TestResult(mi_stat, pval, df, suff_power) 
@@ -180,7 +193,7 @@ function test_subsets(X::Int, Y::Int, Z_total::Vector{Int}, data,
             if discrete_test
                 make_cum_levels!(cum_levels, Zs, levels)
                 test_result = test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z,
-                                   ni, nj, nk, cum_levels, z_map_arr, nz, data_row_inds, data_nzero_vals)
+                                   ni, nj, nk, cum_levels, z_map_arr, nz, data_row_inds, data_nzero_vals, levels)
             else
                 test_result = test(X, Y, Zs, data, test_name)
             end
@@ -197,6 +210,7 @@ function test_subsets(X::Int, Y::Int, Z_total::Vector{Int}, data,
                 end
             else
                 if !issig(test_result, alpha)
+                    #print("[test_subsets] rejected $X with $Y with rejecting subset $Zs")
                     return test_result
                 elseif test_result.pval > lowest_sig_result.pval
                     lowest_sig_result = test_result

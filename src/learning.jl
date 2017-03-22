@@ -19,6 +19,8 @@ function interleaving_phase(T::Int, candidates::Vector{Int}, data,
         
     
     is_nz = is_zero_adjusted(test_name)
+    is_discrete = isdiscrete(test_name)
+    is_dense = !issparse(data)
     
     if isempty(prev_TPC_dict)
         TPC = [candidates[1]]
@@ -43,7 +45,7 @@ function interleaving_phase(T::Int, candidates::Vector{Int}, data,
             continue
         end
         
-        if is_nz && !issparse(data)
+        if is_nz && is_dense && (!is_discrete || levels[candidate] > 2)
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
             sub_data = data
@@ -79,7 +81,9 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
     time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0, whitelist::Set{Int}=Set{Int}())
     
     is_nz = is_zero_adjusted(test_name)
-    
+    is_discrete = isdiscrete(test_name)
+    is_dense = !issparse(data)    
+            
     if !isempty(PC_unchecked) && !isempty(prev_PC_dict)
         PC_dict = prev_PC_dict
         PC_candidates = PC_unchecked
@@ -110,7 +114,7 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
             continue
         end
             
-        if is_nz && !issparse(data)
+        if is_nz && is_dense && (!is_discrete || levels[candidate] > 2)
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
             sub_data = data
@@ -147,25 +151,38 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
     univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
     univar_step::Bool=true,
     prev_state::HitonState=HitonState("S", Dict(), []), debug::Int=0, time_limit::Float64=0.0)
-    """
-    # prepare input
-    if typeof(target_var) == Int
-        T = target_var
-    elseif typeof(target_var) == String
-        T = findfirst(header, target_var)   
-    end
-    """
+
     if debug > 0
         println("Finding neighbors for $T")
     end
     
     state = HitonState("S", Dict(), [])
+    
+    if isdiscrete(test_name)
+        if isempty(levels)
+            levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+        end
+        
+        if levels[T] < 2
+            return Dict{Int,Float64}()
+        end    
+    else
+        levels = Int[]
+    end
+        
     if is_zero_adjusted(test_name)
         if issparse(data)
             data = data[data[:, T] .!= 0, :]
+            #levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
         else
-            data = @view data[data[:, T] .!= 0, :]
+            levels_x = levels[T]
+            
+            if levels_x > 2
+                data = @view data[data[:, T] .!= 0, :]
+                #levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+            end
         end
+        
     end
     
     if issparse(data) && isdiscrete(test_name)
@@ -184,22 +201,10 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
         println("UNIVARIATE")
     end
     
-    if isdiscrete(test_name)
-        if isempty(levels)
-            levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
-        end
-        
-        if levels[T] < 2
-            return Dict{Int,Float64}()
-        end
-        
-        if univar_step
+    if univar_step
+        if isdiscrete(test_name)
             univar_test_results = test(T, test_variables, data, test_name, hps, levels, data_row_inds, data_nzero_vals)
-        end
-    else
-        levels = Int[]
-           
-        if univar_step
+        else
             univar_test_results = test(T, test_variables, data, test_name)
         end
     end
@@ -325,9 +330,9 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
     """
     parallel: 'single', 'multi_e', 'multi_il'
     """
-    if issparse(data)
-        warn("Usage of sparse matrices still produces slightly inaccurate results. Use at own risk!")
-    end
+    #if issparse(data)
+    #    warn("Usage of sparse matrices still produces slightly inaccurate results. Use at own risk!")
+    #end
     
     kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :pwr => pwr, :FDR => FDR,
     :fast_elim => fast_elim, :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,

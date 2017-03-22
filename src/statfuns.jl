@@ -1,6 +1,6 @@
 module Statfuns
 
-export pcor, fz_pval, mutual_information, mi_pval, adjust_df, oddsratio
+export pcor, fz_pval, mutual_information, mi_pval, adjust_df, oddsratio, nz_adjust_cont_tab
 
 using Distributions
 
@@ -16,11 +16,15 @@ function fisher_z_transform(p::Float64, n::Int, len_z::Int)
 end
 
 
-oddsratio(cont_tab::Matrix{Int64}) = (cont_tab[1, 1] * cont_tab[2, 2]) / (cont_tab[1, 2] * cont_tab[2, 1])
+#oddsratio(cont_tab::Union{SubArray,Array{Int,2}}) = (cont_tab[1, 1] * cont_tab[2, 2]) / (cont_tab[1, 2] * cont_tab[2, 1])
 
 
-function oddsratio(cont_tab::Array{Int64,3})
-    median([oddsratio(cont_tab[:, :, i]) for i in 1:size(cont_tab, 3)])
+function oddsratio(cont_tab::Union{SubArray,Array{Int64}})
+    if ndims(cont_tab) == 2
+        return (cont_tab[1, 1] * cont_tab[2, 2]) / (cont_tab[1, 2] * cont_tab[2, 1])
+    else
+        return median([oddsratio(cont_tab[:, :, i]) for i in 1:size(cont_tab, 3)])
+    end
 end
 
 
@@ -62,7 +66,7 @@ function mi_pval(mi::Float64, df::Int)
 end
 
 
-function mutual_information(cont_tab::Array{Int,3})
+function mutual_information(cont_tab::Union{SubArray,Array{Int,3}})
     levels_x = size(cont_tab, 1)
     levels_y = size(cont_tab, 2)
     levels_z = size(cont_tab, 3)
@@ -75,8 +79,8 @@ function mutual_information(cont_tab::Array{Int,3})
 end
 
 
-function mutual_information(cont_tab::Array{Int,3}, levels_x::Int, levels_y::Int, levels_z::Int, ni::Array{Int,2},
-    nj::Array{Int,2}, nk::Array{Int, 1})
+function mutual_information(cont_tab::Union{SubArray,Array{Int,3}}, levels_x::Int, levels_y::Int, levels_z::Int,
+        ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int, 1})
     """Note: returns mutual information * number of observations!"""
     #if reset_marginals
     fill!(ni, 0)
@@ -113,7 +117,8 @@ function mutual_information(cont_tab::Array{Int,3}, levels_x::Int, levels_y::Int
 end
 
 
-function mutual_information(cont_tab::Array{Int,2}, levels_x::Int, levels_y::Int, ni::Array{Int,1}, nj::Array{Int,1})
+function mutual_information(cont_tab::Union{SubArray,Array{Int,2}}, levels_x::Int, levels_y::Int, ni::Array{Int,1},
+        nj::Array{Int,1})
     """Note: returns mutual information * number of observations!"""
     fill!(ni, 0)
     fill!(nj, 0)
@@ -170,6 +175,20 @@ function adjust_df(ni::Array{Int,2}, nj::Array{Int,2}, levels_x::Int, levels_y::
         df += adjust_df(ni[:, k], nj[:, k], levels_x, levels_y)
     end
     df
+end
+
+
+function nz_adjust_cont_tab(levels_x::Int64, levels_y::Int64, cont_tab::Array{Int64})
+    offset_x = levels_x > 2 ? 2 : 1
+    offset_y = levels_y > 2 ? 2 : 1
+    
+    if ndims(cont_tab) == 2
+        return @view cont_tab[offset_x:end, offset_y:end]
+    elseif ndims(cont_tab) == 3
+        return @view cont_tab[offset_x:end, offset_y:end, :]
+    else
+        error("cont_tab must have 2 or 3 dimensions (found $(ndims(cont_tab)) )")
+    end
 end
 
 

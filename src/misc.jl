@@ -130,7 +130,7 @@ end
 
 function level_map!(Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, z::Vector{Int}, cum_levels::Vector{Int},
     z_map_arr::Vector{Int})
-    fill!(z_map_arr, 0)
+    fill!(z_map_arr, -1)
     levels_z = 0
     
     for i in 1:size(data, 1)
@@ -140,7 +140,7 @@ function level_map!(Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, z::Vec
         end
         
         level_val = z_map_arr[gfp_map]
-        if level_val != 0
+        if level_val != -1
             z[i] = level_val
         else
             z_map_arr[gfp_map] = levels_z
