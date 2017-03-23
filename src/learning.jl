@@ -4,6 +4,7 @@ export LGL, si_HITON_PC
 
 using MultipleTesting
 using LightGraphs
+using DataStructures
 #using DistributedArrays
 using Cauocc.Tests
 using Cauocc.Misc
@@ -325,10 +326,12 @@ end
 
 
 function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hps::Int=5, pwr::Float64=0.5,
-    FDR::Bool=true, global_univar::Bool=true, parallel::String="single", fast_elim::Bool=true, weight_type::String="cond_logpval", verbose::Bool=true, update_interval=30.0, edge_merge_fun=maxweight,
-    debug::Int=0, time_limit::Float64=0.0, header::Vector{String}=String[])
+    convergence_threshold=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single", fast_elim::Bool=true,
+        weight_type::String="cond_logpval", verbose::Bool=true, update_interval=30.0, edge_merge_fun=maxweight,
+    debug::Int=0, time_limit::Float64=-1.0, header::Vector{String}=String[])
     """
-    parallel: 'single', 'multi_e', 'multi_il'
+    time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise means time limit in seconds
+    parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
     """
     #if issparse(data)
     #    warn("Usage of sparse matrices still produces slightly inaccurate results. Use at own risk!")
@@ -338,10 +341,21 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
     :fast_elim => fast_elim, :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
     :time_limit => time_limit)
     
+    if time_limit == -1.0
+        if parallel == "multi_il"
+            time_limit = log2(size(data, 2))
+            println("Setting time_limit to $time_limit s.")
+        else
+            time_limit = 0.0
+        end
+    end
+        
     workers_local = workers_all_local()
     
     if time_limit != 0.0 && parallel != "multi_il"
         warn("Using time_limit without interleaved parallelism is not advised.")
+    elseif parallel == "multi_il" && time_limit == 0.0
+        warn("Specify a time_limit when using interleaved parallelism to increase speed.")
     end
     
     if isdiscrete(test_name)
@@ -385,8 +399,9 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
             graph_dict = Dict([(target_var, nbr_dict) for (target_var, nbr_dict) in zip(target_vars, nbr_dicts)])
             
         # interleaved parallelism
-        elseif parallel == "multi_il"
-            graph_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs)
+        elseif endswith(parallel, "il")
+            graph_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs,
+                                             convergence_threshold, parallel=parallel)
             #graph = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs)
         else
             error("'$parallel' not a valid parallel mode")
@@ -472,7 +487,7 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, 
         data_nzero_vals = Int64[]
     end
     
-    if parallel == "single"
+    if startswith(parallel, "single")
         pvals = zeros(Float64, n_pairs)
         stats = zeros(Float64, n_pairs)
         
@@ -542,11 +557,30 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, 
 end
 
 
+function interleaved_worker_try(data, levels, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
+    while true
+        println("waiting for job..")
+        target_var, univar_nbrs, prev_state, current_nbrs = take!(shared_job_q)
+        println("received job.")
+        # if kill signal
+        if target_var == -1
+            return
+        end
+
+        nbr_result = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state,
+                                 whitelist=current_nbrs, GLL_args...)
+        put!(shared_result_q, (target_var, nbr_result))
+        println("finished job.")        
+    end
+end
+
+
 function interleaved_worker(data, levels, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
     while true
         try
+            #println("waiting for job..")
             target_var, univar_nbrs, prev_state, current_nbrs = take!(shared_job_q)
-            
+            #println("received job.")
             # if kill signal
             if target_var == -1
                 return
@@ -554,46 +588,92 @@ function interleaved_worker(data, levels, shared_job_q::RemoteChannel, shared_re
 
             nbr_result = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state, whitelist=current_nbrs, GLL_args...)
             put!(shared_result_q, (target_var, nbr_result))
+            #println("finished job.")
         catch exc
+            println("Exception occurred! ", exc)
             put!(shared_result_q, (target_var, exc))
+            #throw(exc)
         end
         
     end
 end
 
 
-function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, update_interval, GLL_args)
-    n_workers = nprocs() - 1
+function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, update_interval, GLL_args,
+        convergence_threshold=0.01; conv_check_start=0.1, conv_time_step=0.2, parallel="multi")
+    jobs_total = length(target_vars)
+    
+    if startswith(parallel, "multi")
+        n_workers = nprocs() - 1
+        job_q_buff_size = n_workers * 2
+        @assert n_workers > 0 "Need to add workers for parallel processing."
+    elseif startswith(parallel, "single")
+        n_workers = 1
+        job_q_buff_size = 1
+        @assert nprocs() > 1 "Need to have one additional worker for interleaved mode."
+    else
+        error("$parallel not a valid execution mode.")
+    end
+    
     shared_job_q = RemoteChannel(() -> StackChannel{Tuple}(size(data, 2) * 2), 1)
+    #shared_job_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2) * 2), 1)
     shared_result_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2)), 1)
     
+    
     # initialize jobs
-    for target_var in reverse(target_vars)
+    queued_jobs = 0
+    waiting_vars = Stack(Int)
+    for (i, target_var) in enumerate(reverse(target_vars))
         job = (target_var, all_univar_nbrs[target_var], HitonState("S", Dict(), []), Set{Int}())
-        put!(shared_job_q, job)
+        
+        if i <= n_workers
+            put!(shared_job_q, job)
+            queued_jobs += 1
+        else
+            push!(waiting_vars, target_var)
+        end
     end
     
     worker_returns = [@spawn interleaved_worker(data, levels, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
     
-    remaining_jobs = length(target_vars)
+    remaining_jobs = jobs_total#length(target_vars)
+    
     graph_dict = Dict{Int,Dict{Int,Float64}}([(target_var, Dict{Int,Float64}()) for target_var in target_vars])
     
-    # this graph is just used for efficiently keeping track of and reporting graph stats during the run
+    # this graph is just used for efficiently keeping track of graph stats during the run
     graph = Graph(length(target_vars))
     edge_set = Set{Tuple{Int64,Int64}}()
     kill_signals_sent = 0
     start_time = time()
     last_update_time = start_time
+    check_convergence = false
+    conv_start_time = 0.0
+    conv_start_num_edges = 0
+    last_conv_time_passed = 0.0
+    last_conv_num_edges = 0
+    converged = false
+    
+    #println("Queued jobs: $queued_jobs")
     
     while remaining_jobs > 0
+        #println("Waiting for result.. (killed $kill_signals_sent)")
         target_var, nbr_result = take!(shared_result_q)
-        
+        #println("Result received.")
+        queued_jobs -= 1
+        #println("jobs: queued $queued_jobs remaining $remaining_jobs $(length(waiting_vars)) $(nv(graph)) $(ne(graph))")
         if isa(nbr_result, Tuple)#typeof(nbr_result) <: Tuple
             #current_nbrs = graph_dict[target_var]
             #job = (target_var, nbr_result[2], nbr_result[1], Set(keys(current_nbrs)))
             target_nbrs = Set(neighbors(graph, target_var))
-            job = (target_var, nbr_result[2], nbr_result[1], target_nbrs)
+            curr_state = nbr_result[1]
+            
+            if converged
+                curr_state.unchecked_vars = Int64[]
+            end
+            
+            job = (target_var, nbr_result[2], curr_state, target_nbrs)
             put!(shared_job_q, job)
+            queued_jobs += 1
         elseif isa(nbr_result, Dict)#typeof(nbr_result) <: Dict
             nbr_dict = nbr_result
             for nbr in keys(nbr_dict)
@@ -601,6 +681,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
                 #push!(edge_set, tuple(sort([target_var, nbr]))...)
                 #add_vertex!(graph, nbr)
                 add_edge!(graph, target_var, nbr)
+                #println("num edges: $(ne(graph))")
             end
             remaining_jobs -= 1
                 
@@ -611,8 +692,26 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
                 kill_signals_sent += 1
             end
         else
-            throw(nbr_result)
+            println(nbr_result)
+            #throw(nbr_result)
         end
+        
+        if !isempty(waiting_vars) && queued_jobs < job_q_buff_size
+            for i in 1:job_q_buff_size - queued_jobs
+                next_var = pop!(waiting_vars)
+                var_nbrs = Set(neighbors(graph, next_var))
+                
+                #println("\tadding job from waiting_vars")
+                job = (next_var, all_univar_nbrs[next_var], HitonState("S", Dict(), []), var_nbrs)
+                put!(shared_job_q, job)
+                queued_jobs += 1
+                
+                if isempty(waiting_vars)
+                    break
+                end
+            end
+        end
+            
         
         # print network stats after each update interval
         curr_time = time()
@@ -620,6 +719,51 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
             println("\nTime passed: ", curr_time - start_time, ". Finished nodes: ", length(target_vars) - remaining_jobs, ". Remaining nodes: ", remaining_jobs)
             print_network_stats(graph)
             last_update_time = curr_time
+        end
+        
+        
+        if convergence_threshold != 0.0 && !converged
+            # start checking convergence only after 'conv_check_start' percent
+            # of variables remain
+            if !check_convergence && remaining_jobs / jobs_total <= conv_check_start
+                check_convergence = true
+                conv_start_time = curr_time
+                conv_start_num_edges = ne(graph)
+                
+                println("Starting convergence checks after $conv_start_time seconds ($conv_start_num_edges edges)")
+                println("$remaining_jobs $jobs_total $conv_check_start")
+            elseif check_convergence
+                if last_conv_time_passed == 0.0
+                    last_conv_time_passed = curr_time - conv_start_time
+                    last_conv_num_edges = ne(graph) - conv_start_num_edges
+
+                    if last_conv_num_edges == 0
+                        converged = true
+                    end
+                else
+                    new_conv_time_passed = curr_time - conv_start_time - last_conv_time_passed
+                    delta_time_passed = new_conv_time_passed / last_conv_time_passed
+                    
+                    if delta_time_passed > conv_time_step
+                        new_conv_num_edges = ne(graph) - conv_start_num_edges - last_conv_num_edges
+                        delta_edgenum = new_conv_num_edges / last_conv_num_edges
+                        conv_level = delta_edgenum / delta_time_passed
+                        println("Current convergence level: $conv_level $delta_edgenum $delta_time_passed")
+                        println("$last_conv_time_passed $new_conv_time_passed")
+                        println("$last_conv_num_edges $new_conv_num_edges")
+                            
+
+                        if conv_level < convergence_threshold
+                            println("\tconverged!")
+                            converged = true
+                        end
+                        
+                        last_conv_time_passed += new_conv_time_passed
+                        last_conv_num_edges += new_conv_num_edges
+                    end
+                    
+                end
+            end
         end
     end
     

@@ -261,209 +261,21 @@ end
     append!(expr.args, full_loop_expr.args)
     
     # fill position in contingency table where all variables were 0 and return the conditioning levels
-    if nz_adjusted
+    if !nz_adjusted
         final_expr = quote
             if z_map_arr[1] != -1
                 cont_tab[1, 1, z_map_arr[1]] += n_rows - sum(cont_tab)
             end
-
-            levels_z - 1
         end
     else
         final_expr = quote end
     end
+    append!(final_expr.args, [:(levels_z - 1)])
     append!(expr.args, final_expr.args)
     
     expr
 end
 
-
-@generated function contingency_table_try!{T, N}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{Int64,Int64},
-        row_inds::Vector{Int64},
-        vals::Vector{Int64}, cont_tab::Array{Int,3}, cum_levels::Array{Int,1}, z_map_arr::Array{Int,1}, levels::N)
-    if T <: Tuple{Int64}
-        n_vars = 3
-    elseif T <: Tuple{Int64,Int64}
-        n_vars = 4
-    elseif T <: Tuple{Int64,Int64,Int64}
-        n_vars = 5
-    else
-        return quote error("Sparse matrices are only supported with max_k <= 3") end
-    end
-    
-    if N <: Vector{Int64}
-        nz_adjusted = true
-    elseif N <: Void
-        nz_adjusted = false
-    else
-        return quote error("Levels needs to be either Vector{Int64} or Void") end
-    end
-    
-    
-    expr = quote
-        fill!(cont_tab, 0)
-        fill!(z_map_arr, 0)
-    
-        n_rows, n_cols = size(data)
-        n_vars = 2 + length(Zs)
-        min_row_ind = n_rows
-        num_out_of_bounds = 0
-        #levels_z = 1
-        levels_z = 0
-    end
-    
-    if nz_adjusted
-        nz_init_expr = quote
-            x_nzadj = levels[X] > 2
-            y_nzadj = levels[Y] > 2
-        end
-        append!(expr.args, nz_init_expr.args)
-    end
-        
-    
-    var_name_dict = Dict()
-    for i in 1:n_vars
-        var_name_dict[i] = (Symbol("var_$i"), Symbol("nzi_$i"), Symbol("nzrow_$i"),
-                            Symbol("nzval_$i"), Symbol("nzbound_$i"), Symbol("nzentry_$i"))
-        var_name, nzi_name, nzrow_name, nzval_name, nzbound_name, nzentry_name = var_name_dict[i]
-        
-        i_expr = quote
-            if $(i) == 1
-                $(var_name) = X
-            elseif $(i) == 2
-                $(var_name) = Y
-            else
-                $(var_name) = Zs[$(i) - 2]
-            end
-            
-            $(nzi_name) = data.colptr[$(var_name)]
-            $(nzrow_name) = row_inds[$(nzi_name)]
-            $(nzval_name) = vals[$(nzi_name)]
-            
-            if $(var_name) != n_cols
-                $(nzbound_name) = data.colptr[$(var_name) + 1]
-            else
-                $(nzbound_name) = nnz(data)
-            end
-            
-            if $(nzrow_name) < min_row_ind
-                min_row_ind = $(nzrow_name)
-            end  
-        end
-        
-        
-        append!(expr.args, i_expr.args)
-    end
-    
-    loop_expr = quote end
-    min_expr = [parse("min_row_ind = min($(join(map(x -> x[3], values(var_name_dict)), ", ")))")]
-    
-    # expressions for updating variables in the tight inner loop
-    for i in 1:n_vars
-        var_name, nzi_name, nzrow_name, nzval_name, nzbound_name, nzentry_name = var_name_dict[i]
-        
-        if nz_adjusted && i == 1
-            zero_expr = quote
-                if x_nzadj
-                    $(min_expr[1])
-                    continue
-                end
-            end
-        elseif nz_adjusted && i == 2
-            zero_expr = quote
-                if y_nzadj
-                    $(min_expr[1])
-                    continue
-                end
-            end
-        else
-            zero_expr = quote end
-        end
-            
-        i_expr = quote
-            if $(nzrow_name) == min_row_ind
-                $(nzentry_name) = $(nzval_name)
-                $(nzi_name) += 1
-                
-                if $(nzi_name) < $(nzbound_name)
-                    $(nzrow_name) = row_inds[$nzi_name]
-                    $(nzval_name) = vals[$nzi_name]
-                else
-                    num_out_of_bounds += 1
-                    $(nzrow_name) = n_rows + 1
-                end 
-            else
-                $(zero_expr)
-                $(nzentry_name) = 0
-            end
-        end
-        append!(loop_expr.args, i_expr.args)
-    end
-    
-    # compute mapping of the conditioning set
-    append!(loop_expr.args, [:(gfp_map = 1)])
-    for i_Zs in 1:n_vars-2
-        var_name, nzi_name, nzrow_name, nzval_name, nzbound_name, nzentry_name = var_name_dict[i_Zs + 2]
-        i_Zs_expr = quote
-            gfp_map += $(nzentry_name) * cum_levels[$(i_Zs)]
-        end
-        append!(loop_expr.args, i_Zs_expr.args)
-    end
-    
-    map_expr = quote
-        level_val = z_map_arr[gfp_map]
-
-        if level_val == 0
-            z_map_arr[gfp_map] = levels_z
-            level_val = levels_z
-            levels_z += 1   
-        end 
-    end
-    append!(loop_expr.args, map_expr.args)
-    
-        
-    # update contingency table
-    X_entry_name = var_name_dict[1][6]
-    Y_entry_name = var_name_dict[2][6]
-    
-    cont_expr = quote
-        cont_tab[$(X_entry_name) + 1, $(Y_entry_name) + 1, level_val] += 1
-    end
-    append!(loop_expr.args, cont_expr.args)
-    
-    # check breaking criterion
-    break_expr = quote
-        if num_out_of_bounds >= n_vars
-            break
-        end
-    end
-    append!(loop_expr.args, break_expr.args)
-    
-    # compute new minimum row
-    append!(loop_expr.args, min_expr)
-    
-    # insert loop into main expression
-    full_loop_expr = quote
-        while true
-            $(loop_expr)
-            #println("gfp_map ", gfp_map, " level_val ", level_val, " val_1 ", nzentry_1, " val_2 ", nzentry_2, " val_3 ", nzentry_3, " val_4 ", nzentry_4, " val_5 ", nzentry_5 )
-        end
-    end
-    append!(expr.args, full_loop_expr.args)
-    
-    # fill position in contingency table where all variables were 0 and return the conditioning levels
-    final_expr = quote        
-        if z_map_arr[1] != 0
-            cont_tab[1, 1, z_map_arr[1]] += n_rows - sum(cont_tab)
-            levels_z += 1
-        end
-
-        levels_z#levels_z - 1
-    end
-    append!(expr.args, final_expr.args)
-    
-    expr
-end
 
 
 function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{Int64,Int64}, row_inds::Vector{Int64}, vals::Vector{Int64},

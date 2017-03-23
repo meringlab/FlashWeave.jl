@@ -64,9 +64,10 @@ function cluster_data(data, sim_type::String="pearson", cluster_sim_threshold::F
 end
 
 
-function clr(X::Matrix{Float64}, pseudo_count::Float64=1e-5)
+function clr(X::Matrix; pseudo_count::Float64=1e-5, ignore_zeros=false)
     X += pseudo_count
-    X = log(X ./ mapslices(geomean, X_trans, 2))
+    center_fun = ignore_zeros ? x -> geomean(x[x .!= 0]) : geomean
+    X = log(X ./ mapslices(center_fun, X, 2))
 end
 
 
@@ -123,7 +124,9 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
     if norm == "rows"
         data = data ./ sum(data, 2)
     elseif norm == "clr"
-        data = clr(data, clr_pseudo_count)
+        data = clr(data, pseudo_count=clr_pseudo_count)
+    elseif norm == "clr_nz"
+        data = clr(data, pseudo_count=clr_pseudo_count, ignore_zeros=true)
     elseif norm == "binary"
         data = sign(data)
     elseif norm == "binned_nz"

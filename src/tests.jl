@@ -10,7 +10,7 @@ using Cauocc.Contingency
 
 
 function issig(test_res::TestResult, alpha::Float64)
-    test_res.pval < alpha
+    test_res.pval < alpha && test_res.suff_power == true
 end
 
 

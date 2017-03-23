@@ -2,9 +2,9 @@
 
 module StackChannels
 
-export StackChannel, put!, take!, wait, fetch, close
+export StackChannel, put!, take!, wait, fetch, close, isready
 
-import Base: put!, take!, push!, fetch, shift!, show
+import Base: put!, take!, push!, fetch, shift!, show, isready, wait
 
 const DEF_CHANNEL_SZ=32
 

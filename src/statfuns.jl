@@ -75,7 +75,8 @@ function mutual_information(cont_tab::Union{SubArray,Array{Int,3}})
     nj = zeros(Int, levels_y, levels_z)
     nk = zeros(Int, levels_z)
     
-    mutual_information(cont_tab, levels_x, levels_y, levels_z, ni, nj, nk)  
+    mutual_information(cont_tab, levels_x, levels_y, levels_z, 
+ni, nj, nk)  
 end
 
 
