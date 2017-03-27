@@ -36,7 +36,7 @@ end
 
 
 
-function pcor(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64}})
+function pcor(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}})
     sub_data = @view data[:, [X, Y, Zs...]]
     cov_mat = cov(sub_data)
     inv_mat = pinv(cov_mat)

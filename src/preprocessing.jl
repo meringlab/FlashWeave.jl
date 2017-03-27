@@ -122,22 +122,26 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
     end
     
     if norm == "rows"
+        data = convert(Matrix{Float64}, data)
         data = data ./ sum(data, 2)
     elseif norm == "clr"
+        data = convert(Matrix{Float64}, data)
         data = clr(data, pseudo_count=clr_pseudo_count)
     elseif norm == "clr_nz"
+        data = convert(Matrix{Float64}, data)
         data = clr(data, pseudo_count=clr_pseudo_count, ignore_zeros=true)
     elseif norm == "binary"
+        data = convert(Matrix{Int64}, data)
         data = sign(data)
     elseif norm == "binned_nz"
+        data = convert(Matrix{Int64}, data)
         data = discretize(data, n_bins=n_bins, nz=true)
         unreduced_vars = size(data, 2)
         data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .>= n_bins)[:]]
         
         if verbose
             println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
-        end
-            
+        end  
     else
         error("$norm is no valid normalization method.")
     end

@@ -105,7 +105,7 @@ end
 
 function make_weights(PC_dict, univar_nbrs, weight_type)
     # create weights
-    nbr_dict = Dict{Union{Int, String},Float64}()
+    nbr_dict = Dict{Int,Float64}()
     weight_kind = String(split(weight_type, "_")[2])
     if startswith(weight_type, "uni")
         nbr_dict = Dict([(nbr, signed_weight(univar_nbrs[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
@@ -171,29 +171,37 @@ function maxweight(weight1::Float64, weight2::Float64)
     sign1 = sign(weight1) 
     sign2 = sign(weight2)
     
-    if sign1 * sign2 < 0
-        warn("Opposite signs for the same edge detected. Arbitarily choosing one.")
+    if isnan(weight1)
+        return weight2
+    elseif isnan(weight2)
         return weight1
     else
-        return maximum(abs([weight1, weight2])) * sign1
+        if sign1 * sign2 < 0
+            warn("Opposite signs for the same edge detected. Arbitarily choosing one.")
+            return weight1
+        else
+            return maximum(abs([weight1, weight2])) * sign1
+        end
     end
 end
 
     
-function make_graph_symmetric(graph_dict::Dict{Int64,Dict{Int64,Float64}}, edge_merge_fun=maxweight)
-    checked_G = Graph(maximum(keys(graph_dict)))
-    for node1 in keys(graph_dict)
-        for node2 in keys(graph_dict[node1])
+function make_graph_symmetric(weights_dict::Dict{Int64,Dict{Int64,Float64}}, edge_merge_fun=maxweight)
+    checked_G = Graph(maximum(keys(weights_dict)))
+    graph_dict = Dict{Int64,Dict{Int64,Float64}}([(target_var, Dict{Int64,Float64}()) for target_var in keys(weights_dict)])
+    
+    for node1 in keys(weights_dict)
+        for node2 in keys(weights_dict[node1])
             
             if !has_edge(checked_G, node1, node2)
                 add_edge!(checked_G, node1, node2)
-                weight = graph_dict[node1][node2]
+                weight = weights_dict[node1][node2]
 
-                prev_weight = haskey(graph_dict[node1], node2) ? graph_dict[node1][node2] : 0.0
+                prev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
 
-                if prev_weight != 0.0 && !isnan(weight)
-                    weight = edge_merge_fun(weight, prev_weight)
-                end
+                #if prev_weight != 0.0 && !isnan(weight)
+                weight = edge_merge_fun(weight, prev_weight)
+                #end
 
                 graph_dict[node1][node2] = weight
                 graph_dict[node2][node1] = weight
