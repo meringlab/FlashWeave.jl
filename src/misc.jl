@@ -237,19 +237,20 @@ end
 #end 
 
 
-function dict_to_adjmat(graph_dict::Dict{Union{Int64,String},Dict{Union{Int64,String},Float64}})
-    n_nodes = length(graph_dict)
-    adj_mat = zeros(Float64, (n_nodes, n_nodes))
-    header = sort(collect(keys(graph_dict)))
-    header_map = Dict(zip(header, 1:n_nodes))
+function dict_to_adjmat(graph_dict::Dict{Union{Int64,String},Dict{Union{Int64,String},Float64}}, header::Vector{String})
+    #n_nodes = length(graph_dict)
+    n_vars = length(header)
+    adj_mat = zeros(Float64, (n_vars, n_vars))
+    #header = sort(collect(keys(graph_dict)))
+    #header_map = Dict(zip(header, 1:length(header)))
     
-    for node in keys(graph_dict)
-        node_index = header_map[node]
-        nbr_dict = graph_dict[node]
+    for node_index in keys(graph_dict)
+        #node_index = #header_map[node]
+        nbr_dict = graph_dict[node_index]
         
-        for nbr in keys(nbr_dict)
-            nbr_index = header_map[nbr]
-            weight = nbr_dict[nbr]
+        for nbr_index in keys(nbr_dict)
+            #nbr_index = header_map[nbr]
+            weight = nbr_dict[nbr_index]
             
             adj_mat[node_index, nbr_index] = weight
             adj_mat[nbr_index, node_index] = weight

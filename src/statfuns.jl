@@ -19,11 +19,12 @@ end
 #oddsratio(cont_tab::Union{SubArray,Array{Int,2}}) = (cont_tab[1, 1] * cont_tab[2, 2]) / (cont_tab[1, 2] * cont_tab[2, 1])
 
 
-function oddsratio(cont_tab::Union{SubArray,Array{Int64}})
+function oddsratio(cont_tab::Union{SubArray,Array{Int64}}, nz::Bool=false)
+    offset = nz ? 1 : 0
     if ndims(cont_tab) == 2
-        return (cont_tab[1, 1] * cont_tab[2, 2]) / (cont_tab[1, 2] * cont_tab[2, 1])
+        return (cont_tab[1 + offset, 1 + offset] * cont_tab[2 + offset, 2 + offset]) / (cont_tab[1 + offset, 2 + offset] * cont_tab[2 + offset, 1 + offset])
     else
-        return median([oddsratio(cont_tab[:, :, i]) for i in 1:size(cont_tab, 3)])
+        return median([oddsratio(cont_tab[:, :, i], nz) for i in 1:size(cont_tab, 3)])
     end
 end
 
@@ -66,17 +67,28 @@ function mi_pval(mi::Float64, df::Int)
 end
 
 
-function mutual_information(cont_tab::Union{SubArray,Array{Int,3}})
+function mutual_information(cont_tab::Union{SubArray,Array{Int}})
+    num_dims = ndims(cont_tab) 
     levels_x = size(cont_tab, 1)
     levels_y = size(cont_tab, 2)
-    levels_z = size(cont_tab, 3)
     
-    ni = zeros(Int, levels_x, levels_z)
-    nj = zeros(Int, levels_y, levels_z)
-    nk = zeros(Int, levels_z)
+    if num_dims == 3
+        levels_z = size(cont_tab, 3)
+    end
     
-    mutual_information(cont_tab, levels_x, levels_y, levels_z, 
-ni, nj, nk)  
+    if num_dims == 3
+        ni = zeros(Int, levels_x, levels_z)
+        nj = zeros(Int, levels_y, levels_z)
+        nk = zeros(Int, levels_z)
+        
+        return mutual_information(cont_tab, levels_x, levels_y, levels_z, ni, nj, nk)
+    else
+        ni = zeros(Int, levels_x)
+        nj = zeros(Int, levels_y)
+        
+        return mutual_information(cont_tab, levels_x, levels_y, ni, nj)    
+    end
+  
 end
 
 

@@ -65,42 +65,73 @@ end
 
 
 function clr(X::Matrix; pseudo_count::Float64=1e-5, ignore_zeros=false)
-    X += pseudo_count
-    center_fun = ignore_zeros ? x -> geomean(x[x .!= 0]) : geomean
-    X = log(X ./ mapslices(center_fun, X, 2))
+    X_trans = X + pseudo_count
+    center_fun = ignore_zeros ? x -> geomean(x[x .!= pseudo_count]) : geomean
+    
+    X_trans = log(X_trans ./ mapslices(center_fun, X_trans, 2))
+    
+    if ignore_zeros
+        X_trans[X .== 0.0] = minimum(X_trans)
+    end
+    
+    X_trans
 end
 
 
-function discretize(x_vec::Vector{Int64}, n_bins::Int64=3; rank_method::String="dense")
-    if rank_method == "dense"
-        x_vec = denserank(x_vec)
-    elseif rank_method == "tied"
-        x_vec = tiedrank(x_vec)
+function discretize(x_vec::Vector, n_bins::Int64=3; rank_method::String="tied", disc_method::String="median")
+    if disc_method == "median"
+        if rank_method == "dense"
+            x_vec = denserank(x_vec)
+        elseif rank_method == "tied"
+            x_vec = tiedrank(x_vec)
+        else
+            error("$rank_method not a valid ranking method")
+        end
+    
+        x_vec /= maximum(x_vec)
+        
+        # compute step, add small number to avoid a separate bin for rank 1.0
+        step = (1.0 / n_bins) + 1e-5
+        #disc_vec = map(x -> Int(floor((x-0.001) / step)), x_vec)
+        disc_vec = map(x -> Int(floor((x) / step)), x_vec)
+        
+    elseif disc_method == "mean"
+        if n_bins > 2
+            error("disc_method $disc_method only works with 2 bins.")
+        end
+        
+        bin_thresh = mean(x_vec)
+        disc_vec = map(x -> x <= bin_thresh ? 0 : 1, x_vec)
     else
-        error("$rank_method not a valid ranking method")
+        error("$disc_method is not a valid discretization method.")
     end
     
-    x_vec /= maximum(x_vec)
-
-    step = 1.0 / n_bins
-
-    disc_vec = map(x -> Int(floor((x-0.001) / step)), x_vec)
+    disc_vec
 end
   
 
-function discretize_nz(x_vec::Vector{Int64}, n_bins::Int64=3)
-    nz_indices = findn(x_vec)
-    x_vec_nz = x_vec[x_vec .> 0]
-    disc_nz_vec = discretize(x_vec_nz, n_bins-1, rank_method="tied") + 1
-    disc_vec = zeros(Int64, size(x_vec))
-    disc_vec[nz_indices] = disc_nz_vec
+function discretize_nz(x_vec::Vector, n_bins::Int64=3, min_elem::Float64=0.0; rank_method::String="tied")
+    nz_indices = findn(x_vec .!= min_elem)
+    
+    if !isempty(nz_indices)
+        x_vec_nz = x_vec[nz_indices]
+        disc_nz_vec = discretize(x_vec_nz, n_bins-1, rank_method=rank_method) + 1
+        disc_vec = zeros(Int64, size(x_vec))
+        disc_vec[nz_indices] = disc_nz_vec
+    else
+        disc_vec = discretize(x_vec, n_bins-1, rank_method=rank_method) + 1
+    end
+    
     disc_vec        
 end
 
 
-function discretize(X::Matrix{Int64}; n_bins::Int64=3, nz::Bool=true)
-    disc_fun = nz ? discretize_nz : discretize
-    mapslices(x -> disc_fun(x, n_bins), X, 1)
+function discretize(X::Matrix; n_bins::Int64=3, nz::Bool=true, min_elem::Float64=0.0, rank_method::String="tied")
+    if nz
+        return mapslices(x -> discretize_nz(x, n_bins, min_elem, rank_method=rank_method), X, 1)
+    else
+        return mapslices(x -> discretize(x, n_bins, rank_method=rank_method), X, 1)
+    end
 end
 
 
@@ -133,15 +164,31 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
     elseif norm == "binary"
         data = convert(Matrix{Int64}, data)
         data = sign(data)
-    elseif norm == "binned_nz"
+    elseif startswith(norm, "binned")
+        if startswith(norm, "binned_nz")
+            if endswith(norm, "rows")
+                data = data ./ sum(data, 2)
+                min_elem = 0.0
+            elseif endswith(norm, "clr")
+                data = clr(data, pseudo_count=clr_pseudo_count, ignore_zeros=true)
+                min_elem = minimum(data)
+            else
+                min_elem = 0.0
+            end
+
+            data = discretize(data, n_bins=n_bins, nz=true, min_elem=min_elem)
+        else
+            data = discretize(data, n_bins=n_bins, nz=false)
+        end
+            
         data = convert(Matrix{Int64}, data)
-        data = discretize(data, n_bins=n_bins, nz=true)
+        
         unreduced_vars = size(data, 2)
         data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .>= n_bins)[:]]
         
         if verbose
             println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
-        end  
+        end
     else
         error("$norm is no valid normalization method.")
     end
@@ -150,9 +197,9 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
 end
 
 
-function preprocess_data_default(data, test_name::String)
-    default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz", "fz" => "clr", "fz_nz" => "clr_nz")
-    data = preprocess_data(data, default_norm_dict[test_name])
+function preprocess_data_default(data, test_name::String, verbose::Bool=true)
+    default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr", "fz_nz" => "clr_nz")
+    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose)
     data
 end
 

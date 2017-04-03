@@ -147,7 +147,7 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
 end
 
 
-function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hps::Int=5,
+function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
     pwr::Float64=0.5, FDR::Bool=true, fast_elim::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
     univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
     univar_step::Bool=true,
@@ -336,7 +336,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
 end
 
 
-function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hps::Int=5, pwr::Float64=0.5,
+function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, pwr::Float64=0.5,
     convergence_threshold::Float64=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
         fast_elim::Bool=true,
         weight_type::String="cond_logpval", verbose::Bool=true, update_interval::Float64=30.0, edge_merge_fun=maxweight,
@@ -428,27 +428,10 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.05, hp
         println("Postprocessing..")
     end
     
-    #graph = dict_to_graph(graph_dict)
     weights_dict = Dict([(target_var, make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)) for target_var in keys(nbr_dict)])
-    #weights_dict = Dict{Int64,Dict{Int64,Float64}}()
-    #for target_var in keys(nbr_dict)
-    #    weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)
-    #end
-    
-    #println(weights_dict)
+
     graph_dict = make_graph_symmetric(weights_dict)
-    
-    println("nbr_dict")
-    println(nbr_dict[16])
-    println(nbr_dict[4])
-    println("weights_dict")
-    println(weights_dict[16])
-    println(weights_dict[4])
-    println(make_weights(nbr_dict[4], all_univar_nbrs[4], weight_type))
-    println(Dict([(target_var, make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)) for target_var in [4]]))
-    println("graph_dict")
-    println(graph_dict[16])
-    println(graph_dict[4])
+
     if !isempty(header)
         graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
     end
