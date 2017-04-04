@@ -58,9 +58,9 @@ end
 
 stop_reached(start_time::Float64, time_limit::Float64) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
-isdiscrete(test_name::String) = test_name in ["mi", "mi_nz"]
+isdiscrete(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
 is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
-is_mi_test(test_name::String) = test_name in ["mi", "mi_nz"]
+is_mi_test(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
 
 signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)
 

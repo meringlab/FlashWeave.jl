@@ -198,7 +198,7 @@ end
 
 
 function preprocess_data_default(data, test_name::String, verbose::Bool=true)
-    default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr", "fz_nz" => "clr_nz")
+    default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
     data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose)
     data
 end

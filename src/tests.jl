@@ -21,7 +21,7 @@ sufficient_power(levels_x::Int, levels_y::Int, levels_z::Int, n_obs::Int, hps::I
 function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}},
         test_name::String)
     
-    if test_name == "fz"
+    if test_name == "fz" || test_name == "fz_nz"
         p_stat = pcor(X, Y, Zs, data)
         df = 0
         pval = fz_pval(p_stat, size(data, 1), 0)
@@ -63,7 +63,7 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64
             pval = 1.0
             suff_power = false
         else
-            mi_stat = mutual_information(sub_cont_tab, levels_x, levels_y, levels_z, ni, nj, nk)
+            mi_stat = mutual_information(sub_cont_tab, levels_x, levels_y, levels_z, ni, nj, nk, test_name == "mi_expdz")
             
             df = adjust_df(ni, nj, levels_x, levels_y, levels_z)
             pval = mi_pval(mi_stat, df)
@@ -111,7 +111,7 @@ function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC
             pval = 1.0
             suff_power = false
         else
-            mi_stat = mutual_information(sub_cont_tab, levels_x, levels_y, ni, nj)
+            mi_stat = mutual_information(sub_cont_tab, levels_x, levels_y, ni, nj, test_name == "mi_expdz")
             
             df = adjust_df(ni, nj, levels_x, levels_y)
             pval = mi_pval(mi_stat, df)
@@ -128,7 +128,7 @@ end
 
 function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}}, test_name::String)
     
-    if test_name == "fz"
+    if test_name == "fz" || test_name == "fz_nz"
         p_stat = cor(data[:, X], data[:, Y])
         df = 0
         pval = fz_pval(p_stat, size(data, 1), 0)

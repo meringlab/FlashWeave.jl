@@ -175,13 +175,12 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
     end
         
     if is_zero_adjusted(test_name)
-        if issparse(data)
-            data = data[data[:, T] .!= 0, :]
-            #levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
-        else
-            levels_x = levels[T]
-            
-            if levels_x > 2
+        
+        if !isdiscrete(test_name) || levels[T] > 2
+            if issparse(data)
+                data = data[data[:, T] .!= 0, :]
+                #levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+            else
                 data = @view data[data[:, T] .!= 0, :]
                 #levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
             end

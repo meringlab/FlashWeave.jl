@@ -92,14 +92,43 @@ function mutual_information(cont_tab::Union{SubArray,Array{Int}})
 end
 
 
+function estimate_expected_dz!(cont_tab::Array, levels_z::Int=0)
+    
+    if ndims(cont_tab) == 3
+        for i in 1:levels_z
+            estimate_expected_dz!(cont_tab[:, :, i])
+        end
+    else
+        num_dz = cont_tab[1, 1]
+
+        while true
+            n_obs = sum(cont_tab)
+            #cont_tab_rel = cont_tab ./ n_obs
+            prev_exp = cont_tab[1, 1]
+            new_exp = Int(round((sum(cont_tab[1, :]) / n_obs) * (sum(cont_tab[:, 1]) / n_obs) * n_obs))
+            cont_tab[1, 1] = new_exp
+
+            if new_exp == prev_exp
+                break
+            else
+                prev_exp = new_exp
+            end
+        end
+    end
+end
+
+
 function mutual_information(cont_tab::Union{SubArray,Array{Int,3}}, levels_x::Int, levels_y::Int, levels_z::Int,
-        ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int, 1})
+        ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int, 1}, exp_dz::Bool=false)
     """Note: returns mutual information * number of observations!"""
     #if reset_marginals
     fill!(ni, 0)
     fill!(nj, 0)
     fill!(nk, 0)
     
+    if exp_dz
+        estimate_expected_dz!(cont_tab, levels_z)
+    end
     #println("cont tab:", cont_tab)
     
     # compute marginals
@@ -116,6 +145,11 @@ function mutual_information(cont_tab::Union{SubArray,Array{Int,3}}, levels_x::In
     
     # compute mutual information
     for i in 1:size(cont_tab, 1), j in 1:size(cont_tab, 2), k in 1:size(cont_tab, 3)
+        
+        #if exp_dz && i == 1 && j == 1
+        #    continue
+        #end
+        
         cell_value = cont_tab[i, j, k]
         nik = ni[i, k]
         njk = nj[j, k]
@@ -131,10 +165,14 @@ end
 
 
 function mutual_information(cont_tab::Union{SubArray,Array{Int,2}}, levels_x::Int, levels_y::Int, ni::Array{Int,1},
-        nj::Array{Int,1})
+        nj::Array{Int,1}, exp_dz::Bool=false)
     """Note: returns mutual information * number of observations!"""
     fill!(ni, 0)
     fill!(nj, 0)
+    
+    if exp_dz
+        estimate_expected_dz!(cont_tab)
+    end
     
     # compute marginals
     for i in 1:levels_x, j in 1:levels_y
@@ -149,6 +187,9 @@ function mutual_information(cont_tab::Union{SubArray,Array{Int,2}}, levels_x::In
     for i in 1:levels_x
         nii = ni[i]
         for j in 1:levels_y
+            #if exp_dz && i == 1 && j == 1
+            #    continue
+            #end
             
             cell_value = cont_tab[i, j]
             njj = nj[j]
