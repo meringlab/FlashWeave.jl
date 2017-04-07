@@ -66,7 +66,7 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64
             mi_stat = mutual_information(sub_cont_tab, levels_x, levels_y, levels_z, ni, nj, nk, test_name == "mi_expdz")
             
             df = adjust_df(ni, nj, levels_x, levels_y, levels_z)
-            pval = mi_pval(mi_stat, df)
+            pval = mi_pval(mi_stat, df, n_obs)
             suff_power = true
             
             # use oddsratio of 2x2 contingency table to determine edge sign
@@ -114,7 +114,7 @@ function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC
             mi_stat = mutual_information(sub_cont_tab, levels_x, levels_y, ni, nj, test_name == "mi_expdz")
             
             df = adjust_df(ni, nj, levels_x, levels_y)
-            pval = mi_pval(mi_stat, df)
+            pval = mi_pval(mi_stat, df, n_obs)
             suff_power = true
             
             # use oddsratio of 2x2 contingency table to determine edge sign

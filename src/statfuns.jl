@@ -60,8 +60,8 @@ function pcor(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float
 end
 
 
-function mi_pval(mi::Float64, df::Int)
-    g_stat = 2 * mi
+function mi_pval(mi::Float64, df::Int, n_obs::Int)
+    g_stat = 2 * mi * n_obs
     pval = df > 0 ? ccdf(Chisq(df), g_stat) : 1.0
     pval
 end
@@ -160,7 +160,7 @@ function mutual_information(cont_tab::Union{SubArray,Array{Int,3}}, levels_x::In
         end
     end
 
-    mi_stat
+    mi_stat / n_obs
 end
 
 
@@ -200,7 +200,7 @@ function mutual_information(cont_tab::Union{SubArray,Array{Int,2}}, levels_x::In
         end
     end
     
-    mi_stat
+    mi_stat / n_obs
 end
 
 

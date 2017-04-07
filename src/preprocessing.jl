@@ -1,11 +1,12 @@
 module Preprocessing
 
-export preprocess_data
+export preprocess_data, preprocess_data_default
 
 using StatsBase
 using Cauocc.Misc
 using Cauocc.Learning
 
+"""
 function pw_mi_matrix(data; nz::Bool=false, parallel::String="single")
     workers_local = nprocs() > 1 ? workers_all_local() : true
     test_name = nz ? "mi_nz" : "mi"
@@ -21,47 +22,7 @@ function pw_mi_matrix(data; nz::Bool=false, parallel::String="single")
     end
     mi_mat
 end
-
-
-function cluster_data(data, sim_type::String="pearson", cluster_sim_threshold::Float64=0.8, parallel="single",
-    ordering="size")
-    if sim_type == "pearson"
-        sim_mat = abs(cor(data))
-    elseif sim_type == "mi"
-        sim_mat = pw_mi_matrix(data, nz=false, parallel=parallel)
-    elseif sim_type == "mi_nz"
-        sim_mat = pw_mi_matrix(data, nz=true, parallel=parallel)
-    else
-        error("$sim_type is no valid similarity type.")
-    end
-    
-    unclustered_vars = Set{Int64}(1:size(data, 2))
-    clust_dict = Dict{Int64,Set{Int64}}()
-    
-    var_order = collect(1:size(data, 2))
-    if ordering == "size"
-        var_sizes = sum(data, 1)
-        sort!(var_order, by=x -> var_sizes[x])
-    end
-
-    for var_A in var_order
-        if var_A in unclustered_vars
-            pop!(unclustered_vars, var_A)
-            
-            clust_members = Set(var_A)
-            #rm_vars = Set{Int64}()
-            for var_B in unclustered_vars
-                if sim_mat[var_A, var_B] > cluster_sim_threshold
-                    push!(clust_members, var_B)
-                    pop!(unclustered_vars, var_B)
-                end
-            end
-            clust_dict[var_A] = clust_members
-        end
-    end
-    
-    (sort(collect(keys(clust_dict))), clust_dict)                 
-end
+"""
 
 
 function clr(X::Matrix; pseudo_count::Float64=1e-5, ignore_zeros=false)

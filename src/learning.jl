@@ -5,7 +5,8 @@ export LGL, si_HITON_PC
 using MultipleTesting
 using LightGraphs
 using DataStructures
-#using DistributedArrays
+using StatsBase
+
 using Cauocc.Tests
 using Cauocc.Misc
 using Cauocc.Statfuns
@@ -337,7 +338,7 @@ end
 
 function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, pwr::Float64=0.5,
     convergence_threshold::Float64=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
-        fast_elim::Bool=true,
+        fast_elim::Bool=true, precluster_sim::Float64=0.85,
         weight_type::String="cond_logpval", verbose::Bool=true, update_interval::Float64=30.0, edge_merge_fun=maxweight,
     debug::Int=0, time_limit::Float64=-1.0, header::Vector{String}=String[])
     """
@@ -394,6 +395,23 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     end
     
     
+    if precluster_sim != 0.0
+        if verbose
+            println("Clustering..")
+        end
+        
+        univar_matrix = pw_unistat_matrix(data, test_name; pw_stat_dict=all_univar_nbrs)
+        clust_repres, clust_dict = cluster_data(data, test_name; cluster_sim_threshold=precluster_sim, sim_mat=univar_matrix)
+        
+        if verbose
+            println("\tfound $(length(clust_repres)) clusters")
+        end
+        
+        target_vars = clust_repres
+        #data = data[:, clust_repres]
+    end
+    
+    
     if verbose
         println("Running si_HITON_PC for each variable..")
     end
@@ -428,6 +446,16 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     end
     
     weights_dict = Dict([(target_var, make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)) for target_var in keys(nbr_dict)])
+    
+    if precluster_sim != 0.0
+        for clust_repres_var in keys(clust_dict)
+            for clust_member in clust_dict[clust_repres_var]
+                for nbr in keys(weights_dict[clust_repres_var])
+                    weights_dict[clust_member][nbr] = NaN64
+                end
+            end
+        end
+    end
 
     graph_dict = make_graph_symmetric(weights_dict)
 
@@ -485,6 +513,10 @@ end
 
 
 function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, hps::Int=5, FDR::Bool=true, levels::Vector{Int64}=Int64[], parallel="single", workers_local::Bool=true)
+    
+    if startswith(test_name, "mi") && isempty(levels)
+        levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+    end
     
     n_vars = size(data, 2)
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
@@ -567,6 +599,90 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, 
     
     
     nbr_dict
+end
+
+
+function pw_unistat_matrix(data, test_name::String; parallel::String="single",
+        pw_stat_dict::Dict{Int64,Dict{Int64,Tuple{Float64,Float64}}}=Dict{Int64,Dict{Int64,Tuple{Float64,Float64}}}())
+    #workers_local = nprocs() > 1 ? workers_all_local() : true
+    #test_name = nz ? "mi_nz" : "mi"
+    if isempty(pw_stat_dict)
+        pw_stat_dict = pw_univar_neighbors(data, test_name=test_name, parallel=parallel)
+    end
+    
+    stat_mat = zeros(Float64, size(data, 2), size(data, 2))
+    
+    for var_A in keys(pw_stat_dict)
+        for var_B in keys(pw_stat_dict[var_A])
+            (stat, pval) = pw_stat_dict[var_A][var_B]
+            stat_mat[var_A, var_B] = stat
+        end
+    end
+    stat_mat
+end
+
+
+function cluster_data(data, stat_type::String="fz"; cluster_sim_threshold::Float64=0.8, parallel="single",
+    ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0))
+    
+    if isempty(sim_mat)
+        sim_mat = pw_unistat_matrix(data, stat_type, parallel=parallel)
+    end
+    
+    if stat_type == "mi"
+        # can potentially be improved by pre-allocation
+        entrs = mapslices(x -> entropy(counts(x) ./ length(x)), data, 1)
+    elseif stat_type == "mi_nz"
+        nz_mask = data .!= 0
+    end
+    
+    unclustered_vars = Set{Int64}(1:size(data, 2))
+    clust_dict = Dict{Int64,Set{Int64}}()
+    
+    var_order = collect(1:size(data, 2))
+    if ordering == "size"
+        var_sizes = sum(data, 1)
+        sort!(var_order, by=x -> var_sizes[x])
+    end
+
+    for var_A in var_order
+        if var_A in unclustered_vars
+            pop!(unclustered_vars, var_A)
+            
+            clust_members = Set(var_A)
+            #rm_vars = Set{Int64}()
+            for var_B in unclustered_vars
+                sim = sim_mat[var_A, var_B]
+                
+                if sim == 0.0
+                    continue
+                end
+                
+                if startswith(stat_type, "mi")
+                    if stat_type == "mi"
+                        entr_A = entrs[var_A]
+                        entr_B = entrs[var_B]
+                    elseif stat_type == "mi_nz"
+                        curr_nz_mask = (nz_mask[:, var_A] & nz_mask[:, var_B])[:]
+                        nz_elems = sum(curr_nz_mask)
+                        entr_A = entropy(counts(data[curr_nz_mask, var_A]) ./ nz_elems)
+                        entr_B = entropy(counts(data[curr_nz_mask, var_B]) ./ nz_elems)
+                    end
+                    norm_term = sqrt(entr_A * entr_B)
+                    
+                    sim = norm_term != 0.0 ? abs(sim) / norm_term : 0.0
+                end
+                
+                if sim > cluster_sim_threshold
+                    push!(clust_members, var_B)
+                    pop!(unclustered_vars, var_B)
+                end
+            end
+            clust_dict[var_A] = clust_members
+        end
+    end
+    
+    (sort(collect(keys(clust_dict))), clust_dict)                 
 end
 
 
