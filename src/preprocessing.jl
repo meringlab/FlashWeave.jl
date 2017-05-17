@@ -102,6 +102,11 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
     
+    if !isempty(skip_cols)
+        skip_data = data[:, collect(skip_cols)]
+        data = data[:, map(x -> !(x in skip_cols), 1:size(data, 2))]
+    end
+    
     unfilt_dims = size(data)
     col_mask = var(data, 1)[:] .> 0.0
     data = data[:, col_mask]
@@ -122,9 +127,11 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
     elseif norm == "clr_nz"
         data = convert(Matrix{Float64}, data)
         data = clr(data, pseudo_count=clr_pseudo_count, ignore_zeros=true)
+        zero_mask = data .== minimum(data)
+        data[zero_mask] = 0.0
     elseif norm == "binary"
-        data = convert(Matrix{Int64}, data)
         data = sign(data)
+        data = convert(Matrix{Int64}, data)
     elseif startswith(norm, "binned")
         if startswith(norm, "binned_nz")
             if endswith(norm, "rows")
@@ -154,13 +161,17 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
         error("$norm is no valid normalization method.")
     end
     
+    if !isempty(skip_cols)
+        data = hcat(data, convert(typeof(data), skip_data))
+    end
+    
     data
 end
 
 
-function preprocess_data_default(data, test_name::String, verbose::Bool=true)
+function preprocess_data_default(data, test_name::String; verbose::Bool=true, skip_cols::Set{Int64}=Set{Int64}())
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
-    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose)
+    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, skip_cols=skip_cols)
     data
 end
 

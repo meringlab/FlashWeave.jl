@@ -219,7 +219,8 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
         pvals = map(x -> x.pval, univar_test_results)
     
         if FDR
-            pvals = adjust(pvals, BenjaminiHochberg())
+            #pvals = adjust(pvals, BenjaminiHochberg())
+            pvals = benjamini_hochberg(pvals)
         end
     
         univar_nbrs = Dict([(nbr, (stat, pval)) for (nbr, stat, pval) in zip(test_variables, map(x -> x.stat, univar_test_results), pvals) if pval < alpha])
@@ -338,7 +339,7 @@ end
 
 function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, pwr::Float64=0.5,
     convergence_threshold::Float64=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
-        fast_elim::Bool=true, precluster_sim::Float64=0.85,
+        fast_elim::Bool=true, precluster_sim::Float64=0.0,
         weight_type::String="cond_logpval", verbose::Bool=true, update_interval::Float64=30.0, edge_merge_fun=maxweight,
     debug::Int=0, time_limit::Float64=-1.0, header::Vector{String}=String[])
     """
@@ -512,7 +513,24 @@ function pw_univar_kernel(X, data, test_name, hps, levels, nz, data_row_inds, da
 end
 
 
-function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, hps::Int=5, FDR::Bool=true, levels::Vector{Int64}=Int64[], parallel="single", workers_local::Bool=true)
+function condensed_stats_to_dict(n_vars::Int64, pvals::Vector{Float64}, stats::Vector{Float64}, alpha::Float64)
+    nbr_dict = Dict([(X, Dict{Int,Tuple{Float64,Float64}}()) for X in 1:n_vars])
+    
+    for X in 1:n_vars-1, Y in X+1:n_vars
+        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+        pval = pvals[pair_index]
+        
+        if pval < alpha
+            stat = stats[pair_index]
+            nbr_dict[X][Y] = (stat, pval)
+            nbr_dict[Y][X] = (stat, pval)
+        end
+    end
+    nbr_dict
+end
+
+
+function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, hps::Int=5, FDR::Bool=true, levels::Vector{Int64}=Int64[], parallel::String="single", workers_local::Bool=true)
     
     if startswith(test_name, "mi") && isempty(levels)
         levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
@@ -573,32 +591,21 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, 
         stats = zeros(Float64, n_pairs)
         Threads.@threads for X in 1:n_vars-1
             for X in 1:n_vars-1
-                pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz)
+                pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals)
             end
         end
-    else
-        error("'$parallel' is not a valid parallel mode")
+    #else
+    #    error("'$parallel' is not a valid parallel mode")
     end
     
     if FDR
-        pvals = adjust(pvals, BenjaminiHochberg())
+        println("num pvals:", length(pvals))
+        pvals = benjamini_hochberg(pvals)
+        #pvals = adjust(pvals, BenjaminiHochberg())
     end
     
-    nbr_dict = Dict([(X, Dict{Int,Tuple{Float64,Float64}}()) for X in 1:n_vars])
-    for X in 1:n_vars-1, Y in X+1:n_vars
-        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
-        pval = pvals[pair_index]
-        
-        if pval < alpha
-            stat = stats[pair_index]
-            nbr_dict[X][Y] = (stat, pval)
-            nbr_dict[Y][X] = (stat, pval)
-        end
-    end
-    
-    
-    
-    nbr_dict
+    #condensed_stats_to_dict(n_vars, pvals, stats, alpha)
+    return pvals
 end
 
 

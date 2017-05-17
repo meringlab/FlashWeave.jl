@@ -19,11 +19,10 @@ end
 
 function contingency_table(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64}}, levels_x::Int, levels_y::Int, nz::Bool=false)
     cont_tab = zeros(Int, levels_x, levels_y)
-    contingency_table!(X, Y, data, cont_tab, nz)
+    contingency_table!(X, Y, data, cont_tab)
         
     cont_tab
 end
-
 
  
 contingency_table(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64}}) = contingency_table(X, Y, data, length(unique(data[:, X])), length(unique(data[:, Y])))

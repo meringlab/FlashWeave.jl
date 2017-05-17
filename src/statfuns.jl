@@ -1,6 +1,6 @@
 module Statfuns
 
-export pcor, fz_pval, mutual_information, mi_pval, adjust_df, oddsratio, nz_adjust_cont_tab
+export pcor, fz_pval, mutual_information, mi_pval, adjust_df, oddsratio, nz_adjust_cont_tab, benjamini_hochberg
 
 using Distributions
 
@@ -39,24 +39,35 @@ end
 
 function pcor(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}})
     sub_data = @view data[:, [X, Y, Zs...]]
-    cov_mat = cov(sub_data)
-    inv_mat = pinv(cov_mat)
     
-    var_x = inv_mat[1, 1]
-    var_y = inv_mat[2, 2]
-    if var_x == 0.0 || var_y == 0.0
-        p = 0.0
-    else
-        p = -inv_mat[1, 2] / sqrt(var_x * var_y)
+    if size(sub_data, 1) < 5
+        return 0.0
     end
-    
-    # make sure partial correlation coeff stays within bounds
-    if p < -1.0
-        p = -1.0
-    elseif p >= 1.0
-        p = 1.0
+        
+    p = try
+        cov_mat = cov(sub_data)
+        #println("$X, $Y, $Zs, $cov_mat")
+        inv_mat = pinv(cov_mat)
+        
+        var_x = inv_mat[1, 1]
+        var_y = inv_mat[2, 2]
+        if var_x == 0.0 || var_y == 0.0
+            p = 0.0
+        else
+            p = -inv_mat[1, 2] / sqrt(var_x * var_y)
+        end
+
+        # make sure partial correlation coeff stays within bounds
+        if p < -1.0
+            p = -1.0
+        elseif p >= 1.0
+            p = 1.0
+        end
+        
+        return p
+    catch
+        return 0.0
     end
-    p
 end
 
 
@@ -140,7 +151,7 @@ function mutual_information(cont_tab::Union{SubArray,Array{Int,3}}, levels_x::In
     end
     
     mi_stat = 0.0
-    #n_obs = sum(cont_tab)
+    n_obs = sum(cont_tab)
     
     
     # compute mutual information
@@ -243,6 +254,42 @@ function nz_adjust_cont_tab(levels_x::Int64, levels_y::Int64, cont_tab::Array{In
     else
         error("cont_tab must have 2 or 3 dimensions (found $(ndims(cont_tab)) )")
     end
+end
+
+
+function reorder{T<:Real}(values::AbstractVector{T})
+    newOrder = sortperm(values)
+    oldOrder = sortperm(newOrder)
+    return newOrder, oldOrder
+end
+
+function benjamini_hochberg(pvals)
+    """Accelerated version of that found in MultipleTesting.jl"""
+    m = length(pvals)
+    
+    sorted_indices, original_order = reorder(pvals)
+    sorted_pvals = pvals[sorted_indices]#sort!(pval_tuples, by=x->x[2])
+    
+    for i in reverse(1:m-1)
+        next_adj = sorted_pvals[i+1]
+        new_adj = sorted_pvals[i] * m / i
+        sorted_pvals[i] = min(next_adj, new_adj)
+    end
+    sorted_pvals[original_order]
+end
+
+function benjamini_hochberg!(pvals)
+    m = length(pvals)
+    
+    rank_dict = Dict(zip(1:m, sortperm(pvals)))
+    inv_rank_dict = Dict([(rank_dict[key], key) for key in keys(rank_dict)])
+    
+    for i in reverse(1:m-1)
+        next_adj = pvals[inv_rank_dict[i+1]]
+        new_orig_index = inv_rank_dict[i]
+        new_adj = pvals[new_orig_index] * m / i
+        pvals[new_orig_index] = min(next_adj, new_adj)
+    end 
 end
 
 
