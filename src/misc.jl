@@ -26,7 +26,6 @@ type IndexPair
 end
 
 
-
 function get_levels(col_vec::SparseVector{Int64,Int64})
     levels = length(unique(nonzeros(col_vec)))
     add_zero = col_vec.n > length(col_vec.nzind) ? 1 : 0
@@ -59,6 +58,7 @@ end
 stop_reached(start_time::Float64, time_limit::Float64) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
 isdiscrete(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
+iscontinuous(test_name::String) = test_name in ["fz", "fz_nz"]
 is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
 is_mi_test(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
 

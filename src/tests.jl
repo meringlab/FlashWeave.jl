@@ -19,12 +19,24 @@ sufficient_power(levels_x::Int, levels_y::Int, levels_z::Int, n_obs::Int, hps::I
 
 
 function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}},
-        test_name::String)
+    test_name::String, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
+    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(), nz::Bool=false)
+    
+    if nz
+        if !issparse(data)
+            sub_data = @view data[data[:, Y] .!= 0, :]
+        else
+            sub_data = data[data[:, Y] .!= 0, :]
+        end
+    else
+        sub_data = data
+    end
     
     if test_name == "fz" || test_name == "fz_nz"
-        p_stat = pcor(X, Y, Zs, data)
+        p_stat = isempty(cor_mat) ? pcor(X, Y, Zs, sub_data) : pcor_rec(X, Y, Zs, cor_mat, pcor_set_dict)
+        @assert !isnan(p_stat) "NaN pcor for variables $X $Y $Zs"
         df = 0
-        pval = fz_pval(p_stat, size(data, 1), 0)
+        pval = fz_pval(p_stat, size(sub_data, 1), 0)
     end
     Misc.TestResult(p_stat, pval, df, true)
 end
@@ -126,12 +138,27 @@ function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC
 end
 
 
-function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}}, test_name::String)
+function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}}, test_name::String,
+    cor_mat::Matrix{Float64}=zeros(Float64, 0, 0), nz::Bool=false)
     
-    if test_name == "fz" || test_name == "fz_nz"
-        p_stat = cor(data[:, X], data[:, Y])
+    if nz
+        if !issparse(data)
+            sub_data = @view data[data[:, Y] .!= 0, :]
+        else
+            sub_data = data[data[:, Y] .!= 0, :]
+        end
+    else
+        sub_data = data
+    end
+    
+    if isempty(sub_data)
+        p_stat = 0.0
         df = 0
-        pval = fz_pval(p_stat, size(data, 1), 0)
+        pval = 1.0
+    elseif test_name == "fz" || test_name == "fz_nz"
+        p_stat = isempty(cor_mat) ? cor(sub_data[:, X], sub_data[:, Y]) : cor_mat[X, Y]
+        df = 0
+        pval = fz_pval(p_stat, size(sub_data, 1), 0)
     end
     TestResult(p_stat, pval, df, true)
 end
@@ -156,19 +183,23 @@ function test(X::Int, Ys::Vector{Int}, data::Union{SubArray,Matrix{Int64},Sparse
     end
 end
 
-
-function test(X::Int, Ys::Array{Int, 1}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}}, test_name::String)
+function test(X::Int, Ys::Array{Int, 1}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}},
+        test_name::String, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0))
     """Test all variables Ys for univariate association with X"""
-    map(Y -> test(X, Y, data, test_name), Ys)
+    nz = is_zero_adjusted(test_name)
+    map(Y -> test(X, Y, data, test_name, cor_mat, nz), Ys)
 end
 
 
 function test_subsets(X::Int, Y::Int, Z_total::Vector{Int}, data,
     test_name::String, max_k::Int, alpha::Float64; hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[],
-    data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
+    data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[], cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
+    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
+    
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
     discrete_test = isdiscrete(test_name)
     num_tests = 0
+    nz = is_zero_adjusted(test_name)
     
     if discrete_test       
         levels_x = levels[X]
@@ -183,7 +214,13 @@ function test_subsets(X::Int, Y::Int, Z_total::Vector{Int}, data,
         cum_levels = zeros(Int, max_k + 1)
         z_map_arr = zeros(Int, max_levels_z)
         num_lowpwr_tests = 0
-        nz = is_zero_adjusted(test_name)
+    elseif nz
+        empty!(pcor_set_dict)
+        
+        # compute correltions on the current subset of variables
+        if !isempty(cor_mat)
+            cor_subset!(data, cor_mat, [X, Y, Z_total...])
+        end     
     end
     
     for subset_size in 1:max_k
@@ -195,7 +232,7 @@ function test_subsets(X::Int, Y::Int, Z_total::Vector{Int}, data,
                 test_result = test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z,
                                    ni, nj, nk, cum_levels, z_map_arr, nz, data_row_inds, data_nzero_vals, levels)
             else
-                test_result = test(X, Y, Zs, data, test_name)
+                test_result = test(X, Y, Zs, data, test_name, cor_mat, pcor_set_dict, nz)
             end
             num_tests += 1
             

@@ -1,6 +1,6 @@
 module Statfuns
 
-export pcor, fz_pval, mutual_information, mi_pval, adjust_df, oddsratio, nz_adjust_cont_tab, benjamini_hochberg
+export cor_nz, pcor, pcor_rec, cor_subset!, fz_pval, mutual_information, mi_pval, adjust_df, oddsratio, nz_adjust_cont_tab, benjamini_hochberg
 
 using Distributions
 
@@ -36,6 +36,27 @@ function fz_pval(stat::Float64, n::Int, len_z::Int)
 end
 
 
+function cor_nz(X::Int, Y::Int, data::Matrix{Float64})
+    """Note: this function is still slow, but not enough of a bottleneck yet to improve"""
+    mask = (data[:, X] .!= 0.0) & (data[:, Y] .!= 0.0)
+    
+    sum(mask) > 1 ? cor(data[mask, X], data[mask, Y]) : 0.0
+end
+            
+
+function cor_nz(data::Matrix{Float64})
+    n_vars = size(data, 2)
+    cor_mat = eye(Float64, n_vars, n_vars)
+
+    for i in 1:n_vars-1
+        for j in i+1:n_vars
+            cor_ij = cor_nz(i, j, data)
+            cor_mat[i, j] = cor_ij
+            cor_mat[j, i] = cor_ij
+        end
+    end
+    cor_mat
+end
 
 function pcor(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}})
     sub_data = @view data[:, [X, Y, Zs...]]
@@ -68,6 +89,70 @@ function pcor(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float
     catch
         return 0.0
     end
+end
+
+
+function pcor_rec(X::Int, Y::Int, Zs::Vector{Int}, cor_mat::Matrix{Float64}, pcor_set_dict::Dict{String,Dict{String,Float64}})
+    XY_key = join((X, Y), "_")
+    Zs_key = join(Zs, "_")
+    
+    if haskey(pcor_set_dict, XY_key) && haskey(pcor_set_dict[XY_key], Zs_key)
+        p = pcor_set_dict[XY_key][Zs_key]   
+    else        
+        if length(Zs) == 1
+            Z = Zs[1]
+            
+            pXY = cor_mat[X, Y]
+            pXZ = cor_mat[X, Z]
+            pYZ = cor_mat[Y, Z]
+            denom_term = (sqrt(1 - pXZ^2) * sqrt(1 - pYZ^2))
+            p = denom_term == 0.0 ? 0.0 : (pXY - pXZ * pYZ) / denom_term
+
+        else        
+            Zs_nZ0 = Zs[1:end-1]
+            Z0 = Zs[end]
+
+            pXY_nZ0 = pcor_rec(X, Y, Zs_nZ0, cor_mat, pcor_set_dict)
+            pXZ0_nZ0 = pcor_rec(X, Z0, Zs_nZ0, cor_mat, pcor_set_dict)
+            pYZ0_nZ0 = pcor_rec(Y, Z0, Zs_nZ0, cor_mat, pcor_set_dict)
+
+            denom_term = sqrt(1 - pXZ0_nZ0^2) * sqrt(1 - pYZ0_nZ0^2)
+            p = denom_term == 0.0 ? 0.0 : (pXY_nZ0 - pXZ0_nZ0 * pYZ0_nZ0) / denom_term
+        end
+        
+        
+        # make sure partial correlation coeff stays within bounds
+        if p < -1.0
+            p = -1.0
+        elseif p >= 1.0
+            p = 1.0
+        end
+        
+        
+        if !haskey(pcor_set_dict, XY_key)
+            pcor_set_dict[XY_key] = Dict{String, Float64}()
+        end
+
+        pcor_set_dict[XY_key][Zs_key] = p
+    end
+
+    p
+end
+
+
+function cor_subset!(data, cor_mat, vars)
+    var_cors = cor(data[:, vars])
+    
+    for (i, var_A) in enumerate(vars)
+        for (j, var_B) in enumerate(vars)
+            cor_entry = var_cors[i, j]
+            cor_val = isnan(cor_entry) ? 0.0 : cor_entry            
+            cor_mat[var_A, var_B] = cor_val
+            cor_mat[var_B, var_A] = cor_val
+        end
+    end
+    
+    @assert sum(isnan(cor_mat)) == 0 "NaNs found for vars $vars"
 end
 
 
