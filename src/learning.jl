@@ -153,7 +153,7 @@ end
 
 function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
     pwr::Float64=0.5, FDR::Bool=true, fast_elim::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
-    univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
+        univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
     univar_step::Bool=true, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(),
     prev_state::HitonState=HitonState("S", Dict(), []), debug::Int=0, time_limit::Float64=0.0)
@@ -347,12 +347,9 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         weight_type::String="cond_logpval", verbose::Bool=true, update_interval::Float64=30.0, edge_merge_fun=maxweight,
     debug::Int=0, time_limit::Float64=-1.0, header::Vector{String}=String[], recursive_pcor::Bool=true)
     """
-    time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise means time limit in seconds
+    time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
     """
-    #if issparse(data)
-    #    warn("Usage of sparse matrices still produces slightly inaccurate results. Use at own risk!")
-    #end
     
     kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :pwr => pwr, :FDR => FDR,
     :fast_elim => fast_elim, :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
@@ -361,7 +358,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     if time_limit == -1.0
         if parallel == "multi_il"
             time_limit = log2(size(data, 2))
-            println("Setting time_limit to $time_limit s.")
+            println("Setting 'time_limit' to $time_limit s.")
         else
             time_limit = 0.0
         end
@@ -372,10 +369,10 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     if time_limit != 0.0 && parallel != "multi_il"
         warn("Using time_limit without interleaved parallelism is not advised.")
     elseif parallel == "multi_il" && time_limit == 0.0
-        warn("Specify a time_limit when using interleaved parallelism to increase speed.")
+        warn("Specify 'time_limit' when using interleaved parallelism to increase speed.")
     end
     
-    if recursive_pcor
+    if recursive_pcor && iscontinuous(test_name)
         warn("'recursive_pcor' produces different results in case of perfectly correlated variables, caution advised")
         if max_k == 0
             warn("Set 'recursive_pcor' to false when only computing univariate associations ('max_k' == 0) to gain speed.")
@@ -434,30 +431,32 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         println("Running si_HITON_PC for each variable..")
     end
         
-    if parallel == "single" || nprocs() == 1
-        nbr_results = [si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
+    if max_k == 0 && global_univar
+        nbr_dict = all_univar_nbrs
     else
-        # embarassingly parallel
-        if parallel == "multi_ep"
-            @sync nbr_results_refs = [@spawn si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
-
-            nbr_results = map(fetch, nbr_res_refs)
-            
-        # interleaved parallelism
-        elseif endswith(parallel, "il")
-            il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs,
-                                           convergence_threshold, parallel=parallel, cor_mat=cor_mat)
-            nbr_results = [il_dict[target_var] for target_var in target_vars]
-            #graph = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs)
+        if parallel == "single" || nprocs() == 1
+            nbr_results = [si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
         else
-            error("'$parallel' not a valid parallel mode")
-        end
+            # embarassingly parallel
+            if parallel == "multi_ep"
+                @sync nbr_results_refs = [@spawn si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
+
+                nbr_results = map(fetch, nbr_res_refs)
+
+            # interleaved parallelism
+            elseif endswith(parallel, "il")
+                il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs,
+                                               convergence_threshold, cor_mat, parallel=parallel)
+                nbr_results = [il_dict[target_var] for target_var in target_vars]
+            else
+                error("'$parallel' not a valid parallel mode")
+            end
         
+        end
+
+        #if !endswith(parallel, "il")
+        nbr_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
     end
-    
-    #if !endswith(parallel, "il")
-    nbr_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
-    #end
             
     if verbose
         println("Postprocessing..")
@@ -676,7 +675,6 @@ function cluster_data(data, stat_type::String="fz"; cluster_sim_threshold::Float
             pop!(unclustered_vars, var_A)
             
             clust_members = Set(var_A)
-            #rm_vars = Set{Int64}()
             for var_B in unclustered_vars
                 sim = sim_mat[var_A, var_B]
                 
@@ -712,24 +710,20 @@ function cluster_data(data, stat_type::String="fz"; cluster_sim_threshold::Float
 end
 
 
-function interleaved_worker(data, levels, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
+function interleaved_worker(data, levels, cor_mat, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
     while true
         try
-            #println("waiting for job..")
             target_var, univar_nbrs, prev_state, current_nbrs = take!(shared_job_q)
-            #println("received job.")
             # if kill signal
             if target_var == -1
                 return
             end
 
-            nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state, whitelist=current_nbrs, GLL_args...)
+            nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state, whitelist=current_nbrs, cor_mat=cor_mat, GLL_args...)
             put!(shared_result_q, (target_var, (nbr_state, univar_nbrs)))
-            #println("finished job.")
         catch exc
             println("Exception occurred! ", exc)
             put!(shared_result_q, (target_var, exc))
-            #throw(exc)
         end
         
     end
@@ -737,7 +731,7 @@ end
 
 
 function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, update_interval, GLL_args,
-        convergence_threshold=0.01; conv_check_start=0.1, conv_time_step=0.1, parallel="multi")
+        convergence_threshold, cor_mat; conv_check_start=0.1, conv_time_step=0.1, parallel="multi")
     jobs_total = length(target_vars)
     
     if startswith(parallel, "multi")
@@ -753,7 +747,6 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
     end
     
     shared_job_q = RemoteChannel(() -> StackChannel{Tuple}(size(data, 2) * 2), 1)
-    #shared_job_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2) * 2), 1)
     shared_result_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2)), 1)
     
     
@@ -770,28 +763,12 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
             queued_jobs += 1
         end
     end
+            
     
-    """
-    nbr_size_arr = []
-    while isready(shared_job_q)
-        target_var, job = take!(shared_job_q)
-        push!(nbr_size_arr, (target_var, length(all_univar_nbrs[target_var])))
-    end
+    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
     
-    while !isempty(waiting_vars)
-        target_var = pop!(waiting_vars)
-        push!(nbr_size_arr, (target_var, length(all_univar_nbrs[target_var])))
-    end
+    remaining_jobs = jobs_total
     
-    println(nbr_size_arr)
-    exit()
-    """         
-    
-    worker_returns = [@spawn interleaved_worker(data, levels, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
-    
-    remaining_jobs = jobs_total#length(target_vars)
-    
-    #graph_dict = Dict{Int,Dict{Int,Float64}}([(target_var, Dict{Int,Float64}()) for target_var in target_vars])
     graph_dict = Dict{Int64, HitonState}()
     
     # this graph is just used for efficiently keeping track of graph stats during the run
@@ -801,26 +778,14 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
     start_time = time()
     last_update_time = start_time
     check_convergence = false
-    #conv_start_time = 0.0
-    #conv_start_num_edges = 0
-    #last_conv_time_passed = 0.0
-    #last_conv_num_edges = 0
     converged = false
     
-    #println("Queued jobs: $queued_jobs")
     
     while remaining_jobs > 0
-        #println("Waiting for result.. (killed $kill_signals_sent)")
         target_var, nbr_result = take!(shared_result_q)
-        #println("Result received.")
         queued_jobs -= 1
-        #println("jobs: queued $queued_jobs remaining $remaining_jobs $(length(waiting_vars)) $(nv(graph)) $(ne(graph))")
-        if isa(nbr_result, Tuple)#typeof(nbr_result) <: Tuple
-            #current_nbrs = graph_dict[target_var]
-            #job = (target_var, nbr_result[2], nbr_result[1], Set(keys(current_nbrs)))
+        if isa(nbr_result, Tuple)
             curr_state, univar_nbrs = nbr_result
-            #println(target_var)
-            #println(curr_state, "\n")
             
             # node has not yet finished computing
             if curr_state.phase != "F"
@@ -833,17 +798,9 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
                 job = (target_var, univar_nbrs, curr_state, target_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
+                
             # node is complete
             else
-                #elseif isa(nbr_result, Dict)#typeof(nbr_result) <: Dict
-                #nbr_dict = nbr_result
-                #for nbr in keys(nbr_dict)
-                #    graph_dict[target_var][nbr] = nbr_dict[nbr]
-                    #push!(edge_set, tuple(sort([target_var, nbr]))...)
-                    #add_vertex!(graph, nbr)
-                #    add_edge!(graph, target_var, nbr)
-                    #println("num edges: $(ne(graph))")
-                #end
                 graph_dict[target_var] = curr_state
                 
                 for nbr in keys(curr_state.state_results)
@@ -869,7 +826,6 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
                 next_var = pop!(waiting_vars)
                 var_nbrs = Set(neighbors(graph, next_var))
                 
-                #println("\tadding job from waiting_vars")
                 job = (next_var, all_univar_nbrs[next_var], HitonState("S", Dict(), []), var_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1

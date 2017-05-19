@@ -151,8 +151,6 @@ function cor_subset!(data, cor_mat, vars)
             cor_mat[var_B, var_A] = cor_val
         end
     end
-    
-    @assert sum(isnan(cor_mat)) == 0 "NaNs found for vars $vars"
 end
 
 

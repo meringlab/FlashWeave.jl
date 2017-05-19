@@ -34,7 +34,6 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float
     
     if test_name == "fz" || test_name == "fz_nz"
         p_stat = isempty(cor_mat) ? pcor(X, Y, Zs, sub_data) : pcor_rec(X, Y, Zs, cor_mat, pcor_set_dict)
-        @assert !isnan(p_stat) "NaN pcor for variables $X $Y $Zs"
         df = 0
         pval = fz_pval(p_stat, size(sub_data, 1), 0)
     end
