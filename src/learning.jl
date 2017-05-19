@@ -17,7 +17,7 @@ function interleaving_phase(T::Int, candidates::Vector{Int}, data,
     test_name::String, max_k::Int, alpha::Float64, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[],
     data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
     prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0,
-    whitelist::Set{Int}=Set{Int}(), cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
+    whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
         
     
@@ -45,6 +45,10 @@ function interleaving_phase(T::Int, candidates::Vector{Int}, data,
         if !isempty(whitelist) && candidate in whitelist
             push!(TPC, candidate)
             TPC_dict[candidate] = (NaN64, NaN64)
+            continue
+        end
+        
+        if !isempty(blacklist) && candidate in blacklist
             continue
         end
         
@@ -82,7 +86,7 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
     data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::Vector{Int}=[],
     time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0, whitelist::Set{Int}=Set{Int}(),
-    cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
+    blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
     
     is_nz = is_zero_adjusted(test_name)
@@ -116,6 +120,10 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
         
         if !isempty(whitelist) && candidate in whitelist
             PC_dict[candidate] = (NaN64, NaN64)
+            continue
+        end
+        
+        if !isempty(blacklist) && candidate in blacklist
             continue
         end
             
@@ -153,6 +161,7 @@ end
 
 function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
     pwr::Float64=0.5, FDR::Bool=true, fast_elim::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
+        blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
     univar_step::Bool=true, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(),
@@ -264,7 +273,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
             end
             
             # interleaving phase
-            TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k, alpha, hps, pwr, levels, data_row_inds, data_nzero_vals, prev_TPC_dict, time_limit, start_time, debug, whitelist, cor_mat, pcor_set_dict)
+            TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k, alpha, hps, pwr, levels, data_row_inds, data_nzero_vals, prev_TPC_dict, time_limit, start_time, debug, whitelist, blacklist, cor_mat, pcor_set_dict)
             
             # set test stats of the initial candidate to its univariate association results
             if prev_state.phase == "S"
@@ -307,7 +316,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
             PC_unchecked = Int[]
             PC_candidates = collect(keys(TPC_dict))
         end
-        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha, fast_elim, hps, pwr, levels, data_row_inds, data_nzero_vals, prev_PC_dict, PC_unchecked, time_limit, start_time, debug, whitelist, cor_mat, pcor_set_dict)
+        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha, fast_elim, hps, pwr, levels, data_row_inds, data_nzero_vals, prev_PC_dict, PC_unchecked, time_limit, start_time, debug, whitelist, blacklist, cor_mat, pcor_set_dict)
             
         if !isempty(TPC_unchecked)
                 
@@ -344,7 +353,8 @@ end
 function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, pwr::Float64=0.5,
     convergence_threshold::Float64=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
         fast_elim::Bool=true, precluster_sim::Float64=0.0,
-        weight_type::String="cond_logpval", verbose::Bool=true, update_interval::Float64=30.0, edge_merge_fun=maxweight,
+        weight_type::String="cond_logpval", edge_rule::String="OR", verbose::Bool=true, update_interval::Float64=30.0,
+        edge_merge_fun=maxweight,
     debug::Int=0, time_limit::Float64=-1.0, header::Vector{String}=String[], recursive_pcor::Bool=true)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
@@ -446,7 +456,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
             # interleaved parallelism
             elseif endswith(parallel, "il")
                 il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs,
-                                               convergence_threshold, cor_mat, parallel=parallel)
+                                               convergence_threshold, cor_mat, parallel=parallel, edge_rule=edge_rule)
                 nbr_results = [il_dict[target_var] for target_var in target_vars]
             else
                 error("'$parallel' not a valid parallel mode")
@@ -474,7 +484,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         end
     end
 
-    graph_dict = make_graph_symmetric(weights_dict)
+    graph_dict = make_graph_symmetric(weights_dict, edge_rule)
 
     if !isempty(header)
         graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
@@ -710,16 +720,20 @@ function cluster_data(data, stat_type::String="fz"; cluster_sim_threshold::Float
 end
 
 
-function interleaved_worker(data, levels, cor_mat, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
+function interleaved_worker(data, levels, cor_mat, edge_rule, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
     while true
         try
-            target_var, univar_nbrs, prev_state, current_nbrs = take!(shared_job_q)
+            target_var, univar_nbrs, prev_state, skip_nbrs = take!(shared_job_q)
             # if kill signal
             if target_var == -1
                 return
             end
 
-            nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state, whitelist=current_nbrs, cor_mat=cor_mat, GLL_args...)
+            if edge_rule == "AND"
+                nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state, blacklist=skip_nbrs, cor_mat=cor_mat, GLL_args...)
+            else
+                nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state, whitelist=skip_nbrs, cor_mat=cor_mat, GLL_args...)
+            end
             put!(shared_result_q, (target_var, (nbr_state, univar_nbrs)))
         catch exc
             println("Exception occurred! ", exc)
@@ -731,7 +745,7 @@ end
 
 
 function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, update_interval, GLL_args,
-        convergence_threshold, cor_mat; conv_check_start=0.1, conv_time_step=0.1, parallel="multi")
+        convergence_threshold, cor_mat; conv_check_start=0.1, conv_time_step=0.1, parallel="multi", edge_rule="OR")
     jobs_total = length(target_vars)
     
     if startswith(parallel, "multi")
@@ -765,7 +779,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
     end
             
     
-    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
+    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
     
     remaining_jobs = jobs_total
     
@@ -773,6 +787,11 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
     
     # this graph is just used for efficiently keeping track of graph stats during the run
     graph = Graph(length(target_vars))
+    
+    if edge_rule == "AND"
+        blacklist_graph = Graph(length(target_vars))
+    end
+    
     edge_set = Set{Tuple{Int64,Int64}}()
     kill_signals_sent = 0
     start_time = time()
@@ -789,12 +808,13 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
             
             # node has not yet finished computing
             if curr_state.phase != "F"
-                target_nbrs = Set(neighbors(graph, target_var))
+                
 
                 if converged
                     curr_state.unchecked_vars = Int64[]
                 end
 
+                skip_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, target_var)) : target_nbrs = Set(neighbors(graph, target_var))
                 job = (target_var, univar_nbrs, curr_state, target_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
@@ -805,6 +825,14 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
                 
                 for nbr in keys(curr_state.state_results)
                     add_edge!(graph, target_var, nbr)
+                end
+                
+                if edge_rule == "AND"
+                    for a_var in target_vars
+                        if !haskey(curr_state.state_results, a_var)
+                            add_edge!(blacklist_graph, target_var, a_var)
+                        end
+                    end
                 end
                 
                 remaining_jobs -= 1

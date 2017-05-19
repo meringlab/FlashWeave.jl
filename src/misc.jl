@@ -186,7 +186,7 @@ function maxweight(weight1::Float64, weight2::Float64)
 end
 
     
-function make_graph_symmetric(weights_dict::Dict{Int64,Dict{Int64,Float64}}, edge_merge_fun=maxweight)
+function make_graph_symmetric(weights_dict::Dict{Int64,Dict{Int64,Float64}}, edge_rule, edge_merge_fun=maxweight)
     checked_G = Graph(maximum(keys(weights_dict)))
     graph_dict = Dict{Int64,Dict{Int64,Float64}}([(target_var, Dict{Int64,Float64}()) for target_var in keys(weights_dict)])
     
@@ -199,9 +199,12 @@ function make_graph_symmetric(weights_dict::Dict{Int64,Dict{Int64,Float64}}, edg
 
                 prev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
 
-                #if prev_weight != 0.0 && !isnan(weight)
+                # if only one direction is present and "AND" rule is specified, skip this edge
+                if edge_rule == "AND" && isnan(prev_weight)
+                    continue
+                end
+                
                 weight = edge_merge_fun(weight, prev_weight)
-                #end
 
                 graph_dict[node1][node2] = weight
                 graph_dict[node2][node1] = weight
