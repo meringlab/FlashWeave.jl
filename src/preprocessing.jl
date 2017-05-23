@@ -132,6 +132,13 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
     elseif norm == "binary"
         data = sign(data)
         data = convert(Matrix{Int64}, data)
+        
+        unreduced_vars = size(data, 2)
+        data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]]
+        
+        if verbose
+            println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than 2 levels")
+        end
     elseif startswith(norm, "binned")
         if startswith(norm, "binned_nz")
             if endswith(norm, "rows")
@@ -152,7 +159,7 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
         data = convert(Matrix{Int64}, data)
         
         unreduced_vars = size(data, 2)
-        data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .>= n_bins)[:]]
+        data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== n_bins)[:]]
         
         if verbose
             println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")

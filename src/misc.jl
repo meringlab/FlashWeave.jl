@@ -3,7 +3,7 @@ module Misc
 using LightGraphs
 using StatsBase
 
-export HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, pw_unistat_matrix, dict_to_adjmat, make_weights
+export HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights
 
 const inf_weight = 708.3964185322641
 
@@ -213,6 +213,30 @@ function make_graph_symmetric(weights_dict::Dict{Int64,Dict{Int64,Float64}}, edg
     end
     
     graph_dict
+end
+    
+
+function map_edge_keys(nbr_dict::Dict{Int64,Dict{Int64,Tuple{Float64,Float64}}}, key_map_dict::Dict{Int64,Int64})
+    new_nbr_dict = similar(nbr_dict)
+        
+    for (key, sub_dict) in nbr_dict
+        if !haskey(key_map_dict, key)
+            continue
+        end
+        
+        var_key = key_map_dict[key]
+        new_sub_dict = similar(sub_dict)
+            
+        for (sub_key, sub_val) in sub_dict
+            if haskey(key_map_dict, sub_key)
+                var_sub_key = key_map_dict[sub_key]
+                new_sub_dict[var_sub_key] = sub_val
+            end
+        end
+            
+        new_nbr_dict[var_key] = new_sub_dict
+    end
+    new_nbr_dict
 end
     
 

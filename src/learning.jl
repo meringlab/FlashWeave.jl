@@ -82,7 +82,7 @@ end
 
 
 function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
-    max_k::Int, alpha::Float64, fast_elim::Bool, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=[],
+    max_k::Int, alpha::Float64, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=[],
     data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::Vector{Int}=[],
     time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0, whitelist::Set{Int}=Set{Int}(),
@@ -160,7 +160,7 @@ end
 
 
 function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
-    pwr::Float64=0.5, FDR::Bool=true, fast_elim::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
+    pwr::Float64=0.5, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
         blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
     univar_step::Bool=true, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
@@ -316,7 +316,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
             PC_unchecked = Int[]
             PC_candidates = collect(keys(TPC_dict))
         end
-        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha, fast_elim, hps, pwr, levels, data_row_inds, data_nzero_vals, prev_PC_dict, PC_unchecked, time_limit, start_time, debug, whitelist, blacklist, cor_mat, pcor_set_dict)
+        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha, hps, pwr, levels, data_row_inds, data_nzero_vals, prev_PC_dict, PC_unchecked, time_limit, start_time, debug, whitelist, blacklist, cor_mat, pcor_set_dict)
             
         if !isempty(TPC_unchecked)
                 
@@ -359,6 +359,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
+    fast_elim: currently always on
     """
     
     kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :pwr => pwr, :FDR => FDR,
@@ -383,7 +384,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     end
     
     if recursive_pcor && iscontinuous(test_name)
-        warn("'recursive_pcor' produces different results in case of perfectly correlated variables, caution advised")
+        warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated variables, caution advised")
         if max_k == 0
             warn("Set 'recursive_pcor' to false when only computing univariate associations ('max_k' == 0) to gain speed.")
         end
@@ -433,7 +434,16 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         end
         
         target_vars = clust_repres
-        #data = data[:, clust_repres]
+        data = data[:, clust_repres]
+        
+        target_vars = collect(1:length(clust_repres))
+        var_clust_dict = Dict(zip(clust_repres, 1:length(clust_repres)))
+        clust_var_dict = Dict(zip(1:length(clust_repres), clust_repres))
+        all_univar_nbrs = map_edge_keys(all_univar_nbrs, var_clust_dict)
+        
+        if isdiscrete(test_name)
+            levels = levels[clust_repres]
+        end
     end
     
     
@@ -472,19 +482,24 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         println("Postprocessing..")
     end
     
+    if precluster_sim != 0.0
+        nbr_dict = map_edge_keys(nbr_dict, clust_var_dict)
+        all_univar_nbrs = map_edge_keys(all_univar_nbrs, clust_var_dict)
+    end
+        
     weights_dict = Dict([(target_var, make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)) for target_var in keys(nbr_dict)])
     
-    if precluster_sim != 0.0
-        for clust_repres_var in keys(clust_dict)
-            for clust_member in clust_dict[clust_repres_var]
-                for nbr in keys(weights_dict[clust_repres_var])
-                    weights_dict[clust_member][nbr] = NaN64
-                end
-            end
-        end
-    end
+    #if precluster_sim != 0.0
+    #    for clust_repres_var in keys(clust_dict)
+    #        for clust_member in clust_dict[clust_repres_var]
+    #            for nbr in keys(weights_dict[clust_repres_var])
+    #                weights_dict[clust_member][nbr] = NaN64
+    #            end
+    #        end
+    #    end
+    #end
 
-    graph_dict = make_graph_symmetric(weights_dict, edge_rule)
+    graph_dict = weights_dict#make_graph_symmetric(weights_dict, edge_rule)
 
     if !isempty(header)
         graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
@@ -814,8 +829,8 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
                     curr_state.unchecked_vars = Int64[]
                 end
 
-                skip_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, target_var)) : target_nbrs = Set(neighbors(graph, target_var))
-                job = (target_var, univar_nbrs, curr_state, target_nbrs)
+                skip_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, target_var)) : Set(neighbors(graph, target_var))
+                job = (target_var, univar_nbrs, curr_state, skip_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
                 
