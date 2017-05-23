@@ -363,7 +363,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     """
     
     kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :pwr => pwr, :FDR => FDR,
-    :fast_elim => fast_elim, :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
+    :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
     :time_limit => time_limit)
     
     if time_limit == -1.0
@@ -415,6 +415,11 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, FDR=FDR, levels=levels, parallel=parallel, workers_local=workers_local, cor_mat=cor_mat)
         var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
         target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
+        
+        if verbose
+            println("\nUnivariate degree stats:")
+            println(summarystats(map(length, values(all_univar_nbrs))), "\n")
+        end
     else
         target_vars = 1:size(data, 2)
         all_univar_nbrs = Dict([(x, Dict{Int,Tuple{Float64,Float64}}()) for x in target_vars])
@@ -486,25 +491,15 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         nbr_dict = map_edge_keys(nbr_dict, clust_var_dict)
         all_univar_nbrs = map_edge_keys(all_univar_nbrs, clust_var_dict)
     end
-        
+     
     weights_dict = Dict([(target_var, make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)) for target_var in keys(nbr_dict)])
-    
-    #if precluster_sim != 0.0
-    #    for clust_repres_var in keys(clust_dict)
-    #        for clust_member in clust_dict[clust_repres_var]
-    #            for nbr in keys(weights_dict[clust_repres_var])
-    #                weights_dict[clust_member][nbr] = NaN64
-    #            end
-    #        end
-    #    end
+
+    graph_dict = make_graph_symmetric(weights_dict, edge_rule)
+
+    #if !isempty(header)
+    #    graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
     #end
-
-    graph_dict = weights_dict#make_graph_symmetric(weights_dict, edge_rule)
-
-    if !isempty(header)
-        graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
-    end
-    convert(Dict{Union{Int, String},Dict{Union{Int, String}, Float64}}, graph_dict)
+    #convert(Dict{Union{Int, String},Dict{Union{Int, String}, Float64}}, graph_dict)
 end
 
 
@@ -749,7 +744,7 @@ function interleaved_worker(data, levels, cor_mat, edge_rule, shared_job_q::Remo
             else
                 nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels, prev_state=prev_state, whitelist=skip_nbrs, cor_mat=cor_mat, GLL_args...)
             end
-            put!(shared_result_q, (target_var, (nbr_state, univar_nbrs)))
+            put!(shared_result_q, (target_var, nbr_state))
         catch exc
             println("Exception occurred! ", exc)
             put!(shared_result_q, (target_var, exc))
@@ -757,7 +752,6 @@ function interleaved_worker(data, levels, cor_mat, edge_rule, shared_job_q::Remo
         
     end
 end
-
 
 function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, update_interval, GLL_args,
         convergence_threshold, cor_mat; conv_check_start=0.1, conv_time_step=0.1, parallel="multi", edge_rule="OR")
@@ -818,19 +812,17 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
     while remaining_jobs > 0
         target_var, nbr_result = take!(shared_result_q)
         queued_jobs -= 1
-        if isa(nbr_result, Tuple)
-            curr_state, univar_nbrs = nbr_result
+        if isa(nbr_result, HitonState)
+            curr_state = nbr_result
             
             # node has not yet finished computing
             if curr_state.phase != "F"
-                
-
                 if converged
                     curr_state.unchecked_vars = Int64[]
                 end
 
                 skip_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, target_var)) : Set(neighbors(graph, target_var))
-                job = (target_var, univar_nbrs, curr_state, skip_nbrs)
+                job = (target_var, all_univar_nbrs[target_var], curr_state, skip_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
                 
@@ -867,7 +859,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
         if !isempty(waiting_vars) && queued_jobs < job_q_buff_size
             for i in 1:job_q_buff_size - queued_jobs
                 next_var = pop!(waiting_vars)
-                var_nbrs = Set(neighbors(graph, next_var))
+                var_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, next_var)) : Set(neighbors(graph, next_var))
                 
                 job = (next_var, all_univar_nbrs[next_var], HitonState("S", Dict(), []), var_nbrs)
                 put!(shared_job_q, job)
@@ -920,7 +912,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
         
 
     end
-
+    
     graph_dict
 end
 
