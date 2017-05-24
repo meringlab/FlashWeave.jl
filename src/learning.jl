@@ -418,7 +418,11 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         
         if verbose
             println("\nUnivariate degree stats:")
-            println(summarystats(map(length, values(all_univar_nbrs))), "\n")
+            nbr_nums = map(length, values(all_univar_nbrs))
+            println(summarystats(nbr_nums), "\n")
+            if mean(nbr_nums) > size(data, 1) * 0.2
+                warn("The univariate network is exceptionally dense, computations may be very slow. Check if appropriate normalization was used (employ niche-mode if not yet the case) and try using the AND rule to gain speed.")
+            end
         end
     else
         target_vars = 1:size(data, 2)
@@ -495,6 +499,21 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     weights_dict = Dict([(target_var, make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)) for target_var in keys(nbr_dict)])
 
     graph_dict = make_graph_symmetric(weights_dict, edge_rule)
+    
+    if precluster_sim != 0.0
+        for (clust_repres, clust_members) in clust_dict
+            for member in clust_members                
+                graph_dict[member] = Dict{Int64,Float64}()
+                
+                for nbr in keys(graph_dict[clust_repres])
+                    graph_dict[member][nbr] = graph_dict[clust_repres][nbr]
+                end
+                
+                graph_dict[member][clust_repres] = NAN64
+                graph_dict[clust_repres][member] = NAN64
+            end
+        end
+    end
 
     #if !isempty(header)
     #    graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])

@@ -266,7 +266,7 @@ end
 
 
 
-function dict_to_adjmat(graph_dict::Dict{Union{Int64,String},Dict{Union{Int64,String},Float64}}, header::Vector{String})
+function dict_to_adjmat(graph_dict::Dict{Int64,Dict{Int64,Float64}}, header::Vector{String})
     #n_nodes = length(graph_dict)
     n_vars = length(header)
     adj_mat = zeros(Float64, (n_vars, n_vars))

@@ -23,16 +23,75 @@ function pw_mi_matrix(data; nz::Bool=false, parallel::String="single")
     mi_mat
 end
 """
+function pseudocount_vars_from_sample_nolog(s::Vector{Float64})
+    z_mask = s .== 0
+    k = sum(z_mask)
+    Nprod = prod(s[!z_mask])
+    return k, Nprod
+end
+
+
+function adaptive_pseudocount_nolog(x1::Float64, s1::Vector{Float64}, s2::Vector{Float64})::Float64
+    k, Nprod1 = pseudocount_vars_from_sample(s1)
+    n, Nprod2 = pseudocount_vars_from_sample(s2)
+    p = length(s1)
+    #x2 = nthroot(n-p, (x1^(k-p) * Nprod1) / Nprod2)
+    @assert n < p && k < p "samples with all zero abundances are not allowed"
+    x2 = ((x1^(k-p) * Nprod1) / Nprod2)^(1/(n-p))
+    return x2
+end
+
+
+function pseudocount_vars_from_sample(s::Vector{Float64})
+    z_mask = s .== 0
+    k = sum(z_mask)
+    Nprod = sum(log(s[!z_mask]))
+    return k, Nprod
+end
+
+
+function adaptive_pseudocount(x1::Float64, s1::Vector{Float64}, s2::Vector{Float64})::Float64
+    k, Nprod1_log = pseudocount_vars_from_sample(s1)
+    n, Nprod2_log = pseudocount_vars_from_sample(s2)
+    p = length(s1)
+    #x2 = nthroot(n-p, (x1^(k-p) * Nprod1) / Nprod2)
+    @assert n < p && k < p "samples with all zero abundances are not allowed"
+    #x2_log = (1 / (n-p)) * (log(x1^(k-p)) + Nprod1_log - Nprod2_log)
+    x2_log = (1 / (n-p)) * ((k-p)*log(x1) + Nprod1_log - Nprod2_log)
+    return exp(x2_log)
+end
+
+
+function adaptive_pseudocount(X::Matrix{Float64})
+    max_depth_index = findmax(sum(X, 2))[2]
+    max_depth_sample::Vector{Float64} = X[max_depth_index, :]
+    #pseudo_counts = mapslices(x -> adaptive_pseudocount(1.0, max_depth_sample, x), X, 2)
+    min_abund = minimum(X[X .!= 0])
+    base_pcount = 1.0#min_abund >= 1 ? 1.0 : min_abund / 10
+    pseudo_counts = [adaptive_pseudocount(base_pcount, max_depth_sample, X[x, :]) for x in 1:size(X, 1)]
+    
+    X_pcount = copy(X)
+    
+    for i in 1:size(X, 1)
+        s_vec = @view X_pcount[i, :]
+        s_vec[s_vec .== 0] = pseudo_counts[i]
+    end
+    X_pcount
+end
 
 
 function clr(X::Matrix; pseudo_count::Float64=1e-5, ignore_zeros=false)
-    X_trans = X + pseudo_count
-    center_fun = ignore_zeros ? x -> geomean(x[x .!= pseudo_count]) : geomean
-    
-    X_trans = log(X_trans ./ mapslices(center_fun, X_trans, 2))
-    
-    if ignore_zeros
-        X_trans[X .== 0.0] = minimum(X_trans)
+    if pseudo_count == -1 && !ignore_zeros
+        X_trans = clr(adaptive_pseudocount(X), pseudo_count=0.0, ignore_zeros=false)
+    else
+        X_trans = X + pseudo_count
+        center_fun = ignore_zeros ? x -> geomean(x[x .!= pseudo_count]) : geomean
+
+        X_trans = log(X_trans ./ mapslices(center_fun, X_trans, 2))
+
+        if ignore_zeros
+            X_trans[X .== 0.0] = minimum(X_trans) - 1
+        end
     end
     
     X_trans
@@ -124,6 +183,9 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
     elseif norm == "clr"
         data = convert(Matrix{Float64}, data)
         data = clr(data, pseudo_count=clr_pseudo_count)
+    elseif norm == "clr_adapt"
+        data = convert(Matrix{Float64}, data)
+        data = clr(data, pseudo_count=-1.0)
     elseif norm == "clr_nz"
         data = convert(Matrix{Float64}, data)
         data = clr(data, pseudo_count=clr_pseudo_count, ignore_zeros=true)
@@ -177,7 +239,7 @@ end
 
 
 function preprocess_data_default(data, test_name::String; verbose::Bool=true, skip_cols::Set{Int64}=Set{Int64}())
-    default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
+    default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
     data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, skip_cols=skip_cols)
     data
 end
