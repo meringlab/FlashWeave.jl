@@ -509,8 +509,8 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
                     graph_dict[member][nbr] = graph_dict[clust_repres][nbr]
                 end
                 
-                graph_dict[member][clust_repres] = NAN64
-                graph_dict[clust_repres][member] = NAN64
+                graph_dict[member][clust_repres] = NaN64
+                graph_dict[clust_repres][member] = NaN64
             end
         end
     end
@@ -518,7 +518,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     #if !isempty(header)
     #    graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
     #end
-    #convert(Dict{Union{Int, String},Dict{Union{Int, String}, Float64}}, graph_dict)
+    convert(Dict{Int64,Dict{Int64, Float64}}, graph_dict)
 end
 
 
