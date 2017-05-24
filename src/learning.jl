@@ -420,7 +420,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
             println("\nUnivariate degree stats:")
             nbr_nums = map(length, values(all_univar_nbrs))
             println(summarystats(nbr_nums), "\n")
-            if mean(nbr_nums) > size(data, 1) * 0.2
+            if mean(nbr_nums) > size(data, 2) * 0.2
                 warn("The univariate network is exceptionally dense, computations may be very slow. Check if appropriate normalization was used (employ niche-mode if not yet the case) and try using the AND rule to gain speed.")
             end
         end
@@ -894,7 +894,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
         # print network stats after each update interval
         curr_time = time()
         if curr_time - last_update_time > update_interval
-            println("\nTime passed: ", curr_time - start_time, ". Finished nodes: ", length(target_vars) - remaining_jobs, ". Remaining nodes: ", remaining_jobs)
+            println("\nTime passed: ", Int(round(curr_time - start_time)), ". Finished nodes: ", length(target_vars) - remaining_jobs, ". Remaining nodes: ", remaining_jobs)
             if check_convergence
                 println("Convergence times: $last_conv_time $(curr_time - last_conv_time - start_time) $((curr_time - last_conv_time - start_time) / last_conv_time) $(ne(graph) - last_conv_num_edges)")
             end
