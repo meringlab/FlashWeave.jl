@@ -340,13 +340,33 @@ function nz_adjust_cont_tab(levels_x::Int64, levels_y::Int64, cont_tab::Array{In
 end
 
 
+function benjamini_hochberg(pvals::Vector{Float64})
+    """Accelerated version of that found in MultipleTesting.jl"""
+    m = length(pvals)
+    
+    sorted_pval_tuples::Vector{Tuple{Int,Float64}} = collect(zip(1:length(pvals), pvals))
+    sort!(sorted_pval_tuples, by=x->x[2])
+    
+    for i in reverse(1:m-1)
+        next_adj = sorted_pval_tuples[i+1][2]
+        new_adj = sorted_pval_tuples[i][2] * m / i
+        min_adj = min(next_adj, new_adj)
+        sorted_pval_tuples[i] = (sorted_pval_tuples[i][1], min_adj)
+    end
+    
+    sort!(sorted_pval_tuples, by=x->x[1])
+    return [x[2] for x in sorted_pval_tuples]
+end
+
+
 function reorder{T<:Real}(values::AbstractVector{T})
+    """Also taken from MultipleTesting.jl"""
     newOrder = sortperm(values)
     oldOrder = sortperm(newOrder)
     return newOrder, oldOrder
 end
 
-function benjamini_hochberg(pvals)
+function benjamini_hochberg_old(pvals)
     """Accelerated version of that found in MultipleTesting.jl"""
     m = length(pvals)
     

@@ -162,7 +162,7 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
     end
     
     if !isempty(skip_cols)
-        skip_data = data[:, collect(skip_cols)]
+        skip_data = data[:, sort(collect(skip_cols))]
         data = data[:, map(x -> !(x in skip_cols), 1:size(data, 2))]
     end
     

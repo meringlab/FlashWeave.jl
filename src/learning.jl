@@ -385,9 +385,9 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     
     if recursive_pcor && iscontinuous(test_name)
         warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated variables, caution advised")
-        if max_k == 0
-            warn("Set 'recursive_pcor' to false when only computing univariate associations ('max_k' == 0) to gain speed.")
-        end
+        #if max_k == 0
+        #    warn("Set 'recursive_pcor' to false when only computing univariate associations ('max_k' == 0) to gain speed.")
+        #end
     end
     
     if isdiscrete(test_name)
@@ -398,8 +398,13 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         cor_mat = zeros(Float64, 0, 0)
     else
         levels = Int64[]
-        if recursive_pcor
-            cor_mat = is_zero_adjusted(test_name) ? cor_nz(data) : cor(data)
+        #if recursive_pcor
+        #    cor_mat = is_zero_adjusted(test_name) ? cor_nz(data) : cor(data)
+        #else
+        #    cor_mat = zeros(Float64, 0, 0)
+        #end
+        if recursive_pcor && !is_zero_adjusted(test_name)
+            cor_mat = cor(data)
         else
             cor_mat = zeros(Float64, 0, 0)
         end
@@ -502,15 +507,18 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     
     if precluster_sim != 0.0
         for (clust_repres, clust_members) in clust_dict
-            for member in clust_members                
-                graph_dict[member] = Dict{Int64,Float64}()
-                
-                for nbr in keys(graph_dict[clust_repres])
-                    graph_dict[member][nbr] = graph_dict[clust_repres][nbr]
+            for member in clust_members           
+                #@assert !haskey(graph_dict, member) "cluster member was part of representatives"
+                if member != clust_repres
+                    graph_dict[member] = Dict{Int64,Float64}()
+
+                    for nbr in keys(graph_dict[clust_repres])
+                        graph_dict[member][nbr] = graph_dict[clust_repres][nbr]
+                    end
+
+                    graph_dict[member][clust_repres] = NaN64
+                    graph_dict[clust_repres][member] = NaN64
                 end
-                
-                graph_dict[member][clust_repres] = NaN64
-                graph_dict[clust_repres][member] = NaN64
             end
         end
     end
@@ -585,7 +593,7 @@ function condensed_stats_to_dict(n_vars::Int64, pvals::Vector{Float64}, stats::V
 end
 
 
-function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.05, hps::Int=5, FDR::Bool=true,
+function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.01, hps::Int=5, FDR::Bool=true,
         levels::Vector{Int64}=Int64[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{Float64}=zeros(Float64, 0, 0))
     
@@ -706,7 +714,7 @@ function cluster_data(data, stat_type::String="fz"; cluster_sim_threshold::Float
     var_order = collect(1:size(data, 2))
     if ordering == "size"
         var_sizes = sum(data, 1)
-        sort!(var_order, by=x -> var_sizes[x])
+        sort!(var_order, by=x -> var_sizes[x], rev=true)
     end
 
     for var_A in var_order
