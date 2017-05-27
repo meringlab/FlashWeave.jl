@@ -368,7 +368,7 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
     
     if time_limit == -1.0
         if parallel == "multi_il"
-            time_limit = log2(size(data, 2))
+            time_limit = round(log2(size(data, 2)))
             println("Setting 'time_limit' to $time_limit s.")
         else
             time_limit = 0.0
