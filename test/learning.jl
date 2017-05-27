@@ -2,7 +2,7 @@ using Cauocc
 using DataFrames
 using Base.Test
 
-const data = Array(readtable(joinpath("data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+const data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 
 const exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4,15,23,3,4,8,8,
                                                  13,4,4,22,3,7,12,6,14,11,16,18,11,17,8,6,6,1,
@@ -30,26 +30,42 @@ const exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4
                                                     0,0,0,0]))
 
 
-function get_num_nbr(data, test_name; kwargs...)
-  data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false)
-  graph_dict = LGL(data_norm; test_name=test_name, verbose=false, edge_rule="OR", kwargs...)
-  map(length, [graph_dict[key] for key in 1:size(data_norm, 2)])
+function make_network(data, test_name, make_sparse=false; kwargs...)
+    data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse)
+    graph_dict = LGL(data_norm; test_name=test_name, verbose=false, kwargs...)
 end
 
-@testset "learning_single" begin
+function get_num_nbr(data, test_name, make_sparse=false; kwargs...)
+    graph_dict = make_network(data, test_name, make_sparse; kwargs...)
+    map(length, [graph_dict[key] for key in sort(collect(keys(graph_dict)))])
+end
+
+@testset "single" begin
     for (test_name, sub_dict) in exp_num_nbr_dict
-        for (max_k, exp_num_nbr) in sub_dict
-            @test all(get_num_nbr(data, test_name, max_k=max_k, parallel="single") .== exp_num_nbr)
+        @testset "$test_name" begin
+            for (max_k, exp_num_nbr) in sub_dict
+                @testset "max_k $max_k" begin
+                    for make_sparse in [true, false]
+                        @testset "sparse $make_sparse" begin
+                            @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single") .== exp_num_nbr)
+                        end
+                    end
+                end
+            end
         end
     end
 end
 
-@testset "learning_parallel" begin
+"""
+@testset "parallel" begin
     for (test_name, sub_dict) in exp_num_nbr_dict
         for (max_k, exp_num_nbr) in sub_dict
-            num_diffs = get_num_nbr(data, test_name, max_k=max_k, parallel="multi_il", time_limit=0.0) .-
-                        exp_num_nbr |> abs |> sum
-            @test (test_name == "mi" && num_diffs == 20) || num_diffs == 0
+            for make_sparse in [true, false]
+                num_diffs = get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="multi_il", time_limit=0.0) .-
+                            exp_num_nbr |> abs |> sum
+                @test (test_name == "mi" && num_diffs == 20) || num_diffs == 0
+            end
         end
     end
 end
+"""

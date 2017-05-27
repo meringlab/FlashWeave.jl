@@ -556,7 +556,7 @@ end
 function pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
     n_vars = size(data, 2)
 
-    if nz && !issparse(data)
+    if nz
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
@@ -581,7 +581,7 @@ end
 function pw_univar_kernel(X, data, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
     n_vars = size(data, 2)
 
-    if nz && !issparse(data)
+    if nz
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
