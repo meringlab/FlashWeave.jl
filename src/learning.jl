@@ -241,9 +241,8 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
             pvals = benjamini_hochberg(pvals)
         end
 
-        univar_nbrs = Dict([(nbr, (stat, pval)) for (nbr, stat, pval) in
-                            zip(test_variables, map(x -> x.stat, univar_test_results), pvals)
-                            if pval < alpha])
+        help_zip = zip(test_variables, map(x -> x.stat, univar_test_results), pvals)
+        univar_nbrs = Dict([(nbr, (stat, pval)) for (nbr, stat, pval) in help_zip if pval < alpha])
     end
 
 
@@ -524,15 +523,16 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         all_univar_nbrs = map_edge_keys(all_univar_nbrs, clust_var_dict)
     end
 
-    weights_dict = Dict([(target_var, make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type))
-                         for target_var in keys(nbr_dict)])
+    weights_dict = Dict{Int,Dict{Int,Float64}}()
+    for target_var in keys(nbr_dict)
+        weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)
+    end
 
     graph_dict = make_graph_symmetric(weights_dict, edge_rule)
 
     if precluster_sim != 0.0
         for (clust_repres, clust_members) in clust_dict
             for member in clust_members
-                #@assert !haskey(graph_dict, member) "cluster member was part of representatives"
                 if member != clust_repres
                     graph_dict[member] = Dict{Int64,Float64}()
 
@@ -547,9 +547,6 @@ function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hp
         end
     end
 
-    #if !isempty(header)
-    #    graph_dict = Dict([(header[x], Dict([(header[y], graph_dict[x][y]) for y in keys(graph_dict[x])])) for x in keys(graph_dict)])
-    #end
     convert(Dict{Int64,Dict{Int64, Float64}}, graph_dict)
 end
 
@@ -627,7 +624,6 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.01, 
 
     n_vars = size(data, 2)
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
-    #levels = map(x -> length(unique(data[:, x])), 1:size(data, 2))
 
     nz = is_zero_adjusted(test_name)
 
@@ -686,14 +682,10 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.01, 
                 pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals)
             end
         end
-    #else
-    #    error("'$parallel' is not a valid parallel mode")
     end
 
     if FDR
-        #println("num pvals:", length(pvals))
         pvals = benjamini_hochberg(pvals)
-        #pvals = adjust(pvals, BenjaminiHochberg())
     end
 
     condensed_stats_to_dict(n_vars, pvals, stats, alpha)
@@ -702,8 +694,7 @@ end
 
 function pw_unistat_matrix(data, test_name::String; parallel::String="single",
         pw_stat_dict::Dict{Int64,Dict{Int64,Tuple{Float64,Float64}}}=Dict{Int64,Dict{Int64,Tuple{Float64,Float64}}}())
-    #workers_local = nprocs() > 1 ? workers_all_local() : true
-    #test_name = nz ? "mi_nz" : "mi"
+
     if isempty(pw_stat_dict)
         pw_stat_dict = pw_univar_neighbors(data, test_name=test_name, parallel=parallel)
     end
@@ -934,7 +925,10 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
         # print network stats after each update interval
         curr_time = time()
         if curr_time - last_update_time > update_interval
-            println("\nTime passed: ", Int(round(curr_time - start_time)), ". Finished nodes: ", length(target_vars) - remaining_jobs, ". Remaining nodes: ", remaining_jobs)
+            if verbose
+                println("\nTime passed: ", Int(round(curr_time - start_time)), ". Finished nodes: ", length(target_vars) - remaining_jobs, ". Remaining nodes: ", remaining_jobs)
+            end
+
             if check_convergence && verbose
                 println("Convergence times: $last_conv_time $(curr_time - last_conv_time - start_time) $((curr_time - last_conv_time - start_time) / last_conv_time) $(ne(graph) - last_conv_num_edges)")
             end
@@ -950,7 +944,7 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
                 last_conv_num_edges = ne(graph)
 
                 if verbose
-                  println("Starting convergence checks at $last_conv_num_edges edges.")
+                    println("Starting convergence checks at $last_conv_num_edges edges.")
                 end
             elseif check_convergence
                 delta_time = (curr_time - start_time - last_conv_time) / last_conv_time
@@ -961,14 +955,14 @@ function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, le
                     conv_level = delta_num_edges / delta_time
 
                     if verbose
-                      println("Current convergence level: $conv_level")
+                        println("Current convergence level: $conv_level")
                     end
 
                     if conv_level < convergence_threshold
                         converged = true
 
                         if verbose
-                          println("\tCONVERGED!")
+                            println("\tCONVERGED!")
                         end
                     end
 
