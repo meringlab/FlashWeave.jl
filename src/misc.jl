@@ -21,27 +21,27 @@ type TestResult
 end
 
 type IndexPair
-    min_ind :: Int64
-    sec_ind :: Int64
+    min_ind :: Int
+    sec_ind :: Int
 end
 
 
-function get_levels(col_vec::SparseVector{Int64,Int64})
+function get_levels(col_vec::SparseVector{Int,Int})
     levels = length(unique(nonzeros(col_vec)))
     add_zero = col_vec.n > length(col_vec.nzind) ? 1 : 0
     levels + add_zero
 end
 
 
-function get_levels(col_vec::Vector{Int64})
+function get_levels(col_vec::Vector{Int})
     length(unique(col_vec))
 end
 
 
-function min_sec_indices!(ind_pair::IndexPair, index_vec::Vector{Int64})
+function min_sec_indices!(ind_pair::IndexPair, index_vec::Vector{Int})
     min_ind = 0
     sec_ind = 0
-    
+
     for ind in index_vec
         if min_ind == 0 || ind < min_ind
             sec_ind = min_ind
@@ -69,7 +69,7 @@ function signed_weight(stat::Float64, pval::Float64, kind::String="logpval")
         weight = stat
     elseif endswith(kind, "pval")
         sign_factor = stat < 0.0 ? -1.0 : 1.0
-    
+
         if kind == "logpval"
             weight = -log(pval)
             weight = isinf(weight) ? inf_weight : weight
@@ -91,7 +91,7 @@ end
 function workers_all_local()
     local_host = gethostname()
     workers_local = true
-    
+
     for worker_id in workers()
         worker_host = remotecall_fetch(()->gethostname(), worker_id)
         if worker_host != local_host
@@ -112,7 +112,7 @@ function make_weights(PC_dict, univar_nbrs, weight_type)
     else
         nbr_dict = Dict([(nbr, signed_weight(PC_dict[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
     end
-    
+
     nbr_dict
 end
 
@@ -128,27 +128,27 @@ function make_cum_levels!(cum_levels::Vector{Int}, Zs::Vector{Int}, levels::Vect
 end
 
 
-function level_map!(Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64}}, z::Vector{Int}, cum_levels::Vector{Int},
+function level_map!(Zs::Vector{Int}, data::AbstractMatrix{Int}, z::Vector{Int}, cum_levels::Vector{Int},
     z_map_arr::Vector{Int})
     fill!(z_map_arr, -1)
     levels_z = 0
-    
+
     for i in 1:size(data, 1)
         gfp_map = 1
         for (j, Z_var) in enumerate(Zs)
             gfp_map += data[i, Z_var] * cum_levels[j]
         end
-        
+
         level_val = z_map_arr[gfp_map]
         if level_val != -1
             z[i] = level_val
         else
             z_map_arr[gfp_map] = levels_z
             z[i] = levels_z
-            levels_z += 1   
+            levels_z += 1
         end
     end
-    
+
     levels_z
 end
 
@@ -168,9 +168,9 @@ end
 
 
 function maxweight(weight1::Float64, weight2::Float64)
-    sign1 = sign(weight1) 
+    sign1 = sign(weight1)
     sign2 = sign(weight2)
-    
+
     if isnan(weight1)
         return weight2
     elseif isnan(weight2)
@@ -185,14 +185,14 @@ function maxweight(weight1::Float64, weight2::Float64)
     end
 end
 
-    
-function make_graph_symmetric(weights_dict::Dict{Int64,Dict{Int64,Float64}}, edge_rule, edge_merge_fun=maxweight)
+
+function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule, edge_merge_fun=maxweight)
     checked_G = Graph(maximum(keys(weights_dict)))
-    graph_dict = Dict{Int64,Dict{Int64,Float64}}([(target_var, Dict{Int64,Float64}()) for target_var in keys(weights_dict)])
-    
+    graph_dict = Dict{Int,Dict{Int,Float64}}([(target_var, Dict{Int,Float64}()) for target_var in keys(weights_dict)])
+
     for node1 in keys(weights_dict)
         for node2 in keys(weights_dict[node1])
-            
+
             if !has_edge(checked_G, node1, node2)
                 add_edge!(checked_G, node1, node2)
                 weight = weights_dict[node1][node2]
@@ -203,7 +203,7 @@ function make_graph_symmetric(weights_dict::Dict{Int64,Dict{Int64,Float64}}, edg
                 if edge_rule == "AND" && isnan(prev_weight)
                     continue
                 end
-                
+
                 weight = edge_merge_fun(weight, prev_weight)
 
                 graph_dict[node1][node2] = weight
@@ -211,81 +211,81 @@ function make_graph_symmetric(weights_dict::Dict{Int64,Dict{Int64,Float64}}, edg
             end
         end
     end
-    
+
     graph_dict
 end
-    
 
-function map_edge_keys(nbr_dict::Dict{Int64,Dict{Int64,Tuple{Float64,Float64}}}, key_map_dict::Dict{Int64,Int64})
+
+function map_edge_keys(nbr_dict::Dict{Int,Dict{Int,Tuple{Float64,Float64}}}, key_map_dict::Dict{Int,Int})
     new_nbr_dict = similar(nbr_dict)
-        
+
     for (key, sub_dict) in nbr_dict
         if !haskey(key_map_dict, key)
             continue
         end
-        
+
         var_key = key_map_dict[key]
         new_sub_dict = similar(sub_dict)
-            
+
         for (sub_key, sub_val) in sub_dict
             if haskey(key_map_dict, sub_key)
                 var_sub_key = key_map_dict[sub_key]
                 new_sub_dict[var_sub_key] = sub_val
             end
         end
-            
+
         new_nbr_dict[var_key] = new_sub_dict
     end
     new_nbr_dict
 end
-    
+
 
 #function dict_to_graph(graph_dict::Dict{Int64,Dict{Int64,Float64}}, edge_merge_fun=maxweight)
 #    max_key = maximum(keys(graph_dict))
 #    adj_mat = zeros(Float64, max_key, max_key)
 #    #graph = Graph(maximum(keys(graph_dict)))
-#    
+#
 #    for node1 in keys(graph_dict)
 #        for node2 in keys(graph_dict[node1])
 #            weight = graph_dict[node1][node2]
 #            prev_weight = adj_mat[node1, node2]
-#            
+#
 #            if prev_weight != 0.0 && !isnan(weight)
 #                weight = edge_merge_fun([weight, prev_weight])
 #            end
-#            
+#
 #            adj_mat[node1, node2] = weight
 #            adj_mat[node2, node1] = weight
-#            
+#
 #        end
 #    end
-#    
+#
 #    Graph(adj_mat)
-#end 
+#end
 
 
 
 
-function dict_to_adjmat(graph_dict::Dict{Int64,Dict{Int64,Float64}}, header::Vector{String})
+function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::Vector{String})
     #n_nodes = length(graph_dict)
     n_vars = length(header)
     adj_mat = zeros(Float64, (n_vars, n_vars))
     #header = sort(collect(keys(graph_dict)))
     #header_map = Dict(zip(header, 1:length(header)))
-    
+
     for node_index in keys(graph_dict)
         #node_index = #header_map[node]
         nbr_dict = graph_dict[node_index]
-        
+
         for nbr_index in keys(nbr_dict)
             #nbr_index = header_map[nbr]
             weight = nbr_dict[nbr_index]
-            
+
             adj_mat[node_index, nbr_index] = weight
             adj_mat[nbr_index, node_index] = weight
         end
-    end    
-    
+    end
+
     adj_mat = vcat(reshape(header, 1, size(adj_mat, 2)), adj_mat)
     adj_mat = hcat(reshape(["", header...], size(adj_mat, 2) + 1, 1), adj_mat)
     adj_mat

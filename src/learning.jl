@@ -13,7 +13,7 @@ using Cauocc.Statfuns
 using Cauocc.StackChannels
 
 
-function interleaving_phase(T::Int, candidates::Vector{Int}, data,
+function interleaving_phase{ElType <: Real}(T::Int, candidates::Vector{Int}, data::AbstractMatrix{ElType},
     test_name::String, max_k::Int, alpha::Float64, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[],
     data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
     prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0,
@@ -84,7 +84,7 @@ function interleaving_phase(T::Int, candidates::Vector{Int}, data,
 end
 
 
-function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
+function elimination_phase{ElType <: Real}(T::Int, TPC::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String,
     max_k::Int, alpha::Float64, hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=[],
     data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::Vector{Int}=[],
@@ -164,7 +164,7 @@ function elimination_phase(T::Int, TPC::Vector{Int}, data, test_name::String,
 end
 
 
-function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
+function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
     pwr::Float64=0.5, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
         blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
@@ -363,7 +363,7 @@ function si_HITON_PC(T, data; test_name::String="mi", max_k::Int=3, alpha::Float
 end
 
 
-function LGL(data; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, pwr::Float64=0.5,
+function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, pwr::Float64=0.5,
     convergence_threshold::Float64=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
         fast_elim::Bool=true, precluster_sim::Float64=0.0,
         weight_type::String="cond_logpval", edge_rule::String="OR", verbose::Bool=true, update_interval::Float64=30.0,
@@ -553,7 +553,7 @@ end
 
 # SPECIALIZED FUNCTIONS AND TYPES
 
-function pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
+function pw_univar_kernel!{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
     n_vars = size(data, 2)
 
     if nz
@@ -578,7 +578,7 @@ function pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, da
 end
 
 
-function pw_univar_kernel(X, data, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
+function pw_univar_kernel{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
     n_vars = size(data, 2)
 
     if nz
@@ -614,7 +614,7 @@ function condensed_stats_to_dict(n_vars::Int64, pvals::Vector{Float64}, stats::V
 end
 
 
-function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.01, hps::Int=5, FDR::Bool=true,
+function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", alpha::Float64=0.01, hps::Int=5, FDR::Bool=true,
         levels::Vector{Int64}=Int64[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{Float64}=zeros(Float64, 0, 0))
 
@@ -692,7 +692,7 @@ function pw_univar_neighbors(data; test_name::String="mi", alpha::Float64=0.01, 
 end
 
 
-function pw_unistat_matrix(data, test_name::String; parallel::String="single",
+function pw_unistat_matrix{ElType <: Real}(data::AbstractMatrix{ElType}, test_name::String; parallel::String="single",
         pw_stat_dict::Dict{Int64,Dict{Int64,Tuple{Float64,Float64}}}=Dict{Int64,Dict{Int64,Tuple{Float64,Float64}}}())
 
     if isempty(pw_stat_dict)
@@ -711,7 +711,7 @@ function pw_unistat_matrix(data, test_name::String; parallel::String="single",
 end
 
 
-function cluster_data(data, stat_type::String="fz"; cluster_sim_threshold::Float64=0.8, parallel="single",
+function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::String="fz"; cluster_sim_threshold::Float64=0.8, parallel="single",
     ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0))
 
     if isempty(sim_mat)
@@ -774,7 +774,7 @@ function cluster_data(data, stat_type::String="fz"; cluster_sim_threshold::Float
 end
 
 
-function interleaved_worker(data, levels, cor_mat, edge_rule, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel,
+function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels::Vector{Int}, cor_mat, edge_rule, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel,
                             GLL_fun, GLL_args::Dict{Symbol,Any})
     while true
         try
@@ -802,7 +802,7 @@ function interleaved_worker(data, levels, cor_mat, edge_rule, shared_job_q::Remo
     end
 end
 
-function interleaved_backend(target_vars::Vector{Int}, data, all_univar_nbrs, levels, update_interval, GLL_args,
+function interleaved_backend{ElType <: Real}(target_vars::Vector{Int}, data::AbstractMatrix{ElType}, all_univar_nbrs, levels, update_interval, GLL_args,
         convergence_threshold, cor_mat; conv_check_start=0.1, conv_time_step=0.1, parallel="multi", edge_rule="OR",
         verbose=true)
     jobs_total = length(target_vars)

@@ -6,23 +6,7 @@ using StatsBase
 using Cauocc.Misc
 using Cauocc.Learning
 
-"""
-function pw_mi_matrix(data; nz::Bool=false, parallel::String="single")
-    workers_local = nprocs() > 1 ? workers_all_local() : true
-    test_name = nz ? "mi_nz" : "mi"
-    pw_mi_dict = pw_univar_neighbors(data, test_name, parallel=parallel)
 
-    mi_mat = zeros(Float64, size(data, 2), size(data, 2))
-
-    for var_A in keys(pw_mi_dict)
-        for var_B in keys(pw_mi_dict[var_A])
-            (stat, pval) = pw_mi_dict[var_A][var_B]
-            mi_mat[var_A, var_B] = stat
-        end
-    end
-    mi_mat
-end
-"""
 function pseudocount_vars_from_sample_nolog(s::Vector{Float64})
     z_mask = s .== 0
     k = sum(z_mask)
@@ -80,7 +64,7 @@ function adaptive_pseudocount(X::Matrix{Float64})
 end
 
 
-function clr(X::Matrix; pseudo_count::Float64=1e-5, ignore_zeros=false)
+function clr{ElType <: Real}(X::Matrix{ElType}; pseudo_count::Float64=1e-5, ignore_zeros=false)
     if pseudo_count == -1 && !ignore_zeros
         X_trans = clr(adaptive_pseudocount(X), pseudo_count=0.0, ignore_zeros=false)
     else
@@ -98,7 +82,7 @@ function clr(X::Matrix; pseudo_count::Float64=1e-5, ignore_zeros=false)
 end
 
 
-function discretize(x_vec::Vector, n_bins::Int64=3; rank_method::String="tied", disc_method::String="median")
+function discretize{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3; rank_method::String="tied", disc_method::String="median")
     if disc_method == "median"
         if rank_method == "dense"
             x_vec = denserank(x_vec)
@@ -130,13 +114,13 @@ function discretize(x_vec::Vector, n_bins::Int64=3; rank_method::String="tied", 
 end
 
 
-function discretize_nz(x_vec::Vector, n_bins::Int64=3, min_elem::Float64=0.0; rank_method::String="tied")
+function discretize_nz{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3, min_elem::Float64=0.0; rank_method::String="tied")
     nz_indices = findn(x_vec .!= min_elem)
 
     if !isempty(nz_indices)
         x_vec_nz = x_vec[nz_indices]
         disc_nz_vec = discretize(x_vec_nz, n_bins-1, rank_method=rank_method) + 1
-        disc_vec = zeros(Int64, size(x_vec))
+        disc_vec = zeros(Int, size(x_vec))
         disc_vec[nz_indices] = disc_nz_vec
     else
         disc_vec = discretize(x_vec, n_bins-1, rank_method=rank_method) + 1
@@ -146,7 +130,7 @@ function discretize_nz(x_vec::Vector, n_bins::Int64=3, min_elem::Float64=0.0; ra
 end
 
 
-function discretize(X::Matrix; n_bins::Int64=3, nz::Bool=true, min_elem::Float64=0.0, rank_method::String="tied")
+function discretize{ElType <: Real}(X::Matrix{ElType}; n_bins::Int=3, nz::Bool=true, min_elem::Float64=0.0, rank_method::String="tied")
     if nz
         return mapslices(x -> discretize_nz(x, n_bins, min_elem, rank_method=rank_method), X, 1)
     else
@@ -155,8 +139,8 @@ function discretize(X::Matrix; n_bins::Int64=3, nz::Bool=true, min_elem::Float64
 end
 
 
-function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0, clr_pseudo_count::Float64=1e-5, n_bins::Int64=3,
-        verbose::Bool=true, skip_cols::Set{Int64}=Set{Int64}(), make_sparse::Bool=false)
+function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; cluster_sim_threshold::Float64=0.0, clr_pseudo_count::Float64=1e-5, n_bins::Int=3,
+        verbose::Bool=true, skip_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false)
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
@@ -193,7 +177,7 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
         data[zero_mask] = 0.0
     elseif norm == "binary"
         data = sign(data)
-        data = convert(Matrix{Int64}, data)
+        data = convert(Matrix{Int}, data)
 
         unreduced_vars = size(data, 2)
         data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]]
@@ -218,7 +202,7 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
             data = discretize(data, n_bins=n_bins, nz=false)
         end
 
-        data = convert(Matrix{Int64}, data)
+        data = convert(Matrix{Int}, data)
 
         unreduced_vars = size(data, 2)
         data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== n_bins)[:]]
@@ -241,7 +225,7 @@ function preprocess_data(data, norm::String; cluster_sim_threshold::Float64=0.0,
 end
 
 
-function preprocess_data_default(data, test_name::String; verbose::Bool=true, skip_cols::Set{Int64}=Set{Int64}(), make_sparse=false)
+function preprocess_data_default{ElType <: Real}(data::Matrix{ElType}, test_name::String; verbose::Bool=true, skip_cols::Set{Int}=Set{Int}(), make_sparse=false)
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
     data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, skip_cols=skip_cols, make_sparse=make_sparse)
     data

@@ -21,9 +21,9 @@ sufficient_power(levels_x::Int, levels_y::Int, levels_z::Int, n_obs::Int, hps::I
 ### UNIVARIATE ###
 ##################
 
-function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC{Int64,Int64}}, test_name::String, hps::Int,
+function test(X::Int, Y::Int, data::AbstractMatrix{Int}, test_name::String, hps::Int,
     levels_x::Int, levels_y::Int, cont_tab::Array{Int,2}, ni::Array{Int,1}, nj::Array{Int,1}, nz::Bool=false,
-    data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
+    data_row_inds::Vector{Int}=Int64[], data_nzero_vals::Vector{Int}=Int64[])
 
     if nz && !issparse(data) && (levels_y > 2)
         sub_data = @view data[data[:, Y] .!= 0, :]
@@ -69,7 +69,7 @@ function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC
 end
 
 
-function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}}, test_name::String,
+function test(X::Int, Y::Int, data::AbstractMatrix{Float64}, test_name::String,
     cor_mat::Matrix{Float64}=zeros(Float64, 0, 0), nz::Bool=false)
 
     if nz
@@ -91,14 +91,14 @@ function test(X::Int, Y::Int, data::Union{SubArray,Matrix{Float64},SparseMatrixC
         df = 0
         pval = fz_pval(p_stat, size(sub_data, 1), 0)
     else
-        error("$test_name is not a valid test for continuous data")    
+        error("$test_name is not a valid test for continuous data")
     end
     TestResult(p_stat, pval, df, true)
 end
 
 
-function test(X::Int, Ys::Vector{Int}, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC{Int64,Int64}}, test_name::String,
-    hps::Int, levels::Vector{Int}, data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[])
+function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::String,
+    hps::Int, levels::Vector{Int}, data_row_inds::Vector{Int}=Int64[], data_nzero_vals::Vector{Int}=Int64[])
     """Test all variables Ys for univariate association with X"""
 
     levels_x = levels[X]
@@ -116,7 +116,7 @@ function test(X::Int, Ys::Vector{Int}, data::Union{SubArray,Matrix{Int64},Sparse
     end
 end
 
-function test(X::Int, Ys::Array{Int, 1}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}},
+function test(X::Int, Ys::Array{Int, 1}, data::AbstractMatrix{Float64},
         test_name::String, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0))
     """Test all variables Ys for univariate association with X"""
     nz = is_zero_adjusted(test_name)
@@ -128,7 +128,7 @@ end
 ### CONDITIONAL ###
 ###################
 
-function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float64},SparseMatrixCSC{Float64,Int64}},
+function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64},
     test_name::String, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(), nz::Bool=false)
 
@@ -151,7 +151,7 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Float
 end
 
 
-function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64},SparseMatrixCSC{Int64,Int64}},
+function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int},
         test_name::String, hps::Int, levels_x::Int, levels_y::Int, cont_tab::Array{Int,3},
     z::Vector{Int}, ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int,1}, cum_levels::Vector{Int},
     z_map_arr::Vector{Int}, nz::Bool=false, data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
@@ -199,9 +199,9 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::Union{SubArray,Matrix{Int64
 end
 
 
-function test_subsets(X::Int, Y::Int, Z_total::Vector{Int}, data,
+function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::Vector{Int}, data::AbstractMatrix{ElType},
     test_name::String, max_k::Int, alpha::Float64; hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[],
-    data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[], cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
+    data_row_inds::Vector{Int}=Int64[], data_nzero_vals::Vector{Int}=Int64[], cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
