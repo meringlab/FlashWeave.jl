@@ -196,15 +196,8 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
     if is_zero_adjusted(test_name)
         if !isdiscrete(test_name) || levels[T] > 2
-            if issparse(data)
-                data = data[data[:, T] .!= 0, :]
-                #levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
-            else
-                data = @view data[data[:, T] .!= 0, :]
-                #levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
-            end
+            data = @view data[data[:, T] .!= 0, :]
         end
-
     end
 
     if issparse(data) && isdiscrete(test_name)

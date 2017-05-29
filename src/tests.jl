@@ -25,7 +25,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{Int}, test_name::String, hps:
     levels_x::Int, levels_y::Int, cont_tab::Array{Int,2}, ni::Array{Int,1}, nj::Array{Int,1}, nz::Bool=false,
     data_row_inds::Vector{Int}=Int64[], data_nzero_vals::Vector{Int}=Int64[])
 
-    if nz && !issparse(data) && (levels_y > 2)
+    if nz && (levels_y > 2)
         sub_data = @view data[data[:, Y] .!= 0, :]
     else
         sub_data = data
@@ -73,11 +73,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{Float64}, test_name::String,
     cor_mat::Matrix{Float64}=zeros(Float64, 0, 0), nz::Bool=false)
 
     if nz
-        if !issparse(data)
-            sub_data = @view data[data[:, Y] .!= 0, :]
-        else
-            sub_data = data[data[:, Y] .!= 0, :]
-        end
+        sub_data = @view data[data[:, Y] .!= 0, :]
     else
         sub_data = data
     end
@@ -133,11 +129,7 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64},
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(), nz::Bool=false)
 
     if nz
-        if !issparse(data)
-            sub_data = @view data[data[:, Y] .!= 0, :]
-        else
-            sub_data = data[data[:, Y] .!= 0, :]
-        end
+        sub_data = @view data[data[:, Y] .!= 0, :]
     else
         sub_data = data
     end

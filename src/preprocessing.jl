@@ -114,32 +114,33 @@ function discretize{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3; rank_m
 end
 
 
-function discretize_nz{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3, min_elem::Float64=0.0; rank_method::String="tied")
+function discretize_nz{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3, min_elem::Float64=0.0; rank_method::String="tied", disc_method::String="median")
     nz_indices = findn(x_vec .!= min_elem)
 
     if !isempty(nz_indices)
         x_vec_nz = x_vec[nz_indices]
-        disc_nz_vec = discretize(x_vec_nz, n_bins-1, rank_method=rank_method) + 1
+        disc_nz_vec = discretize(x_vec_nz, n_bins-1, rank_method=rank_method, disc_method=disc_method) + 1
         disc_vec = zeros(Int, size(x_vec))
         disc_vec[nz_indices] = disc_nz_vec
     else
-        disc_vec = discretize(x_vec, n_bins-1, rank_method=rank_method) + 1
+        disc_vec = discretize(x_vec, n_bins-1, rank_method=rank_method, disc_method=disc_method) + 1
     end
 
     disc_vec
 end
 
 
-function discretize{ElType <: Real}(X::Matrix{ElType}; n_bins::Int=3, nz::Bool=true, min_elem::Float64=0.0, rank_method::String="tied")
+function discretize{ElType <: Real}(X::Matrix{ElType}; n_bins::Int=3, nz::Bool=true, min_elem::Float64=0.0, rank_method::String="tied", disc_method::String="median")
     if nz
-        return mapslices(x -> discretize_nz(x, n_bins, min_elem, rank_method=rank_method), X, 1)
+        return mapslices(x -> discretize_nz(x, n_bins, min_elem, rank_method=rank_method, disc_method=disc_method), X, 1)
     else
-        return mapslices(x -> discretize(x, n_bins, rank_method=rank_method), X, 1)
+        return mapslices(x -> discretize(x, n_bins, rank_method=rank_method, disc_method=disc_method), X, 1)
     end
 end
 
 
-function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; cluster_sim_threshold::Float64=0.0, clr_pseudo_count::Float64=1e-5, n_bins::Int=3,
+function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; cluster_sim_threshold::Float64=0.0, clr_pseudo_count::Float64=1e-5, n_bins::Int=3, rank_method::String="tied",
+    disc_method::String="median",
         verbose::Bool=true, skip_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false)
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
@@ -197,9 +198,9 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clu
                 min_elem = 0.0
             end
 
-            data = discretize(data, n_bins=n_bins, nz=true, min_elem=min_elem)
+            data = discretize(data, n_bins=n_bins, nz=true, min_elem=min_elem, rank_method=rank_method, disc_method=disc_method)
         else
-            data = discretize(data, n_bins=n_bins, nz=false)
+            data = discretize(data, n_bins=n_bins, nz=false, rank_method=rank_method, disc_method=disc_method)
         end
 
         data = convert(Matrix{Int}, data)
