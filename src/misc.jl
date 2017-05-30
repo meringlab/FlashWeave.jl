@@ -7,18 +7,20 @@ export HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_rea
 
 const inf_weight = 708.3964185322641
 
-type HitonState
-    phase :: String
-    state_results :: Dict{Int,Tuple{Float64,Float64}}
-    unchecked_vars :: Vector{Int}
-end
-
 type TestResult
     stat :: Float64
     pval :: Float64
     df :: Int
     suff_power :: Bool
 end
+
+type HitonState
+    phase :: String
+    state_results :: Dict{Int,Tuple{Float64,Float64}}
+    unchecked_vars :: Vector{Int}
+    state_rejections :: Dict{Int,Tuple{Tuple,TestResult}}
+end
+
 
 type IndexPair
     min_ind :: Int

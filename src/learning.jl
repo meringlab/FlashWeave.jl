@@ -18,7 +18,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::Vector{Int}, dat
     data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
     prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0,
     whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
+    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
 
 
     is_nz = is_zero_adjusted(test_name)
@@ -58,7 +58,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::Vector{Int}, dat
             sub_data = data
         end
 
-        test_result = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps,
+        (test_result, lowest_sig_Zs) = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps,
                                    pwr=pwr, levels=levels, data_row_inds=data_row_inds,
                                    data_nzero_vals=data_nzero_vals, cor_mat=cor_mat,
                                    pcor_set_dict=pcor_set_dict)
@@ -70,8 +70,13 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::Vector{Int}, dat
             if debug > 0
                 println("\taccepted: ", test_result)
             end
-        elseif debug > 0
-            println("\trejected: ", test_result)
+        else
+            if track_rejections
+                rej_dict[candidate] = (tuple(lowest_sig_Zs...), test_result)
+            end
+            if debug > 0
+                println("\trejected: ", test_result)
+            end
         end
 
         if cand_index < n_candidates && stop_reached(start_time, time_limit)
@@ -90,7 +95,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::Vector{Int}, data::Abstr
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::Vector{Int}=[],
     time_limit::Float64=0.0, start_time::Float64=0.0, debug::Int=0, whitelist::Set{Int}=Set{Int}(),
     blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
+    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
 
     is_nz = is_zero_adjusted(test_name)
     is_discrete = isdiscrete(test_name)
@@ -136,12 +141,16 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::Vector{Int}, data::Abstr
             sub_data = data
         end
 
-        test_result = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps,
+        (test_result, lowest_sig_Zs) = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps,
                                    levels=levels, data_row_inds=data_row_inds, data_nzero_vals=data_nzero_vals,
                                    cor_mat=cor_mat, pcor_set_dict=pcor_set_dict)
 
         if !issig(test_result, alpha)
             deleteat!(PC, findin(PC, candidate))
+
+            if track_rejections
+                rej_dict[candidate] = (tuple(lowest_sig_Zs...), test_result)
+            end
 
             if debug > 0
                 println("\trejected: ", test_result)
@@ -170,13 +179,14 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{Int64}=Int64[],
     univar_step::Bool=true, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(),
-    prev_state::HitonState=HitonState("S", Dict(), []), debug::Int=0, time_limit::Float64=0.0)
+    prev_state::HitonState=HitonState("S", Dict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
 
     if debug > 0
         println("Finding neighbors for $T")
     end
 
-    state = HitonState("S", Dict(), [])
+    state = HitonState("S", Dict(), [], Dict())
+    rej_dict = Dict{Int, Tuple{Tuple,TestResult}}()
 
     if isdiscrete(test_name)
         if isempty(levels)
@@ -187,6 +197,8 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             state.phase = "F"
             state.state_results = Dict{Int,Tuple{Float64,Float64}}()
             state.unchecked_vars = Int64[]
+            state.state_rejections = rej_dict
+
             return state
         end
     else
@@ -268,6 +280,8 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 state.phase = "F"
                 state.state_results = Dict{Int,Tuple{Float64,Float64}}()
                 state.unchecked_vars = Int64[]
+                state.state_rejections = rej_dict
+
                 return state
             end
 
@@ -276,7 +290,8 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                                                                 alpha, hps, pwr, levels, data_row_inds,
                                                                 data_nzero_vals, prev_TPC_dict, time_limit,
                                                                 start_time, debug, whitelist, blacklist, cor_mat,
-                                                                pcor_set_dict)
+                                                                pcor_set_dict, rej_dict,
+                                                                track_rejections)
 
             # set test stats of the initial candidate to its univariate association results
             if prev_state.phase == "S"
@@ -292,6 +307,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 state.phase = "I"
                 state.state_results = TPC_dict
                 state.unchecked_vars = candidates_unchecked
+                state.state_rejections = rej_dict
 
                 return state
             end
@@ -321,7 +337,8 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
                                                    hps, pwr, levels, data_row_inds, data_nzero_vals,
                                                    prev_PC_dict, PC_unchecked, time_limit, start_time,
-                                                   debug, whitelist, blacklist, cor_mat, pcor_set_dict)
+                                                   debug, whitelist, blacklist, cor_mat, pcor_set_dict, rej_dict,
+                                                   track_rejections)
 
         if !isempty(TPC_unchecked)
 
@@ -332,6 +349,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             state.phase = "E"
             state.state_results = PC_dict
             state.unchecked_vars = TPC_unchecked
+            state.state_rejections = rej_dict
 
             return state
         end
@@ -350,6 +368,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
     state.phase = "F"
     state.state_results = PC_dict
     state.unchecked_vars = Int64[]
+    state.state_rejections = rej_dict
 
     state
 end
@@ -360,7 +379,8 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         fast_elim::Bool=true, precluster_sim::Float64=0.0,
         weight_type::String="cond_logpval", edge_rule::String="OR", verbose::Bool=true, update_interval::Float64=30.0,
         edge_merge_fun=maxweight,
-    debug::Int=0, time_limit::Float64=-1.0, header::Vector{String}=String[], recursive_pcor::Bool=true)
+    debug::Int=0, time_limit::Float64=-1.0, header::Vector{String}=String[], recursive_pcor::Bool=true,
+    track_rejections::Bool=false)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
@@ -369,7 +389,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
     kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :pwr => pwr, :FDR => FDR,
     :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
-    :time_limit => time_limit)
+    :time_limit => time_limit, :track_rejections => track_rejections)
 
     if time_limit == -1.0
         if parallel == "multi_il"
@@ -498,8 +518,11 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
         end
 
-        #if !endswith(parallel, "il")
         nbr_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
+
+        if track_rejections
+            rej_dict = Dict([(target_var, nbr_state.state_rejections) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
+        end
     end
 
     if verbose
@@ -535,7 +558,13 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         end
     end
 
-    convert(Dict{Int64,Dict{Int64, Float64}}, graph_dict)
+    return_dict = convert(Dict{Int,Dict{Int, Float64}}, graph_dict)
+
+    if track_rejections
+        return return_dict, rej_dict
+    else
+        return return_dict
+    end
 end
 
 
@@ -815,7 +844,7 @@ function interleaved_backend{ElType <: Real}(target_vars::Vector{Int}, data::Abs
     queued_jobs = 0
     waiting_vars = Stack(Int)
     for (i, target_var) in enumerate(reverse(target_vars))
-        job = (target_var, all_univar_nbrs[target_var], HitonState("S", Dict(), []), Set{Int}())
+        job = (target_var, all_univar_nbrs[target_var], HitonState("S", Dict(), [], Dict()), Set{Int}())
 
         if i < jobs_total - n_workers
             push!(waiting_vars, target_var)
@@ -884,7 +913,7 @@ function interleaved_backend{ElType <: Real}(target_vars::Vector{Int}, data::Abs
 
                 # kill workers if not needed anymore
                 if remaining_jobs < n_workers
-                    kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState("S", Dict(), []), Set{Int}())
+                    kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState("S", Dict(), [], Dict()), Set{Int}())
                     put!(shared_job_q, kill_signal)
                     kill_signals_sent += 1
                 end
@@ -899,7 +928,7 @@ function interleaved_backend{ElType <: Real}(target_vars::Vector{Int}, data::Abs
                 next_var = pop!(waiting_vars)
                 var_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, next_var)) : Set(neighbors(graph, next_var))
 
-                job = (next_var, all_univar_nbrs[next_var], HitonState("S", Dict(), []), var_nbrs)
+                job = (next_var, all_univar_nbrs[next_var], HitonState("S", Dict(), [], Dict()), var_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
 

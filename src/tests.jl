@@ -197,6 +197,7 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::Vector{Int}, data
     pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
+    lowest_sig_Zs = Int[]
     discrete_test = isdiscrete(test_name)
     num_tests = 0
     nz = is_zero_adjusted(test_name)
@@ -243,19 +244,20 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::Vector{Int}, data
 
                 if num_lowpwr_tests / num_tests >= 1 - pwr
                     lowest_sig_result.suff_power = false
-                    return lowest_sig_result
+                    return lowest_sig_result, Zs
                 end
             else
                 if !issig(test_result, alpha)
-                    return test_result
+                    return test_result, Zs
                 elseif test_result.pval > lowest_sig_result.pval
                     lowest_sig_result = test_result
+                    lowest_sig_Zs = Zs
                 end
             end
         end
     end
 
-    lowest_sig_result
+    lowest_sig_result, lowest_sig_Zs
 end
 
 end
