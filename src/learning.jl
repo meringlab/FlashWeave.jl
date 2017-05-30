@@ -408,6 +408,11 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         warn("Specify 'time_limit' when using interleaved parallelism to increase speed.")
     end
 
+    if track_rejections && (time_limit != 0.0)
+        warn("Can't use track_rejections with a time_limit, omitting tracking")
+        kwargs[:track_rejections] = false
+    end
+
     if recursive_pcor && iscontinuous(test_name)
         warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated
               variables, caution advised")
@@ -532,6 +537,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     if precluster_sim != 0.0
         nbr_dict = map_edge_keys(nbr_dict, clust_var_dict)
         all_univar_nbrs = map_edge_keys(all_univar_nbrs, clust_var_dict)
+
+        if track_rejections
+            rej_dict = map_edge_keys(rej_dict, clust_var_dict)
+        end
     end
 
     weights_dict = Dict{Int,Dict{Int,Float64}}()
@@ -729,7 +738,11 @@ end
 
 
 function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::String="fz"; cluster_sim_threshold::Float64=0.8, parallel="single",
-    ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0))
+    ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0), verbose::Bool=false)
+
+    if verbose
+        println("Computing pairwise distances")
+    end
 
     if isempty(sim_mat)
         sim_mat = pw_unistat_matrix(data, stat_type, parallel=parallel)
@@ -749,6 +762,10 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
     if ordering == "size"
         var_sizes = sum(data, 1)
         sort!(var_order, by=x -> var_sizes[x], rev=true)
+    end
+
+    if verbose
+        println("Clustering")
     end
 
     for var_A in var_order

@@ -158,7 +158,7 @@ function mi_pval(mi::Float64, df::Int, n_obs::Int)
 end
 
 
-function mutual_information(cont_tab::AbstractArray{Int, 3})
+function mutual_information(cont_tab::AbstractArray{Int})
     num_dims = ndims(cont_tab)
     levels_x = size(cont_tab, 1)
     levels_y = size(cont_tab, 2)

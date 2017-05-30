@@ -3,6 +3,7 @@ module Preprocessing
 export preprocess_data, preprocess_data_default
 
 using StatsBase
+using DataFrames
 using Cauocc.Misc
 using Cauocc.Learning
 
@@ -139,16 +140,31 @@ function discretize{ElType <: Real}(X::Matrix{ElType}; n_bins::Int=3, nz::Bool=t
 end
 
 
-function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; cluster_sim_threshold::Float64=0.0, clr_pseudo_count::Float64=1e-5, n_bins::Int=3, rank_method::String="tied",
+function factors_to_binary_cols!(data_df::DataFrame, factor_cols::Vector{Symbol})
+    for f_col in factor_cols
+        f_vec = data_df[:, f_col]
+        f_uniques = unique(f_vec)
+        if length(f_uniques) > 2
+            for unique_val in f_uniques
+                new_col = Symbol("$(f_col)_$unique_val")
+                data_df[new_col] = convert(Vector{Int}, f_vec .== unique_val)
+            end
+            delete!(data_df, f_col)
+        end
+    end    
+end
+
+
+function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr_pseudo_count::Float64=1e-5, n_bins::Int=3, rank_method::String="tied",
     disc_method::String="median",
-        verbose::Bool=true, skip_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false)
+        verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false, factor_cols::Set{Int}=Set{Int}())
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
 
-    if !isempty(skip_cols)
-        skip_data = data[:, sort(collect(skip_cols))]
-        data = data[:, map(x -> !(x in skip_cols), 1:size(data, 2))]
+    if !isempty(env_cols)
+        env_data = data[:, sort(collect(env_cols))]
+        data = data[:, map(x -> !(x in env_cols), 1:size(data, 2))]
     end
 
     unfilt_dims = size(data)
@@ -186,6 +202,11 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clu
         if verbose
             println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than 2 levels")
         end
+
+        if !isempty(env_cols)
+            env_data = discretize(env_data, nz=false, n_bins=2)
+            env_data = convert(Matrix{Int}, env_data)
+        end
     elseif startswith(norm, "binned")
         if startswith(norm, "binned_nz")
             if endswith(norm, "rows")
@@ -211,12 +232,17 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clu
         if verbose
             println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
         end
+
+        if !isempty(env_cols)
+            env_data = discretize(env_data, nz=false, n_bins=n_bins)
+            env_data = convert(Matrix{Int}, env_data)
+        end
     else
         error("$norm is no valid normalization method.")
     end
 
-    if !isempty(skip_cols)
-        data = hcat(data, convert(typeof(data), skip_data))
+    if !isempty(env_cols)
+        data = hcat(data, convert(typeof(data), env_data))
     end
 
     if make_sparse
@@ -226,9 +252,9 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clu
 end
 
 
-function preprocess_data_default{ElType <: Real}(data::Matrix{ElType}, test_name::String; verbose::Bool=true, skip_cols::Set{Int}=Set{Int}(), make_sparse=false)
+function preprocess_data_default{ElType <: Real}(data::Matrix{ElType}, test_name::String; verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse=false, factor_cols::Set{Int}=Set{Int}())
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
-    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, skip_cols=skip_cols, make_sparse=make_sparse)
+    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, env_cols=env_cols, make_sparse=make_sparse, factor_cols=factor_cols)
     data
 end
 
