@@ -204,8 +204,8 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         data_row_inds = rowvals(data)
         data_nzero_vals = nonzeros(data)
     else
-        data_row_inds = Int64[]
-        data_nzero_vals = Int64[]
+        data_row_inds = Int[]
+        data_nzero_vals = Int[]
     end
 
     test_variables = filter(x -> x != T, 1:size(data, 2))
@@ -268,7 +268,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 state.phase = "F"
                 state.state_results = Dict{Int,Tuple{Float64,Float64}}()
                 state.unchecked_vars = Int64[]
-                return state#Dict{Int,Float64}()
+                return state
             end
 
             # interleaving phase
@@ -309,7 +309,6 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
 
         # elimination phase
-
         if prev_state.phase == "E"
             prev_PC_dict = prev_state.state_results
             PC_unchecked = prev_state.unchecked_vars
@@ -405,11 +404,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         cor_mat = zeros(Float64, 0, 0)
     else
         levels = Int64[]
-        #if recursive_pcor
-        #    cor_mat = is_zero_adjusted(test_name) ? cor_nz(data) : cor(data)
-        #else
-        #    cor_mat = zeros(Float64, 0, 0)
-        #end
+
         if recursive_pcor && !is_zero_adjusted(test_name)
             cor_mat = cor(data)
         else

@@ -22,7 +22,7 @@ sufficient_power(levels_x::Int, levels_y::Int, levels_z::Int, n_obs::Int, hps::I
 ##################
 
 function test(X::Int, Y::Int, data::AbstractMatrix{Int}, test_name::String, hps::Int,
-    levels_x::Int, levels_y::Int, cont_tab::Array{Int,2}, ni::Array{Int,1}, nj::Array{Int,1}, nz::Bool=false,
+    levels_x::Int, levels_y::Int, cont_tab::Matrix{Int}, ni::Vector{Int}, nj::Vector{Int}, nz::Bool=false,
     data_row_inds::Vector{Int}=Int64[], data_nzero_vals::Vector{Int}=Int64[])
 
     if nz && (levels_y > 2)
@@ -104,7 +104,7 @@ function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::Str
     else
         max_level_y = maximum(levels[Ys])
         cont_tab = zeros(Int, levels_x, max_level_y)
-        ni = zeros(Int, max_level_y)
+        ni = zeros(Int, levels_x)
         nj = zeros(Int, max_level_y)
         nz = is_zero_adjusted(test_name)
 
