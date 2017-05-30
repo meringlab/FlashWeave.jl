@@ -51,15 +51,15 @@ function contingency_table(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix
     max_k = length(Zs)
     levels_x = levels[X]
     levels_y = levels[Y]
-    max_levels = maximum(levels)
-    max_levels_z = sum([max_levels^(i+1) for i in 1:max_k])
+    #max_levels = maximum(levels)
+    max_levels_z = sum([maximum(levels[Zs])^(i+1) for i in 1:max_k])
     cont_tab = zeros(Int, levels_x, levels_y, max_levels_z)
     z = zeros(Int, size(data, 1))
     cum_levels = zeros(Int, max_k + 1)
     make_cum_levels!(cum_levels, Zs, levels)
     z_map_arr = zeros(Int, max_levels_z)
 
-    contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr, nz)
+    contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr)
 
     cont_tab
 end

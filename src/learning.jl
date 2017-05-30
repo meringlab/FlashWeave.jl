@@ -263,6 +263,10 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             if prev_state.phase == "I"
                 prev_TPC_dict = prev_state.state_results
                 candidates = prev_state.unchecked_vars
+
+                if track_rejections
+                    rej_dict = prev_state.state_rejections
+                end
             else
                 # sort candidates
                 candidate_pval_pairs = [(candidate, univar_nbrs[candidate][2]) for candidate in keys(univar_nbrs)]
@@ -329,6 +333,10 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             prev_PC_dict = prev_state.state_results
             PC_unchecked = prev_state.unchecked_vars
             PC_candidates = [keys(prev_PC_dict)..., PC_unchecked...]
+
+            if track_rejections
+                rej_dict = prev_state.state_rejections
+            end
         else
             prev_PC_dict = Dict{Int,Tuple{Float64,Float64}}()
             PC_unchecked = Int[]
