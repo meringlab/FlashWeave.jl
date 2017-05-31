@@ -94,7 +94,7 @@ end
 
 
 function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::String,
-    hps::Int, levels::Vector{Int}, data_row_inds::Vector{Int}=Int64[], data_nzero_vals::Vector{Int}=Int64[])
+    hps::Int, levels::Vector{Int}, data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{Int}=Int[])
     """Test all variables Ys for univariate association with X"""
 
     levels_x = levels[X]
@@ -110,6 +110,20 @@ function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::Str
 
         return map(Y -> test(X, Y, data, test_name, hps, levels_x, levels[Y], cont_tab, ni, nj, nz, data_row_inds, data_nzero_vals), Ys)
     end
+end
+
+function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::String, hps::Int=5)
+    levels = get_levels(data)
+
+    if issparse(data)
+        data_row_inds = rowvals(data)
+        data_nzero_vals = nonzeros(data)
+    else
+        data_row_inds = Int[]
+        data_nzero_vals = Int[]
+    end
+
+    test(X, Ys, data, test_name, hps, levels, data_row_inds, data_nzero_vals)
 end
 
 function test(X::Int, Ys::Array{Int, 1}, data::AbstractMatrix{Float64},
@@ -143,11 +157,18 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64},
 end
 
 
+function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64}, test_name::String, recursive::Bool=true)
+    cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)
+    pcor_set_dict = Dict{String,Dict{String,Float64}}()
+    test(X, Y, Zs, data, test_name, cor_mat, pcor_set_dict, is_zero_adjusted(test_name))
+end
+
+
 function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int},
         test_name::String, hps::Int, levels_x::Int, levels_y::Int, cont_tab::Array{Int,3},
     z::Vector{Int}, ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int,1}, cum_levels::Vector{Int},
-    z_map_arr::Vector{Int}, nz::Bool=false, data_row_inds::Vector{Int64}=Int64[], data_nzero_vals::Vector{Int64}=Int64[],
-    levels::Vector{Int64}=Int64[])
+    z_map_arr::Vector{Int}, nz::Bool=false, data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{Int}=Int[],
+    levels::Vector{Int}=Int[])
     """Test association between X and Y"""
 
     if !issparse(data)
@@ -188,6 +209,35 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int},
         end
     end
     Misc.TestResult(mi_stat, pval, df, suff_power)
+end
+
+
+function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int}, test_name::String, hps::Int=5)
+    levels = get_levels(data)
+    levels_x = levels[X]
+    levels_y = levels[Y]
+    max_levels = maximum(levels)
+    max_k = length(Zs)
+
+    max_levels_z = sum([max_levels^(i+1) for i in 1:max_k])
+    cont_tab = zeros(Int, levels_x, levels_y, max_levels_z)
+    z = zeros(Int, size(data, 1))
+    ni = zeros(Int, levels_x, max_levels_z)
+    nj = zeros(Int, levels_y, max_levels_z)
+    nk = zeros(Int, max_levels_z)
+    cum_levels = zeros(Int, max_k + 1)
+    make_cum_levels!(cum_levels, Zs, levels)
+    z_map_arr = zeros(Int, max_levels_z)
+
+    if issparse(data)
+        data_row_inds = rowvals(data)
+        data_nzero_vals = nonzeros(data)
+    else
+        data_row_inds = Int[]
+        data_nzero_vals = Int[]
+    end
+
+    test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z, ni, nj, nk, cum_levels, z_map_arr, is_zero_adjusted(test_name), data_row_inds, data_nzero_vals, levels)
 end
 
 

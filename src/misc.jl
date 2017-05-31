@@ -40,6 +40,11 @@ function get_levels(col_vec::Vector{Int})
 end
 
 
+function get_levels(data::AbstractMatrix{Int})
+    map(x -> get_levels(data[:, x]), 1:size(data, 2))
+end
+
+
 function min_sec_indices!(ind_pair::IndexPair, index_vec::Vector{Int})
     min_ind = 0
     sec_ind = 0

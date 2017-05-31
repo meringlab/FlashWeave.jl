@@ -433,10 +433,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         if verbose
             println("Computing levels..")
         end
-        levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+        levels = get_levels(data)
         cor_mat = zeros(Float64, 0, 0)
     else
-        levels = Int64[]
+        levels = Int[]
 
         if recursive_pcor && !is_zero_adjusted(test_name)
             cor_mat = cor(data)
