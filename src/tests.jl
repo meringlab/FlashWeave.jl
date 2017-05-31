@@ -139,8 +139,8 @@ end
 ###################
 
 function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64},
-    test_name::String, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}(), nz::Bool=false)
+    test_name::String, nz::Bool, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
+    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
 
     if nz
         sub_data = @view data[data[:, Y] .!= 0, :]
@@ -157,11 +157,11 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64},
 end
 
 
-# function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64}, test_name::String, recursive::Bool=true)
-#     cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)
-#     pcor_set_dict = Dict{String,Dict{String,Float64}}()
-#     test(X, Y, Zs, data, test_name, cor_mat, pcor_set_dict, is_zero_adjusted(test_name))
-# end
+function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64}, test_name::String, recursive::Bool=true)
+    cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)
+    pcor_set_dict = Dict{String,Dict{String,Float64}}()
+    test(X, Y, Zs, data, test_name, is_zero_adjusted(test_name), cor_mat, pcor_set_dict)
+end
 
 
 function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int},
@@ -283,7 +283,7 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::Vector{Int}, data
                 test_result = test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z,
                                    ni, nj, nk, cum_levels, z_map_arr, nz, data_row_inds, data_nzero_vals, levels)
             else
-                test_result = test(X, Y, Zs, data, test_name, cor_mat, pcor_set_dict, nz)
+                test_result = test(X, Y, Zs, data, test_name, nz, cor_mat, pcor_set_dict)
             end
             num_tests += 1
 
