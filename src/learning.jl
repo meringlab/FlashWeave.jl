@@ -388,7 +388,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         weight_type::String="cond_logpval", edge_rule::String="OR", verbose::Bool=true, update_interval::Float64=30.0,
         edge_merge_fun=maxweight,
     debug::Int=0, time_limit::Float64=-1.0, header::Vector{String}=String[], recursive_pcor::Bool=true,
-    track_rejections::Bool=false)
+    track_rejections::Bool=false, fully_connect_clusters::Bool=false)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
@@ -446,6 +446,11 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     end
 
     pcor_set_dict = Dict{String,Dict{String,Float64}}()
+
+    if track_rejections
+        rej_dict = Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
+    end
+
     if global_univar
         # precompute univariate associations and sort variables (fewest neighbors first)
         if verbose
@@ -534,7 +539,9 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         nbr_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
 
         if track_rejections
-            rej_dict = Dict([(target_var, nbr_state.state_rejections) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
+            for (target_var, nbr_state) in zip(target_vars, nbr_results)
+                rej_dict[target_var] = nbr_state.state_rejections
+            end
         end
     end
 
@@ -558,7 +565,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
     graph_dict = make_graph_symmetric(weights_dict, edge_rule)
 
-    if precluster_sim != 0.0
+    if precluster_sim != 0.0 && fully_connect_clusters
         for (clust_repres, clust_members) in clust_dict
             for member in clust_members
                 if member != clust_repres

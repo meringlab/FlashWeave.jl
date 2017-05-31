@@ -36,18 +36,25 @@ function make_network(data, test_name, make_sparse=false; kwargs...)
 end
 
 function get_num_nbr(data, test_name, make_sparse=false; kwargs...)
-    graph_dict = make_network(data, test_name, make_sparse; kwargs...)
+    graph_res = make_network(data, test_name, make_sparse; kwargs...)
+    kwargs_dict = Dict(kwargs)
+    graph_dict = haskey(kwargs_dict, :track_rejections) && kwargs_dict[:track_rejections] ? graph_res[1] : graph_res
+
     map(length, [graph_dict[key] for key in sort(collect(keys(graph_dict)))])
 end
 
-@testset "single" begin
+@testset "major_test_modes" begin
     for (test_name, sub_dict) in exp_num_nbr_dict
         @testset "$test_name" begin
             for (max_k, exp_num_nbr) in sub_dict
                 @testset "max_k $max_k" begin
                     for make_sparse in [true, false]
                         @testset "sparse $make_sparse" begin
-                            @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single") .== exp_num_nbr)
+                            for parallel in ["single", "multi_il"]
+                                @testset "parallel $parallel" begin
+                                    @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel=parallel, time_limit=0.0) .== exp_num_nbr)
+                                end
+                            end
                         end
                     end
                 end
@@ -56,16 +63,22 @@ end
     end
 end
 
-"""
-@testset "parallel" begin
-    for (test_name, sub_dict) in exp_num_nbr_dict
-        for (max_k, exp_num_nbr) in sub_dict
-            for make_sparse in [true, false]
-                num_diffs = get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="multi_il", time_limit=0.0) .-
-                            exp_num_nbr |> abs |> sum
-                @test (test_name == "mi" && num_diffs == 20) || num_diffs == 0
-            end
-        end
-    end
+@testset "track_rejections" begin
+    exp_num_nbr = exp_num_nbr_dict["fz"][3]
+    @test all(get_num_nbr(data, "fz", false, max_k=3, parallel="single", track_rejections=true) .== exp_num_nbr)
+    exp_num_nbr = exp_num_nbr_dict["mi"][0]
+    @test all(get_num_nbr(data, "mi", false, max_k=0, parallel="single", track_rejections=true) .== exp_num_nbr)
 end
-"""
+
+@testset "preclustering" begin
+    test_name = "fz"
+    make_sparse = false
+    max_k = 3
+    precluster_sim = 0.2
+    exp_num_nbr = [1,1,0,2,0,0,1,0,0,2,0,1,2,1,0,0,0,0,2,1,0,0,0,0,2,0,1,0,1,0,1,1]
+    @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=false) .== exp_num_nbr)
+    exp_num_nbr = [1,2,1,1,1,1,5,0,2,0,2,1,1,3,0,3,0,5,3,1,
+                   4,2,1,4,1,0,1,1,3,2,4,1,2,0,2,1,3,0,3,0,
+                   2,1,0,2,0,1,1,0,2,2]
+    @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=true) .== exp_num_nbr)
+end

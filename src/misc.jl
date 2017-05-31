@@ -218,7 +218,7 @@ function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
 end
 
 
-function map_edge_keys(nbr_dict::Dict{Int,Dict{Int,Tuple{Float64,Float64}}}, key_map_dict::Dict{Int,Int})
+function map_edge_keys{T}(nbr_dict::Dict{Int,Dict{Int,T}}, key_map_dict::Dict{Int,Int})
     new_nbr_dict = similar(nbr_dict)
 
     for (key, sub_dict) in nbr_dict
