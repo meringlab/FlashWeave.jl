@@ -9,6 +9,12 @@ using Base.Test
 
 for test_module in ["preprocessing.jl", "misc.jl", "contingency.jl", "statfuns.jl",
                     "tests.jl", "learning.jl"]
-    println("\nTesting $test_module (this will take a moment)")
+
+    println("\nTesting $test_module")
+    if test_module == "learning.jl"
+        println("(this will take a moment)")
+    end
     include(test_module)
 end
+
+println("\n\n Finished testing.")

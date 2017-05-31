@@ -1,19 +1,19 @@
 using Cauocc
 using Base.Test
 
-const vec1 = [0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1]
-const vec2 = [0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1]
-const vec3 = [0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 2]
-const vec4 = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
-const ctab12 = [4 2; 2 4]
-const ctab23 = [6 0 0; 0 5 1]
-const ctab12_3 = zeros(Int, 2, 2, 3)
+vec1 = [0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1]
+vec2 = [0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1]
+vec3 = [0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 2]
+vec4 = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
+ctab12 = [4 2; 2 4]
+ctab23 = [6 0 0; 0 5 1]
+ctab12_3 = zeros(Int, 2, 2, 3)
 ctab12_3[1, 1, 1] = 4
 ctab12_3[2, 1, 1] = 2
 ctab12_3[1, 2, 2] = 2
 ctab12_3[2, 2, 2] = 3
 ctab12_3[2, 2, 3] = 1
-const ctab12_34 = zeros(Int, 2, 2, 6)
+ctab12_34 = zeros(Int, 2, 2, 6)
 ctab12_34[1, 1, 1] = 2
 ctab12_34[1, 2, 2] = 2
 ctab12_34[2, 2, 2] = 2
@@ -22,7 +22,7 @@ ctab12_34[2, 1, 3] = 2
 ctab12_34[2, 2, 4] = 1
 ctab12_34[2, 2, 5] = 1
 
-const data_contingency = hcat(vec1, vec2, vec3, vec4)
+data_contingency = hcat(vec1, vec2, vec3, vec4)
 
 for sparsity_mode in ["dense", "sparse"]
     @testset "$sparsity_mode" begin

@@ -1,10 +1,11 @@
 using Cauocc
 using DataFrames
+using JLD
 using Base.Test
 
-const data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 
-const exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4,15,23,3,4,8,8,
+exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4,15,23,3,4,8,8,
                                                  13,4,4,22,3,7,12,6,14,11,16,18,11,17,8,6,6,1,
                                                  2,12,2,20,9,10,19,5,1,11,9,7,16],
                                            3 => [10,4,1,4,3,6,6,2,3,2,4,5,2,7,6,2,3,2,3,3,2,
@@ -29,19 +30,56 @@ const exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4
                                                     0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,3,0,0,1,0,0,
                                                     0,0,0,0]))
 
+exp_dict = load(joinpath(pwd(), "test", "data", "learning_expected.jld"))
 
 function make_network(data, test_name, make_sparse=false; kwargs...)
     data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse)
-    graph_dict = LGL(data_norm; test_name=test_name, verbose=false, kwargs...)
+    kwargs_dict = Dict(kwargs)
+    graph_res = LGL(data_norm; test_name=test_name, verbose=false, kwargs...)
+    graph_dict = haskey(kwargs_dict, :track_rejections) && kwargs_dict[:track_rejections] ? graph_res[1] : graph_res
+end
+
+function get_num_nbr(graph_dict)
+    map(length, [graph_dict[key] for key in sort(collect(keys(graph_dict)))])
 end
 
 function get_num_nbr(data, test_name, make_sparse=false; kwargs...)
-    graph_res = make_network(data, test_name, make_sparse; kwargs...)
+    graph_dict = make_network(data, test_name, make_sparse; kwargs...)
     kwargs_dict = Dict(kwargs)
-    graph_dict = haskey(kwargs_dict, :track_rejections) && kwargs_dict[:track_rejections] ? graph_res[1] : graph_res
-
     map(length, [graph_dict[key] for key in sort(collect(keys(graph_dict)))])
 end
+
+function compare_graph_dicts(g1, g2, verbose=false)
+    if Set(keys(g1)) != Set(keys(g2))
+        if verbose
+            println("Upper level keys don't match")
+        end
+        return false
+    end
+
+    for T in keys(g1)
+        nbr_dict1 = g1[T]
+        nbr_dict2 = g2[T]
+
+        if Set(keys(nbr_dict1)) != Set(keys(nbr_dict2))
+            if verbose
+                println("Neighbors for node $T dont match")
+            end
+            return false
+        end
+
+        for nbr in keys(nbr_dict1)
+            if !isapprox(nbr_dict1[nbr], nbr_dict2[nbr], rtol=1e-6)
+                if verbose
+                    println("Weights for node $T and neighbor $nbr dont fit: $(nbr_dict1[nbr]), $(nbr_dict2[nbr])")
+                end
+                return false
+            end
+        end
+    end
+    true
+end
+
 
 @testset "major_test_modes" begin
     for (test_name, sub_dict) in exp_num_nbr_dict
@@ -52,11 +90,19 @@ end
                         @testset "sparse $make_sparse" begin
                             for parallel in ["single", "multi_il"]
                                 @testset "parallel $parallel" begin
-                                    if parallel == "single"
-                                        @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel=parallel, time_limit=0.0) .== exp_num_nbr)
-                                    else
-                                        num_diffs = get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel=parallel, time_limit=0.0) .- exp_num_nbr |> abs |> sum
-                                        @test (test_name == "mi" && num_diffs == 20) || num_diffs == 0
+                                    graph_dict = make_network(data, test_name, make_sparse, max_k=max_k, parallel=parallel, time_limit=0.0)
+                                    exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)_sparse$(make_sparse)"]
+                                    @testset "edge_identity" begin
+                                        @test compare_graph_dicts(graph_dict, exp_graph_dict)
+                                    end
+
+                                    @testset "num_neighbors" begin
+                                        if parallel == "single"
+                                            @test all(get_num_nbr(graph_dict) .== exp_num_nbr)
+                                        else
+                                            num_diffs = get_num_nbr(graph_dict) .- exp_num_nbr |> abs |> sum
+                                            @test (test_name == "mi" && num_diffs == 20) || num_diffs == 0
+                                        end
                                     end
                                 end
                             end
@@ -67,6 +113,7 @@ end
         end
     end
 end
+
 
 @testset "track_rejections" begin
     exp_num_nbr = exp_num_nbr_dict["fz"][3]
@@ -92,3 +139,21 @@ end
         @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=true, track_rejections=true) .== exp_num_nbr)
     end
 end
+
+# to create expected output
+
+ # exp_dict = Dict()
+ # for (test_name, sub_dict) in exp_num_nbr_dict
+ #     for (max_k, exp_num_nbr) in sub_dict
+ #         for make_sparse in [true, false]
+ #             for parallel in ["single", "multi_il"]
+ #                 graph_dict = make_network(data, test_name, make_sparse, max_k=max_k, parallel=parallel, time_limit=0.0)
+ #                  exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)_sparse$(make_sparse)"] = graph_dict
+ #              end
+ #          end
+ #      end
+ #  end
+ #
+ #  out_path = joinpath(pwd(), "test", "data", "learning_expected.jld")
+ #  rm(out_path)
+ #  save(out_path, exp_dict)
