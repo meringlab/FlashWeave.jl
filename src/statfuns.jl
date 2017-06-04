@@ -5,7 +5,7 @@ export cor_nz, pcor, pcor_rec, cor_subset!, fz_pval, mutual_information, mi_pval
 using Distributions
 
 
-function fisher_z_transform(p::Float64, n::Int, len_z::Int)
+function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
     sample_factor = n - len_z - 3
 
     if sample_factor > 0
@@ -16,7 +16,7 @@ function fisher_z_transform(p::Float64, n::Int, len_z::Int)
 end
 
 
-function oddsratio(cont_tab::AbstractArray{Int}, nz::Bool=false)
+function oddsratio{ElType <: Integer}(cont_tab::AbstractArray{ElType}, nz::Bool=false)
     offset = nz ? 1 : 0
     if ndims(cont_tab) == 2
         return (cont_tab[1 + offset, 1 + offset] * cont_tab[2 + offset, 2 + offset]) / (cont_tab[1 + offset, 2 + offset] * cont_tab[2 + offset, 1 + offset])
@@ -26,14 +26,14 @@ function oddsratio(cont_tab::AbstractArray{Int}, nz::Bool=false)
 end
 
 
-function fz_pval(stat::Float64, n::Int, len_z::Int)
+function fz_pval(stat::AbstractFloat, n::Int, len_z::Int)
     fz_stat = fisher_z_transform(stat, n, len_z)
     pval = ccdf(Normal(), abs(fz_stat)) * 2
     pval
 end
 
 
-function cor_nz(X::Int, Y::Int, data::Matrix{Float64})
+function cor_nz{ElType <: Real}(X::Int, Y::Int, data::Matrix{ElType})
     """Note: this function is still slow, but not enough of a bottleneck yet to improve"""
     mask = (data[:, X] .!= 0.0) & (data[:, Y] .!= 0.0)
 
@@ -41,9 +41,9 @@ function cor_nz(X::Int, Y::Int, data::Matrix{Float64})
 end
 
 
-function cor_nz(data::Matrix{Float64})
+function cor_nz{ElType <: AbstractFloat}(data::Matrix{ElType})
     n_vars = size(data, 2)
-    cor_mat = eye(Float64, n_vars, n_vars)
+    cor_mat = eye(ElType, n_vars, n_vars)
 
     for i in 1:n_vars-1
         for j in i+1:n_vars
@@ -55,7 +55,7 @@ function cor_nz(data::Matrix{Float64})
     cor_mat
 end
 
-function pcor(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64})
+function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType})
     sub_data = @view data[:, [X, Y, Zs...]]
 
     if size(sub_data, 1) < 5
@@ -89,7 +89,7 @@ function pcor(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64})
 end
 
 
-function pcor_rec(X::Int, Y::Int, Zs::Vector{Int}, cor_mat::Matrix{Float64}, pcor_set_dict::Dict{String,Dict{String,Float64}})
+function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, cor_mat::Matrix{ElType}, pcor_set_dict::Dict{String,Dict{String,ElType}})
     XY_key = join((X, Y), "_")
     Zs_key = join(Zs, "_")
 
@@ -127,7 +127,7 @@ function pcor_rec(X::Int, Y::Int, Zs::Vector{Int}, cor_mat::Matrix{Float64}, pco
 
 
         if !haskey(pcor_set_dict, XY_key)
-            pcor_set_dict[XY_key] = Dict{String, Float64}()
+            pcor_set_dict[XY_key] = Dict{String, ElType}()
         end
 
         pcor_set_dict[XY_key][Zs_key] = p
@@ -137,7 +137,7 @@ function pcor_rec(X::Int, Y::Int, Zs::Vector{Int}, cor_mat::Matrix{Float64}, pco
 end
 
 
-function cor_subset!(data::AbstractMatrix{Float64}, cor_mat::Matrix{Float64}, vars::Vector{Int})
+function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_mat::Matrix{ElType}, vars::Vector{Int})
     var_cors = cor(data[:, vars])
 
     for (i, var_A) in enumerate(vars)
@@ -151,14 +151,14 @@ function cor_subset!(data::AbstractMatrix{Float64}, cor_mat::Matrix{Float64}, va
 end
 
 
-function mi_pval(mi::Float64, df::Int, n_obs::Int)
+function mi_pval(mi::AbstractFloat, df::Integer, n_obs::Integer)
     g_stat = 2 * mi * n_obs
     pval = df > 0 ? ccdf(Chisq(df), g_stat) : 1.0
     pval
 end
 
 
-function mutual_information(cont_tab::AbstractArray{Int})
+function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType})
     num_dims = ndims(cont_tab)
     levels_x = size(cont_tab, 1)
     levels_y = size(cont_tab, 2)
@@ -183,7 +183,7 @@ function mutual_information(cont_tab::AbstractArray{Int})
 end
 
 
-function estimate_expected_dz!(cont_tab::AbstractArray{Int, 3}, levels_z::Int=0)
+function estimate_expected_dz!{ElType <: AbstractFloat}(cont_tab::AbstractArray{ElType, 3}, levels_z::Integer=0)
 
     if ndims(cont_tab) == 3
         for i in 1:levels_z
@@ -209,8 +209,8 @@ function estimate_expected_dz!(cont_tab::AbstractArray{Int, 3}, levels_z::Int=0)
 end
 
 
-function mutual_information(cont_tab::AbstractArray{Int, 3}, levels_x::Int, levels_y::Int, levels_z::Int,
-        ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int, 1}, exp_dz::Bool=false)
+function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType, 3}, levels_x::Integer, levels_y::Integer, levels_z::Integer,
+        ni::Matrix{ElType}, nj::Matrix{ElType}, nk::Vector{ElType}, exp_dz::Bool=false)
     """Note: returns mutual information * number of observations!"""
     #if reset_marginals
     fill!(ni, 0)
@@ -255,8 +255,8 @@ function mutual_information(cont_tab::AbstractArray{Int, 3}, levels_x::Int, leve
 end
 
 
-function mutual_information(cont_tab::AbstractMatrix{Int}, levels_x::Int, levels_y::Int, ni::Array{Int,1},
-        nj::Array{Int,1}, exp_dz::Bool=false)
+function mutual_information{ElType <: Integer}(cont_tab::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, ni::Vector{ElType},
+        nj::Vector{ElType}, exp_dz::Bool=false)
     """Note: returns mutual information * number of observations!"""
     fill!(ni, 0)
     fill!(nj, 0)
@@ -295,7 +295,7 @@ function mutual_information(cont_tab::AbstractMatrix{Int}, levels_x::Int, levels
 end
 
 
-function adjust_df(ni::Vector{Int}, nj::Vector{Int}, levels_x::Int, levels_y::Int)
+function adjust_df{ElType <: Integer}(ni::Vector{ElType}, nj::Vector{ElType}, levels_x::Integer, levels_y::Integer)
     alx = 0
     aly = 0
     for i in 1:levels_x
@@ -314,7 +314,7 @@ function adjust_df(ni::Vector{Int}, nj::Vector{Int}, levels_x::Int, levels_y::In
 end
 
 
-function adjust_df(ni::Matrix{Int}, nj::Matrix{Int}, levels_x::Int, levels_y::Int, levels_z::Int)
+function adjust_df{ElType <: Integer}(ni::Matrix{ElType}, nj::Matrix{ElType}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
     df = 0
     for k in 1:levels_z
         df += adjust_df(ni[:, k], nj[:, k], levels_x, levels_y)
@@ -323,7 +323,7 @@ function adjust_df(ni::Matrix{Int}, nj::Matrix{Int}, levels_x::Int, levels_y::In
 end
 
 
-function nz_adjust_cont_tab(levels_x::Int, levels_y::Int, cont_tab::AbstractArray{Int64})
+function nz_adjust_cont_tab{ElType <: Integer}(levels_x::Integer, levels_y::Integer, cont_tab::AbstractArray{ElType})
     offset_x = levels_x > 2 ? 2 : 1
     offset_y = levels_y > 2 ? 2 : 1
 
@@ -337,11 +337,11 @@ function nz_adjust_cont_tab(levels_x::Int, levels_y::Int, cont_tab::AbstractArra
 end
 
 
-function benjamini_hochberg(pvals::Vector{Float64})
+function benjamini_hochberg{ElType <: AbstractFloat}(pvals::Vector{ElType})
     """Accelerated version of that found in MultipleTesting.jl"""
     m = length(pvals)
 
-    sorted_pval_tuples::Vector{Tuple{Int,Float64}} = collect(zip(1:length(pvals), pvals))
+    sorted_pval_tuples::Vector{Tuple{Int,ElType}} = collect(zip(1:length(pvals), pvals))
     sort!(sorted_pval_tuples, by=x->x[2])
 
     for i in reverse(1:m-1)

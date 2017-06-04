@@ -5,31 +5,32 @@ export contingency_table!, contingency_table
 using Cauocc.Misc
 
 
-function contingency_table!(X::Int, Y::Int, data::AbstractMatrix{Int}, cont_tab::Array{Int,2})
+function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, cont_tab::Matrix{ElType})
     """2x2"""
     fill!(cont_tab, 0)
 
     for i = 1:size(data, 1)
-        x_val = data[i, X] + 1
-        y_val = data[i, Y] + 1
+        x_val = data[i, X] + one(ElType)
+        y_val = data[i, Y] + one(ElType)
 
-        cont_tab[x_val, y_val] += 1
+        cont_tab[x_val, y_val] += one(ElType)
     end
 end
 
-function contingency_table(X::Int, Y::Int, data::AbstractMatrix{Int}, levels_x::Int, levels_y::Int, nz::Bool=false)
-    cont_tab = zeros(Int, levels_x, levels_y)
+
+function contingency_table{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, nz::Bool=false)
+    cont_tab = zeros(ElType, levels_x, levels_y)
     contingency_table!(X, Y, data, cont_tab)
 
     cont_tab
 end
 
 
-contingency_table(X::Int, Y::Int, data::AbstractMatrix{Int}) = contingency_table(X, Y, data, length(unique(data[:, X])), length(unique(data[:, Y])))
+contingency_table{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}) = contingency_table(X, Y, data, length(unique(data[:, X])), length(unique(data[:, Y])))
 
 
-function contingency_table!(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int}, cont_tab::Array{Int, 3},
-    z::Vector{Int}, cum_levels::Vector{Int}, z_map_arr::Vector{Int})
+function contingency_table!{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType}, cont_tab::Array{ElType, 3},
+    z::Vector{ElType}, cum_levels::Vector{ElType}, z_map_arr::Vector{ElType})
     fill!(cont_tab, 0)
     levels_z = level_map!(Zs, data, z, cum_levels, z_map_arr)
 
@@ -46,18 +47,18 @@ end
 
 
 # convenience wrapper for three-way contingency tables
-function contingency_table(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int}, nz::Bool=false)
+function contingency_table{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType}, nz::Bool=false)
     levels = map(x -> length(unique(data[:, x])), 1:size(data, 2))
     max_k = length(Zs)
     levels_x = levels[X]
     levels_y = levels[Y]
     #max_levels = maximum(levels)
     max_levels_z = sum([maximum(levels[Zs])^(i+1) for i in 1:max_k])
-    cont_tab = zeros(Int, levels_x, levels_y, max_levels_z)
-    z = zeros(Int, size(data, 1))
-    cum_levels = zeros(Int, max_k + 1)
+    cont_tab = zeros(ElType, levels_x, levels_y, max_levels_z)
+    z = zeros(ElType, size(data, 1))
+    cum_levels = zeros(ElType, max_k + 1)
     make_cum_levels!(cum_levels, Zs, levels)
-    z_map_arr = zeros(Int, max_levels_z)
+    z_map_arr = zeros(ElType, max_levels_z)
 
     contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr)
 
@@ -67,8 +68,8 @@ end
 
 # SPARSE DATA
 
-@generated function contingency_table!{T,N}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{Int,Int}, row_inds::Vector{Int},
-        vals::Vector{Int}, cont_tab::Array{Int,3}, cum_levels::Array{Int,1}, z_map_arr::Array{Int,1}, levels::N)
+@generated function contingency_table!{T,N,ElType}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{ElType},
+        vals::Vector{ElType}, cont_tab::Array{ElType,3}, cum_levels::Vector{ElType}, z_map_arr::Vector{ElType}, levels::N)
     if T <: Tuple{Int}
         n_vars = 3
     elseif T <: Tuple{Int,Int}
@@ -275,8 +276,8 @@ end
 
 
 
-function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{Int,Int}, row_inds::Vector{Int}, vals::Vector{Int},
-        cont_tab::Array{Int,2})
+function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{ElType}, vals::Vector{ElType},
+        cont_tab::Matrix{ElType})
     fill!(cont_tab, 0)
 
     n_rows, n_cols = size(data)

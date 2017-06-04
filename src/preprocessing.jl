@@ -8,7 +8,7 @@ using Cauocc.Misc
 using Cauocc.Learning
 
 
-function pseudocount_vars_from_sample_nolog(s::Vector{Float64})
+function pseudocount_vars_from_sample_nolog{ElType <: AbstractFloat}(s::Vector{ElType})
     z_mask = s .== 0
     k = sum(z_mask)
     Nprod = prod(s[!z_mask])
@@ -16,7 +16,7 @@ function pseudocount_vars_from_sample_nolog(s::Vector{Float64})
 end
 
 
-function adaptive_pseudocount_nolog(x1::Float64, s1::Vector{Float64}, s2::Vector{Float64})::Float64
+function adaptive_pseudocount_nolog{ElType <: AbstractFloat}(x1::ElType, s1::Vector{ElType}, s2::Vector{ElType})::ElType
     k, Nprod1 = pseudocount_vars_from_sample(s1)
     n, Nprod2 = pseudocount_vars_from_sample(s2)
     p = length(s1)
@@ -27,7 +27,7 @@ function adaptive_pseudocount_nolog(x1::Float64, s1::Vector{Float64}, s2::Vector
 end
 
 
-function pseudocount_vars_from_sample(s::Vector{Float64})
+function pseudocount_vars_from_sample{ElType <: AbstractFloat}(s::Vector{ElType})
     z_mask = s .== 0
     k = sum(z_mask)
     Nprod = sum(log(s[!z_mask]))
@@ -35,7 +35,7 @@ function pseudocount_vars_from_sample(s::Vector{Float64})
 end
 
 
-function adaptive_pseudocount(x1::Float64, s1::Vector{Float64}, s2::Vector{Float64})::Float64
+function adaptive_pseudocount{ElType <: AbstractFloat}(x1::ElType, s1::Vector{ElType}, s2::Vector{ElType})::ElType
     k, Nprod1_log = pseudocount_vars_from_sample(s1)
     n, Nprod2_log = pseudocount_vars_from_sample(s2)
     p = length(s1)
@@ -47,9 +47,9 @@ function adaptive_pseudocount(x1::Float64, s1::Vector{Float64}, s2::Vector{Float
 end
 
 
-function adaptive_pseudocount(X::Matrix{Float64})
+function adaptive_pseudocount{ElType <: AbstractFloat}(X::Matrix{ElType})
     max_depth_index = findmax(sum(X, 2))[2]
-    max_depth_sample::Vector{Float64} = X[max_depth_index, :]
+    max_depth_sample::Vector{ElType} = X[max_depth_index, :]
     #pseudo_counts = mapslices(x -> adaptive_pseudocount(1.0, max_depth_sample, x), X, 2)
     min_abund = minimum(X[X .!= 0])
     base_pcount = 1.0#min_abund >= 1 ? 1.0 : min_abund / 10
@@ -65,7 +65,7 @@ function adaptive_pseudocount(X::Matrix{Float64})
 end
 
 
-function clr{ElType <: Real}(X::Matrix{ElType}; pseudo_count::Float64=1e-5, ignore_zeros=false)
+function clr{ElType <: AbstractFloat}(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false)
     if pseudo_count == -1 && !ignore_zeros
         X_trans = clr(adaptive_pseudocount(X), pseudo_count=0.0, ignore_zeros=false)
     else
@@ -83,7 +83,7 @@ function clr{ElType <: Real}(X::Matrix{ElType}; pseudo_count::Float64=1e-5, igno
 end
 
 
-function discretize{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3; rank_method::String="tied", disc_method::String="median")
+function discretize{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median")
     if disc_method == "median"
         if rank_method == "dense"
             x_vec = denserank(x_vec)
@@ -115,7 +115,7 @@ function discretize{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3; rank_m
 end
 
 
-function discretize_nz{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3, min_elem::Float64=0.0; rank_method::String="tied", disc_method::String="median")
+function discretize_nz{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Integer=3, min_elem::ElType=0.0; rank_method::String="tied", disc_method::String="median")
     nz_indices = findn(x_vec .!= min_elem)
 
     if !isempty(nz_indices)
@@ -131,7 +131,7 @@ function discretize_nz{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Int=3, min
 end
 
 
-function discretize{ElType <: Real}(X::Matrix{ElType}; n_bins::Int=3, nz::Bool=true, min_elem::Float64=0.0, rank_method::String="tied", disc_method::String="median")
+function discretize{ElType <: Real}(X::Matrix{ElType}; n_bins::Integer=3, nz::Bool=true, min_elem::ElType=0.0, rank_method::String="tied", disc_method::String="median")
     if nz
         return mapslices(x -> discretize_nz(x, n_bins, min_elem, rank_method=rank_method, disc_method=disc_method), X, 1)
     else
@@ -151,13 +151,14 @@ function factors_to_binary_cols!(data_df::DataFrame, factor_cols::Vector{Symbol}
             end
             delete!(data_df, f_col)
         end
-    end    
+    end
 end
 
+iscontinuousnorm(norm::String) = norm == "rows" || startswith(norm, "clr")
 
-function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr_pseudo_count::Float64=1e-5, n_bins::Int=3, rank_method::String="tied",
-    disc_method::String="median",
-        verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false, factor_cols::Set{Int}=Set{Int}())
+function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
+    disc_method::String="median", verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false, factor_cols::Set{Int}=Set{Int}(),
+    prec::Integer=64)
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
@@ -210,9 +211,11 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
     elseif startswith(norm, "binned")
         if startswith(norm, "binned_nz")
             if endswith(norm, "rows")
+                data = convert(Matrix{Float64}, data)
                 data = data ./ sum(data, 2)
                 min_elem = 0.0
             elseif endswith(norm, "clr")
+                data = convert(Matrix{Float64}, data)
                 data = clr(data, pseudo_count=clr_pseudo_count, ignore_zeros=true)
                 min_elem = minimum(data)
             else
@@ -224,7 +227,7 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
             data = discretize(data, n_bins=n_bins, nz=false, rank_method=rank_method, disc_method=disc_method)
         end
 
-        data = convert(Matrix{Int}, data)
+        #data = convert(Matrix{Int}, data)
 
         unreduced_vars = size(data, 2)
         data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== n_bins)[:]]
@@ -235,7 +238,7 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
 
         if !isempty(env_cols)
             env_data = discretize(env_data, nz=false, n_bins=n_bins)
-            env_data = convert(Matrix{Int}, env_data)
+            #env_data = convert(Matrix{Int}, env_data)
         end
     else
         error("$norm is no valid normalization method.")
@@ -245,6 +248,10 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
         data = hcat(data, convert(typeof(data), env_data))
     end
 
+    target_base_type_str = iscontinuousnorm(norm) ? "Float" : "Int"
+    T = eval(Symbol("$target_base_type_str$prec"))
+    data = convert(Matrix{T}, data)
+
     if make_sparse
         data = sparse(data)
     end
@@ -252,9 +259,9 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
 end
 
 
-function preprocess_data_default{ElType <: Real}(data::Matrix{ElType}, test_name::String; verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse=false, factor_cols::Set{Int}=Set{Int}())
+function preprocess_data_default{ElType <: Real}(data::Matrix{ElType}, test_name::String; verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false, factor_cols::Set{Int}=Set{Int}(), prec::Integer=32)
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
-    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, env_cols=env_cols, make_sparse=make_sparse, factor_cols=factor_cols)
+    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, env_cols=env_cols, make_sparse=make_sparse, factor_cols=factor_cols, prec=prec)
     data
 end
 

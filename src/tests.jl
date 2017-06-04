@@ -9,21 +9,21 @@ using Cauocc.Statfuns
 using Cauocc.Contingency
 
 
-function issig(test_res::TestResult, alpha::Float64)
+function issig(test_res::TestResult, alpha::AbstractFloat)
     test_res.pval < alpha && test_res.suff_power == true
 end
 
 
-sufficient_power(levels_x::Int, levels_y::Int, n_obs::Int, hps::Int) = (n_obs / (levels_x * levels_y)) > hps
-sufficient_power(levels_x::Int, levels_y::Int, levels_z::Int, n_obs::Int, hps::Int) = (n_obs / (levels_x * levels_y * levels_z)) > hps
+sufficient_power(levels_x::Integer, levels_y::Integer, n_obs::Integer, hps::Integer) = (n_obs / (levels_x * levels_y)) > hps
+sufficient_power(levels_x::Integer, levels_y::Integer, levels_z::Integer, n_obs::Integer, hps::Integer) = (n_obs / (levels_x * levels_y * levels_z)) > hps
 
 ##################
 ### UNIVARIATE ###
 ##################
 
-function test(X::Int, Y::Int, data::AbstractMatrix{Int}, test_name::String, hps::Int,
-    levels_x::Int, levels_y::Int, cont_tab::Matrix{Int}, ni::Vector{Int}, nj::Vector{Int}, nz::Bool=false,
-    data_row_inds::Vector{Int}=Int64[], data_nzero_vals::Vector{Int}=Int64[])
+function test{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String, hps::Integer,
+    levels_x::ElType, levels_y::ElType, cont_tab::Matrix{ElType}, ni::Vector{ElType}, nj::Vector{ElType}, nz::Bool=false,
+    data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[])
 
     if nz && (levels_y > 2)
         sub_data = @view data[data[:, Y] .!= 0, :]
@@ -69,8 +69,8 @@ function test(X::Int, Y::Int, data::AbstractMatrix{Int}, test_name::String, hps:
 end
 
 
-function test(X::Int, Y::Int, data::AbstractMatrix{Float64}, test_name::String,
-    cor_mat::Matrix{Float64}=zeros(Float64, 0, 0), nz::Bool=false)
+function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String,
+    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false)
 
     if nz
         sub_data = @view data[data[:, Y] .!= 0, :]
@@ -93,8 +93,8 @@ function test(X::Int, Y::Int, data::AbstractMatrix{Float64}, test_name::String,
 end
 
 
-function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::String,
-    hps::Int, levels::Vector{Int}, data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{Int}=Int[])
+function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String,
+    hps::Integer, levels::Vector{ElType}, data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[])
     """Test all variables Ys for univariate association with X"""
 
     levels_x = levels[X]
@@ -112,7 +112,7 @@ function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::Str
     end
 end
 
-function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::String, hps::Int=5)
+function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String, hps::Integer=5)
     levels = get_levels(data)
 
     if issparse(data)
@@ -126,8 +126,8 @@ function test(X::Int, Ys::Vector{Int}, data::AbstractMatrix{Int}, test_name::Str
     test(X, Ys, data, test_name, hps, levels, data_row_inds, data_nzero_vals)
 end
 
-function test(X::Int, Ys::Array{Int, 1}, data::AbstractMatrix{Float64},
-        test_name::String, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0))
+function test{ElType <: AbstractFloat}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{ElType},
+        test_name::String, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0))
     """Test all variables Ys for univariate association with X"""
     nz = is_zero_adjusted(test_name)
     map(Y -> test(X, Y, data, test_name, cor_mat, nz), Ys)
@@ -138,9 +138,9 @@ end
 ### CONDITIONAL ###
 ###################
 
-function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64},
-    test_name::String, nz::Bool, cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
+function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType},
+    test_name::String, nz::Bool, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
+    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
 
     if nz
         sub_data = @view data[data[:, Y] .!= 0, :]
@@ -157,18 +157,18 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64},
 end
 
 
-function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Float64}, test_name::String, recursive::Bool=true)
-    cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)
-    pcor_set_dict = Dict{String,Dict{String,Float64}}()
+function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String; recursive::Bool=true)
+    cor_mat = recursive ? cor(data) : zeros(ElType, 0, 0)
+    pcor_set_dict = Dict{String,Dict{String,ElType}}()
     test(X, Y, Zs, data, test_name, is_zero_adjusted(test_name), cor_mat, pcor_set_dict)
 end
 
 
-function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int},
-        test_name::String, hps::Int, levels_x::Int, levels_y::Int, cont_tab::Array{Int,3},
-    z::Vector{Int}, ni::Array{Int,2}, nj::Array{Int,2}, nk::Array{Int,1}, cum_levels::Vector{Int},
-    z_map_arr::Vector{Int}, nz::Bool=false, data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{Int}=Int[],
-    levels::Vector{Int}=Int[])
+function test{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType},
+        test_name::String, hps::Integer, levels_x::ElType, levels_y::ElType, cont_tab::Array{ElType,3},
+    z::Vector{ElType}, ni::Array{ElType,2}, nj::Array{ElType,2}, nk::Array{ElType,1}, cum_levels::Vector{ElType},
+    z_map_arr::Vector{ElType}, nz::Bool=false, data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[],
+    levels::Vector{ElType}=ElType[])
     """Test association between X and Y"""
 
     if !issparse(data)
@@ -212,7 +212,7 @@ function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int},
 end
 
 
-function test(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{Int}, test_name::String, hps::Int=5)
+function test{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String, hps::Integer=5)
     levels = get_levels(data)
     levels_x = levels[X]
     levels_y = levels[Y]
@@ -242,9 +242,9 @@ end
 
 
 function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::Vector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Int, alpha::Float64; hps::Int=5, pwr::Float64=0.5, levels::Vector{Int}=Int[],
-    data_row_inds::Vector{Int}=Int64[], data_nzero_vals::Vector{Int}=Int64[], cor_mat::Matrix{Float64}=zeros(Float64, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,Float64}}=Dict{String,Dict{String,Float64}}())
+    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, pwr::AbstractFloat=0.5, levels::Vector{ElType}=ElType[],
+    data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
+    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
     lowest_sig_Zs = Int[]
@@ -257,13 +257,13 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::Vector{Int}, data
         levels_y = levels[Y]
         max_levels = maximum(levels)
         max_levels_z = sum([max_levels^(i+1) for i in 1:max_k])
-        cont_tab = zeros(Int, levels_x, levels_y, max_levels_z)
-        z = zeros(Int, size(data, 1))
-        ni = zeros(Int, levels_x, max_levels_z)
-        nj = zeros(Int, levels_y, max_levels_z)
-        nk = zeros(Int, max_levels_z)
-        cum_levels = zeros(Int, max_k + 1)
-        z_map_arr = zeros(Int, max_levels_z)
+        cont_tab = zeros(ElType, levels_x, levels_y, max_levels_z)
+        z = zeros(ElType, size(data, 1))
+        ni = zeros(ElType, levels_x, max_levels_z)
+        nj = zeros(ElType, levels_y, max_levels_z)
+        nk = zeros(ElType, max_levels_z)
+        cum_levels = zeros(ElType, max_k + 1)
+        z_map_arr = zeros(ElType, max_levels_z)
         num_lowpwr_tests = 0
     elseif nz
         empty!(pcor_set_dict)

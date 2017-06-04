@@ -28,19 +28,19 @@ type IndexPair
 end
 
 
-function get_levels(col_vec::SparseVector{Int,Int})
+function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,})
     levels = length(unique(nonzeros(col_vec)))
     add_zero = col_vec.n > length(col_vec.nzind) ? 1 : 0
     levels + add_zero
 end
 
 
-function get_levels(col_vec::Vector{Int})
+function get_levels{ElType <: Integer}(col_vec::Vector{ElType})
     length(unique(col_vec))
 end
 
 
-function get_levels(data::AbstractMatrix{Int})
+function get_levels{ElType <: Integer}(data::AbstractMatrix{ElType})
     map(x -> get_levels(data[:, x]), 1:size(data, 2))
 end
 
@@ -62,7 +62,7 @@ function min_sec_indices!(ind_pair::IndexPair, index_vec::Vector{Int})
 end
 
 
-stop_reached(start_time::Float64, time_limit::Float64) = time_limit > 0.0 ? time() - start_time > time_limit : false
+stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
 isdiscrete(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
 iscontinuous(test_name::String) = test_name in ["fz", "fz_nz"]
@@ -89,11 +89,6 @@ function signed_weight(stat::Float64, pval::Float64, kind::String="logpval")
 end
 
 
-#function colsize(data::SparseMatrixCSC, col::Int)
-#    col_end_term = col < size(data, 2) ? data.colptr[col + 1] : nnz(data) + 1
-#    col_end_term - data.colptr[col]
-#end
-
 
 function workers_all_local()
     local_host = gethostname()
@@ -110,7 +105,7 @@ function workers_all_local()
 end
 
 
-function make_weights(PC_dict, univar_nbrs, weight_type)
+function make_weights(PC_dict::Dict{Int,Tuple{Float64,Float64}}, univar_nbrs::Dict{Int,Tuple{Float64,Float64}}, weight_type::String)
     # create weights
     nbr_dict = Dict{Int,Float64}()
     weight_kind = String(split(weight_type, "_")[2])
@@ -124,7 +119,7 @@ function make_weights(PC_dict, univar_nbrs, weight_type)
 end
 
 
-function make_cum_levels!(cum_levels::Vector{Int}, Zs::Vector{Int}, levels::Vector{Int})
+function make_cum_levels!{ElType <: Integer}(cum_levels::Vector{ElType}, Zs::Vector{Int}, levels::Vector{ElType})
     cum_levels[1] = 1
 
     for j in 2:length(Zs)
@@ -135,8 +130,8 @@ function make_cum_levels!(cum_levels::Vector{Int}, Zs::Vector{Int}, levels::Vect
 end
 
 
-function level_map!(Zs::Vector{Int}, data::AbstractMatrix{Int}, z::Vector{Int}, cum_levels::Vector{Int},
-    z_map_arr::Vector{Int})
+function level_map!{ElType <: Integer}(Zs::Vector{Int}, data::AbstractMatrix{ElType}, z::Vector{ElType}, cum_levels::Vector{ElType},
+    z_map_arr::Vector{ElType})
     fill!(z_map_arr, -1)
     levels_z = 0
 
@@ -193,7 +188,7 @@ function maxweight(weight1::Float64, weight2::Float64)
 end
 
 
-function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule, edge_merge_fun=maxweight)
+function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String, edge_merge_fun=maxweight)
     checked_G = Graph(maximum(keys(weights_dict)))
     graph_dict = Dict{Int,Dict{Int,Float64}}([(target_var, Dict{Int,Float64}()) for target_var in keys(weights_dict)])
 
@@ -245,32 +240,6 @@ function map_edge_keys{T}(nbr_dict::Dict{Int,Dict{Int,T}}, key_map_dict::Dict{In
     end
     new_nbr_dict
 end
-
-
-#function dict_to_graph(graph_dict::Dict{Int64,Dict{Int64,Float64}}, edge_merge_fun=maxweight)
-#    max_key = maximum(keys(graph_dict))
-#    adj_mat = zeros(Float64, max_key, max_key)
-#    #graph = Graph(maximum(keys(graph_dict)))
-#
-#    for node1 in keys(graph_dict)
-#        for node2 in keys(graph_dict[node1])
-#            weight = graph_dict[node1][node2]
-#            prev_weight = adj_mat[node1, node2]
-#
-#            if prev_weight != 0.0 && !isnan(weight)
-#                weight = edge_merge_fun([weight, prev_weight])
-#            end
-#
-#            adj_mat[node1, node2] = weight
-#            adj_mat[node2, node1] = weight
-#
-#        end
-#    end
-#
-#    Graph(adj_mat)
-#end
-
-
 
 
 function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::Vector{String})

@@ -35,6 +35,7 @@ exp_dict = load(joinpath(pwd(), "test", "data", "learning_expected.jld"))
 function make_network(data, test_name, make_sparse=false; kwargs...)
     data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse)
     kwargs_dict = Dict(kwargs)
+    #println(test_name, " ", typeof(data_norm), " ", kwargs)
     graph_res = LGL(data_norm; test_name=test_name, verbose=false, kwargs...)
     graph_dict = haskey(kwargs_dict, :track_rejections) && kwargs_dict[:track_rejections] ? graph_res[1] : graph_res
 end
@@ -49,7 +50,7 @@ function get_num_nbr(data, test_name, make_sparse=false; kwargs...)
     map(length, [graph_dict[key] for key in sort(collect(keys(graph_dict)))])
 end
 
-function compare_graph_dicts(g1, g2, verbose=false)
+function compare_graph_dicts(g1, g2; verbose=false, rtol=0, atol=0)
     if Set(keys(g1)) != Set(keys(g2))
         if verbose
             println("Upper level keys don't match")
@@ -69,7 +70,7 @@ function compare_graph_dicts(g1, g2, verbose=false)
         end
 
         for nbr in keys(nbr_dict1)
-            if !isapprox(nbr_dict1[nbr], nbr_dict2[nbr], rtol=1e-6)
+            if !isapprox(nbr_dict1[nbr], nbr_dict2[nbr], rtol=rtol, atol=atol)
                 if verbose
                     println("Weights for node $T and neighbor $nbr dont fit: $(nbr_dict1[nbr]), $(nbr_dict2[nbr])")
                 end
