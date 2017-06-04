@@ -1,3 +1,5 @@
+start_time = time()
+
 println("Preparing tests")
 
 if nprocs() == 1
@@ -17,4 +19,5 @@ for test_module in ["preprocessing.jl", "misc.jl", "contingency.jl", "statfuns.j
     include(test_module)
 end
 
-println("\n\n Finished testing.")
+time_total = Int(round(time() - start_time))
+println("\n\n Finished testing (took $(time_total) s))")

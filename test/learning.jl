@@ -32,8 +32,9 @@ exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4,15,23
 
 exp_dict = load(joinpath(pwd(), "test", "data", "learning_expected.jld"))
 
-function make_network(data, test_name, make_sparse=false; kwargs...)
-    data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse)
+function make_network(data, test_name, make_sparse=false, prec=32; kwargs...)
+    data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
+    #println(typeof(data_norm))
     kwargs_dict = Dict(kwargs)
     #println(test_name, " ", typeof(data_norm), " ", kwargs)
     graph_res = LGL(data_norm; test_name=test_name, verbose=false, kwargs...)
@@ -44,13 +45,13 @@ function get_num_nbr(graph_dict)
     map(length, [graph_dict[key] for key in sort(collect(keys(graph_dict)))])
 end
 
-function get_num_nbr(data, test_name, make_sparse=false; kwargs...)
-    graph_dict = make_network(data, test_name, make_sparse; kwargs...)
+function get_num_nbr(data, test_name, make_sparse=false, prec=32; kwargs...)
+    graph_dict = make_network(data, test_name, make_sparse, prec; kwargs...)
     kwargs_dict = Dict(kwargs)
     map(length, [graph_dict[key] for key in sort(collect(keys(graph_dict)))])
 end
 
-function compare_graph_dicts(g1, g2; verbose=false, rtol=0, atol=0)
+function compare_graph_dicts(g1, g2; verbose=false, rtol=0.0, atol=0.0)
     if Set(keys(g1)) != Set(keys(g2))
         if verbose
             println("Upper level keys don't match")
@@ -91,18 +92,31 @@ end
                         @testset "sparse $make_sparse" begin
                             for parallel in ["single", "multi_il"]
                                 @testset "parallel $parallel" begin
-                                    graph_dict = make_network(data, test_name, make_sparse, max_k=max_k, parallel=parallel, time_limit=0.0)
-                                    exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)_sparse$(make_sparse)"]
-                                    @testset "edge_identity" begin
-                                        @test compare_graph_dicts(graph_dict, exp_graph_dict)
-                                    end
+                                    for prec in [32, 64]
+                                        @testset "precision $prec" begin
+                                            graph_dict = make_network(data, test_name, make_sparse, prec, max_k=max_k, parallel=parallel, time_limit=0.0)
+                                            exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)_sparse$(make_sparse)"]
 
-                                    @testset "num_neighbors" begin
-                                        if parallel == "single"
-                                            @test all(get_num_nbr(graph_dict) .== exp_num_nbr)
-                                        else
-                                            num_diffs = get_num_nbr(graph_dict) .- exp_num_nbr |> abs |> sum
-                                            @test (test_name == "mi" && num_diffs == 20) || num_diffs == 0
+                                            if prec == 32
+                                                rtol = 0.0
+                                                atol = 1e-2
+                                            else
+                                                rtol = 1e-6
+                                                atol = 0.0
+                                            end
+
+                                            @testset "edge_identity" begin
+                                                @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=rtol, atol=atol)
+                                            end
+
+                                            @testset "num_neighbors" begin
+                                                if parallel == "single"
+                                                    @test all(get_num_nbr(graph_dict) .== exp_num_nbr)
+                                                else
+                                                    num_diffs = get_num_nbr(graph_dict) .- exp_num_nbr |> abs |> sum
+                                                    @test (test_name == "mi" && num_diffs == 20) || num_diffs == 0
+                                                end
+                                            end
                                         end
                                     end
                                 end

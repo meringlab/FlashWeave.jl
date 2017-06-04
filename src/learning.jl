@@ -15,7 +15,7 @@ using Cauocc.StackChannels
 
 function interleaving_phase{ElType <: Real}(T::Int, candidates::Vector{Int}, data::AbstractMatrix{ElType},
     test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, pwr::AbstractFloat=0.5, levels::Vector{ElType}=ElType[],
-    data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[],
+    data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[],
     prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0,
     whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
@@ -91,7 +91,7 @@ end
 
 function elimination_phase{ElType <: Real}(T::Int, TPC::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String,
     max_k::Integer, alpha::AbstractFloat, hps::Integer=5, pwr::AbstractFloat=0.5, levels::Vector{ElType}=ElType[],
-    data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[],
+    data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[],
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::Vector{Int}=[],
     time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0, whitelist::Set{Int}=Set{Int}(),
     blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
@@ -217,7 +217,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         data_row_inds = rowvals(data)
         data_nzero_vals = nonzeros(data)
     else
-        data_row_inds = ElType[]
+        data_row_inds = Int[]
         data_nzero_vals = ElType[]
     end
 
@@ -595,7 +595,7 @@ end
 
 # SPECIALIZED FUNCTIONS AND TYPES
 
-function pw_univar_kernel!{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
+function pw_univar_kernel!{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, stats::AbstractVector{Float64}, pvals::AbstractVector{Float64}, test_name::String, hps::Integer, levels::Vector{ElType}, nz::Bool, data_row_inds::Vector{Int}, data_nzero_vals::Vector{ElType}, cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
     if nz
@@ -673,7 +673,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
         data_row_inds = rowvals(data)
         data_nzero_vals = nonzeros(data)
     else
-        data_row_inds = ElType[]
+        data_row_inds = Int[]
         data_nzero_vals = ElType[]
     end
 

@@ -131,7 +131,7 @@ function discretize_nz{ElType <: Real}(x_vec::Vector{ElType}, n_bins::Integer=3,
 end
 
 
-function discretize{ElType <: Real}(X::Matrix{ElType}; n_bins::Integer=3, nz::Bool=true, min_elem::ElType=0.0, rank_method::String="tied", disc_method::String="median")
+function discretize{ElType <: Real}(X::Matrix{ElType}; n_bins::Integer=3, nz::Bool=true, min_elem::ElType=zero(ElType), rank_method::String="tied", disc_method::String="median")
     if nz
         return mapslices(x -> discretize_nz(x, n_bins, min_elem, rank_method=rank_method, disc_method=disc_method), X, 1)
     else

@@ -23,7 +23,7 @@ sufficient_power(levels_x::Integer, levels_y::Integer, levels_z::Integer, n_obs:
 
 function test{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String, hps::Integer,
     levels_x::ElType, levels_y::ElType, cont_tab::Matrix{ElType}, ni::Vector{ElType}, nj::Vector{ElType}, nz::Bool=false,
-    data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[])
+    data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[])
 
     if nz && (levels_y > 2)
         sub_data = @view data[data[:, Y] .!= 0, :]
@@ -94,7 +94,7 @@ end
 
 
 function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String,
-    hps::Integer, levels::Vector{ElType}, data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[])
+    hps::Integer, levels::Vector{ElType}, data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[])
     """Test all variables Ys for univariate association with X"""
 
     levels_x = levels[X]
@@ -103,9 +103,9 @@ function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{E
         return [TestResult(0.0, 1.0, 0, false) for Y in Ys]
     else
         max_level_y = maximum(levels[Ys])
-        cont_tab = zeros(Int, levels_x, max_level_y)
-        ni = zeros(Int, levels_x)
-        nj = zeros(Int, max_level_y)
+        cont_tab = zeros(ElType, levels_x, max_level_y)
+        ni = zeros(ElType, levels_x)
+        nj = zeros(ElType, max_level_y)
         nz = is_zero_adjusted(test_name)
 
         return map(Y -> test(X, Y, data, test_name, hps, levels_x, levels[Y], cont_tab, ni, nj, nz, data_row_inds, data_nzero_vals), Ys)
@@ -120,7 +120,7 @@ function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{E
         data_nzero_vals = nonzeros(data)
     else
         data_row_inds = Int[]
-        data_nzero_vals = Int[]
+        data_nzero_vals = ElType[]
     end
 
     test(X, Ys, data, test_name, hps, levels, data_row_inds, data_nzero_vals)
@@ -167,7 +167,7 @@ end
 function test{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType},
         test_name::String, hps::Integer, levels_x::ElType, levels_y::ElType, cont_tab::Array{ElType,3},
     z::Vector{ElType}, ni::Array{ElType,2}, nj::Array{ElType,2}, nk::Array{ElType,1}, cum_levels::Vector{ElType},
-    z_map_arr::Vector{ElType}, nz::Bool=false, data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[],
+    z_map_arr::Vector{ElType}, nz::Bool=false, data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[],
     levels::Vector{ElType}=ElType[])
     """Test association between X and Y"""
 
@@ -220,21 +220,21 @@ function test{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::Abstract
     max_k = length(Zs)
 
     max_levels_z = sum([max_levels^(i+1) for i in 1:max_k])
-    cont_tab = zeros(Int, levels_x, levels_y, max_levels_z)
-    z = zeros(Int, size(data, 1))
-    ni = zeros(Int, levels_x, max_levels_z)
-    nj = zeros(Int, levels_y, max_levels_z)
-    nk = zeros(Int, max_levels_z)
-    cum_levels = zeros(Int, max_k + 1)
+    cont_tab = zeros(ElType, levels_x, levels_y, max_levels_z)
+    z = zeros(ElType, size(data, 1))
+    ni = zeros(ElType, levels_x, max_levels_z)
+    nj = zeros(ElType, levels_y, max_levels_z)
+    nk = zeros(ElType, max_levels_z)
+    cum_levels = zeros(ElType, max_k + 1)
     make_cum_levels!(cum_levels, Zs, levels)
-    z_map_arr = zeros(Int, max_levels_z)
+    z_map_arr = zeros(ElType, max_levels_z)
 
     if issparse(data)
         data_row_inds = rowvals(data)
         data_nzero_vals = nonzeros(data)
     else
         data_row_inds = Int[]
-        data_nzero_vals = Int[]
+        data_nzero_vals = ElType[]
     end
 
     test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z, ni, nj, nk, cum_levels, z_map_arr, is_zero_adjusted(test_name), data_row_inds, data_nzero_vals, levels)
@@ -243,7 +243,7 @@ end
 
 function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::Vector{Int}, data::AbstractMatrix{ElType},
     test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, pwr::AbstractFloat=0.5, levels::Vector{ElType}=ElType[],
-    data_row_inds::Vector{ElType}=ElType[], data_nzero_vals::Vector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
+    data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)

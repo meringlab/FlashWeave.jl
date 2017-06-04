@@ -28,14 +28,14 @@ type IndexPair
 end
 
 
-function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,})
+function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,Int})::ElType
     levels = length(unique(nonzeros(col_vec)))
-    add_zero = col_vec.n > length(col_vec.nzind) ? 1 : 0
+    add_zero = col_vec.n > length(col_vec.nzind) ? one(ElType) : zero(ElType)
     levels + add_zero
 end
 
 
-function get_levels{ElType <: Integer}(col_vec::Vector{ElType})
+function get_levels{ElType <: Integer}(col_vec::Vector{ElType})::ElType
     length(unique(col_vec))
 end
 
@@ -133,10 +133,10 @@ end
 function level_map!{ElType <: Integer}(Zs::Vector{Int}, data::AbstractMatrix{ElType}, z::Vector{ElType}, cum_levels::Vector{ElType},
     z_map_arr::Vector{ElType})
     fill!(z_map_arr, -1)
-    levels_z = 0
+    levels_z = zero(ElType)
 
     for i in 1:size(data, 1)
-        gfp_map = 1
+        gfp_map = one(ElType)
         for (j, Z_var) in enumerate(Zs)
             gfp_map += data[i, Z_var] * cum_levels[j]
         end
@@ -147,7 +147,7 @@ function level_map!{ElType <: Integer}(Zs::Vector{Int}, data::AbstractMatrix{ElT
         else
             z_map_arr[gfp_map] = levels_z
             z[i] = levels_z
-            levels_z += 1
+            levels_z += one(ElType)
         end
     end
 

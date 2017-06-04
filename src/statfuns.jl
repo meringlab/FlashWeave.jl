@@ -9,7 +9,7 @@ function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
     sample_factor = n - len_z - 3
 
     if sample_factor > 0
-        return (sqrt(sample_factor) / 2) * log((1 + p) / (1 - p))
+        return (sqrt(sample_factor) / 2.0) * log((1.0 + p) / (1.0 - p))
     else
         return 0.0
     end
@@ -28,7 +28,7 @@ end
 
 function fz_pval(stat::AbstractFloat, n::Int, len_z::Int)
     fz_stat = fisher_z_transform(stat, n, len_z)
-    pval = ccdf(Normal(), abs(fz_stat)) * 2
+    pval = ccdf(Normal(), abs(fz_stat)) * 2.0
     pval
 end
 
@@ -102,7 +102,7 @@ function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, cor_
             pXY = cor_mat[X, Y]
             pXZ = cor_mat[X, Z]
             pYZ = cor_mat[Y, Z]
-            denom_term = (sqrt(1 - pXZ^2) * sqrt(1 - pYZ^2))
+            denom_term = (sqrt(one(ElType) - pXZ^2) * sqrt(one(ElType) - pYZ^2))
             p = denom_term == 0.0 ? 0.0 : (pXY - pXZ * pYZ) / denom_term
 
         else
@@ -113,7 +113,7 @@ function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, cor_
             pXZ0_nZ0 = pcor_rec(X, Z0, Zs_nZ0, cor_mat, pcor_set_dict)
             pYZ0_nZ0 = pcor_rec(Y, Z0, Zs_nZ0, cor_mat, pcor_set_dict)
 
-            denom_term = sqrt(1 - pXZ0_nZ0^2) * sqrt(1 - pYZ0_nZ0^2)
+            denom_term = sqrt(one(ElType) - pXZ0_nZ0^2) * sqrt(one(ElType) - pYZ0_nZ0^2.0)
             p = denom_term == 0.0 ? 0.0 : (pXY_nZ0 - pXZ0_nZ0 * pYZ0_nZ0) / denom_term
         end
 
@@ -152,7 +152,7 @@ end
 
 
 function mi_pval(mi::AbstractFloat, df::Integer, n_obs::Integer)
-    g_stat = 2 * mi * n_obs
+    g_stat = 2.0 * mi * n_obs
     pval = df > 0 ? ccdf(Chisq(df), g_stat) : 1.0
     pval
 end
@@ -168,14 +168,14 @@ function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType})
     end
 
     if num_dims == 3
-        ni = zeros(Int, levels_x, levels_z)
-        nj = zeros(Int, levels_y, levels_z)
-        nk = zeros(Int, levels_z)
+        ni = zeros(ElType, levels_x, levels_z)
+        nj = zeros(ElType, levels_y, levels_z)
+        nk = zeros(ElType, levels_z)
 
         return mutual_information(cont_tab, levels_x, levels_y, levels_z, ni, nj, nk)
     else
-        ni = zeros(Int, levels_x)
-        nj = zeros(Int, levels_y)
+        ni = zeros(ElType, levels_x)
+        nj = zeros(ElType, levels_y)
 
         return mutual_information(cont_tab, levels_x, levels_y, ni, nj)
     end
@@ -308,7 +308,7 @@ function adjust_df{ElType <: Integer}(ni::Vector{ElType}, nj::Vector{ElType}, le
     alx = max(1, alx)
     aly = max(1, aly)
 
-    df = (alx - 1) * (aly - 1)
+    df = (alx - one(ElType)) * (aly - one(ElType))
 
     df
 end

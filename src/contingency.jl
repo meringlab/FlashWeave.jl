@@ -68,7 +68,7 @@ end
 
 # SPARSE DATA
 
-@generated function contingency_table!{T,N,ElType}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{ElType},
+@generated function contingency_table!{T,N,ElType}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{Int},
         vals::Vector{ElType}, cont_tab::Array{ElType,3}, cum_levels::Vector{ElType}, z_map_arr::Vector{ElType}, levels::N)
     if T <: Tuple{Int}
         n_vars = 3
@@ -276,7 +276,7 @@ end
 
 
 
-function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{ElType}, vals::Vector{ElType},
+function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{Int}, vals::Vector{ElType},
         cont_tab::Matrix{ElType})
     fill!(cont_tab, 0)
 

@@ -22,7 +22,8 @@ ctab12_34[2, 2, 5] = 1
 data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 
 @testset "correlation" begin
-    data_clr = Cauocc.Preprocessing.preprocess_data_default(data, "fz", verbose=false)
+    data_clr = Cauocc.Preprocessing.preprocess_data_default(data, "fz", verbose=false,
+    prec=64)
     exp_pcor_Z1 = -0.16393307352649364
     cor_mat = cor(data_clr)
     @testset "pcor_Z1" begin

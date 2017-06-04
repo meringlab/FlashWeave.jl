@@ -4,10 +4,10 @@ using DataFrames
 using Base.Test
 
 data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
-data_clr = Cauocc.Preprocessing.preprocess_data_default(data, "fz", verbose=false)
-data_clr_nz = Cauocc.Preprocessing.preprocess_data_default(data, "fz_nz", verbose=false)
-data_bin = Cauocc.Preprocessing.preprocess_data_default(data, "mi", verbose=false)
-data_mi_nz = Cauocc.Preprocessing.preprocess_data_default(data, "mi_nz", verbose=false)
+data_clr = Cauocc.Preprocessing.preprocess_data_default(data, "fz", verbose=false, prec=64)
+data_clr_nz = Cauocc.Preprocessing.preprocess_data_default(data, "fz_nz", verbose=false, prec=64)
+data_bin = Cauocc.Preprocessing.preprocess_data_default(data, "mi", verbose=false, prec=64)
+data_mi_nz = Cauocc.Preprocessing.preprocess_data_default(data, "mi_nz", verbose=false, prec=64)
 
 exp_dict = load(joinpath(pwd(), "test", "data", "tests_expected.jld"))
 
