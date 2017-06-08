@@ -33,7 +33,7 @@ function main(input_args::Vector{String})
     println("Normalizing data")
     tic()
     skip_cols = Set([x for x in 1:length(header) if startswith(header[x], "ENV")])
-    data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false, skip_cols=skip_cols)
+    data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols)
 
     #if test_name == "fz_nz"
     #    zero_mask = data_norm .== minimum(data_norm)
