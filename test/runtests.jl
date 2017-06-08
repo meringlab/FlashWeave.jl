@@ -20,4 +20,4 @@ for test_module in ["preprocessing.jl", "misc.jl", "contingency.jl", "statfuns.j
 end
 
 time_total = Int(round(time() - start_time))
-println("\n\n Finished testing (took $(time_total) s))")
+println("\n\n Finished testing (took $(time_total)s)")

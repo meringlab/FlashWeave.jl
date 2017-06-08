@@ -852,13 +852,6 @@ function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels
     end
 end
 
-# function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
-#     pwr::Float64=0.5, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
-#         blacklist::Set{Int}=Set{Int}(),
-#         univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::Vector{ElType}=ElType[],
-#     univar_step::Bool=true, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
-#     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(),
-#     prev_state::HitonState=HitonState("S", Dict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
 
 function interleaved_backend{ElType <: Real}(target_vars::Vector{Int}, data::AbstractMatrix{ElType}, all_univar_nbrs::Dict{Int,Dict{Int,Tuple{Float64,Float64}}},
      levels::Vector{ElType}, update_interval::Real, GLL_args::Dict{Symbol,Any},
