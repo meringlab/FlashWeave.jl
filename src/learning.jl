@@ -333,7 +333,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         if prev_state.phase == "E"
             prev_PC_dict = prev_state.state_results
             PC_unchecked = prev_state.unchecked_vars
-            PC_candidates = [keys(prev_PC_dict)..., PC_unchecked...]
+            PC_candidates = [keys(prev_PC_dict)..., PC_unchecked...]::Vector{Int}
 
             if track_rejections
                 rej_dict = prev_state.state_rejections
@@ -341,7 +341,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         else
             prev_PC_dict = Dict{Int,Tuple{Float64,Float64}}()
             PC_unchecked = Int[]
-            PC_candidates = collect(keys(TPC_dict))
+            PC_candidates = collect(keys(TPC_dict))::Vector{Int}
         end
         PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
                                                    hps, pwr, levels, data_row_inds, data_nzero_vals,
@@ -1014,7 +1014,7 @@ function interleaved_backend{ElType <: Real}(target_vars::Vector{Int}, data::Abs
                         converged = true
 
                         if verbose
-                            println("\tCONVERGED!")
+                            println("\tCONVERGED! Waiting for remaining processes to finish their current load.")
                         end
                     end
 
