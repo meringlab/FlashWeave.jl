@@ -333,7 +333,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         if prev_state.phase == "E"
             prev_PC_dict = prev_state.state_results
             PC_unchecked = prev_state.unchecked_vars
-            PC_candidates = [keys(prev_PC_dict)..., PC_unchecked...]::Vector{Int}
+            PC_candidates = convert(Vector{Int}, [keys(prev_PC_dict)..., PC_unchecked...])
 
             if track_rejections
                 rej_dict = prev_state.state_rejections
@@ -341,7 +341,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         else
             prev_PC_dict = Dict{Int,Tuple{Float64,Float64}}()
             PC_unchecked = Int[]
-            PC_candidates = collect(keys(TPC_dict))::Vector{Int}
+            PC_candidates = convert(Vector{Int}, collect(keys(TPC_dict)))
         end
         PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
                                                    hps, pwr, levels, data_row_inds, data_nzero_vals,
@@ -846,7 +846,9 @@ function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels
             put!(shared_result_q, (target_var, nbr_state))
         catch exc
             println("Exception occurred! ", exc)
-            put!(shared_result_q, (target_var, exc))
+            println(catch_stacktrace())
+            #put!(shared_result_q, (target_var, exc))
+            #throw(exc)
         end
 
     end
@@ -1058,10 +1060,11 @@ function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode="cont";
     end
 
     if nprocs() < threads
-        if verbose
-            println("Adding workers")
-        end
-        addprocs(threads - procs())
+        error("Add $(threads - nprocs()) processes before running this function.")
+        #if verbose
+        #    println("Adding workers")
+        #end
+        #addprocs(threads - procs())
     end
 
     if verbose
