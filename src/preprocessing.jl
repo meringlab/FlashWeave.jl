@@ -4,8 +4,8 @@ export preprocess_data, preprocess_data_default
 
 using StatsBase
 using DataFrames
-using Cauocc.Misc
-using Cauocc.Learning
+using FlashWeave.Misc
+using FlashWeave.Learning
 
 
 function pseudocount_vars_from_sample_nolog{ElType <: AbstractFloat}(s::Vector{ElType})

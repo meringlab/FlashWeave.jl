@@ -4,9 +4,9 @@ export test, test_subsets, issig
 
 using Combinatorics
 
-using Cauocc.Misc
-using Cauocc.Statfuns
-using Cauocc.Contingency
+using FlashWeave.Misc
+using FlashWeave.Statfuns
+using FlashWeave.Contingency
 
 
 function issig(test_res::TestResult, alpha::AbstractFloat)

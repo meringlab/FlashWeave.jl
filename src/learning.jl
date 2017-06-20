@@ -7,10 +7,10 @@ using LightGraphs
 using DataStructures
 using StatsBase
 
-using Cauocc.Tests
-using Cauocc.Misc
-using Cauocc.Statfuns
-using Cauocc.StackChannels
+using FlashWeave.Tests
+using FlashWeave.Misc
+using FlashWeave.Statfuns
+using FlashWeave.StackChannels
 
 
 function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},

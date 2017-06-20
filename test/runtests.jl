@@ -6,7 +6,7 @@ if nprocs() == 1
     addprocs(1)
 end
 
-using Cauocc
+using FlashWeave
 using Base.Test
 
 for test_module in ["preprocessing.jl", "misc.jl", "contingency.jl", "statfuns.jl",

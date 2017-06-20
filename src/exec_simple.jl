@@ -18,7 +18,7 @@ function main(input_args::Vector{String})
         addprocs(n_jobs - 1)
     end
 
-    eval(Expr(:using,:Cauocc))
+    eval(Expr(:using,:FlashWeave))
 
     println("Finished after $(toc())s\n")
 

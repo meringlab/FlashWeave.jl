@@ -1,4 +1,4 @@
-using Cauocc
+using FlashWeave
 using DataFrames
 using JLD
 using Base.Test
@@ -33,7 +33,7 @@ exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4,15,23
 exp_dict = load(joinpath(pwd(), "test", "data", "learning_expected.jld"))
 
 function make_network(data, test_name, make_sparse=false, prec=32; kwargs...)
-    data_norm = Cauocc.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
+    data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
     #println(typeof(data_norm))
     kwargs_dict = Dict(kwargs)
     #println(test_name, " ", typeof(data_norm), " ", kwargs)

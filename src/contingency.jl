@@ -2,7 +2,7 @@ module Contingency
 
 export contingency_table!, contingency_table
 
-using Cauocc.Misc
+using FlashWeave.Misc
 
 
 function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, cont_tab::Matrix{ElType})

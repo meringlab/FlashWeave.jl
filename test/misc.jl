@@ -1,4 +1,4 @@
-using Cauocc
+using FlashWeave
 using Base.Test
 
 @testset "weights" begin
