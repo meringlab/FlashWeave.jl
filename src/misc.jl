@@ -35,7 +35,7 @@ function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,Int})::ElTyp
 end
 
 
-function get_levels{ElType <: Integer}(col_vec::Vector{ElType})::ElType
+function get_levels{ElType <: Integer}(col_vec::AbstractVector{ElType})::ElType
     length(unique(col_vec))
 end
 
@@ -45,7 +45,7 @@ function get_levels{ElType <: Integer}(data::AbstractMatrix{ElType})
 end
 
 
-function min_sec_indices!(ind_pair::IndexPair, index_vec::Vector{Int})
+function min_sec_indices!(ind_pair::IndexPair, index_vec::AbstractVector{Int})
     min_ind = 0
     sec_ind = 0
 
@@ -119,7 +119,7 @@ function make_weights(PC_dict::Dict{Int,Tuple{Float64,Float64}}, univar_nbrs::Di
 end
 
 
-function make_cum_levels!{ElType <: Integer}(cum_levels::Vector{ElType}, Zs::Vector{Int}, levels::Vector{ElType})
+function make_cum_levels!{ElType <: Integer}(cum_levels::AbstractVector{ElType}, Zs::AbstractVector{Int}, levels::AbstractVector{ElType})
     cum_levels[1] = 1
 
     for j in 2:length(Zs)
@@ -130,8 +130,8 @@ function make_cum_levels!{ElType <: Integer}(cum_levels::Vector{ElType}, Zs::Vec
 end
 
 
-function level_map!{ElType <: Integer}(Zs::Vector{Int}, data::AbstractMatrix{ElType}, z::Vector{ElType}, cum_levels::Vector{ElType},
-    z_map_arr::Vector{ElType})
+function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, z::AbstractVector{ElType}, cum_levels::AbstractVector{ElType},
+    z_map_arr::AbstractVector{ElType})
     fill!(z_map_arr, -1)
     levels_z = zero(ElType)
 
@@ -242,7 +242,7 @@ function map_edge_keys{T}(nbr_dict::Dict{Int,Dict{Int,T}}, key_map_dict::Dict{In
 end
 
 
-function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::Vector{String})
+function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::AbstractVector{String})
     #n_nodes = length(graph_dict)
     n_vars = length(header)
     adj_mat = zeros(Float64, (n_vars, n_vars))

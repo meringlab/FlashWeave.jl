@@ -55,7 +55,7 @@ function cor_nz{ElType <: AbstractFloat}(data::Matrix{ElType})
     cor_mat
 end
 
-function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType})
+function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType})
     sub_data = @view data[:, [X, Y, Zs...]]
 
     if size(sub_data, 1) < 5
@@ -89,7 +89,7 @@ function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, data::Ab
 end
 
 
-function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, cor_mat::Matrix{ElType}, pcor_set_dict::Dict{String,Dict{String,ElType}})
+function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, cor_mat::AbstractMatrix{ElType}, pcor_set_dict::Dict{String,Dict{String,ElType}})
     XY_key = join((X, Y), "_")
     Zs_key = join(Zs, "_")
 
@@ -137,7 +137,7 @@ function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, cor_
 end
 
 
-function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_mat::Matrix{ElType}, vars::Vector{Int})
+function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_mat::AbstractMatrix{ElType}, vars::AbstractVector{Int})
     var_cors = cor(data[:, vars])
 
     for (i, var_A) in enumerate(vars)
@@ -210,7 +210,7 @@ end
 
 
 function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType, 3}, levels_x::Integer, levels_y::Integer, levels_z::Integer,
-        ni::Matrix{ElType}, nj::Matrix{ElType}, nk::Vector{ElType}, exp_dz::Bool=false)
+        ni::AbstractMatrix{ElType}, nj::AbstractMatrix{ElType}, nk::AbstractVector{ElType}, exp_dz::Bool=false)
     """Note: returns mutual information * number of observations!"""
     #if reset_marginals
     fill!(ni, 0)
@@ -255,8 +255,8 @@ function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType, 3
 end
 
 
-function mutual_information{ElType <: Integer}(cont_tab::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, ni::Vector{ElType},
-        nj::Vector{ElType}, exp_dz::Bool=false)
+function mutual_information{ElType <: Integer}(cont_tab::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, ni::AbstractVector{ElType},
+        nj::AbstractVector{ElType}, exp_dz::Bool=false)
     """Note: returns mutual information * number of observations!"""
     fill!(ni, 0)
     fill!(nj, 0)
@@ -295,7 +295,7 @@ function mutual_information{ElType <: Integer}(cont_tab::AbstractMatrix{ElType},
 end
 
 
-function adjust_df{ElType <: Integer}(ni::Vector{ElType}, nj::Vector{ElType}, levels_x::Integer, levels_y::Integer)
+function adjust_df{ElType <: Integer}(ni::AbstractVector{ElType}, nj::AbstractVector{ElType}, levels_x::Integer, levels_y::Integer)
     alx = 0
     aly = 0
     for i in 1:levels_x
@@ -314,7 +314,7 @@ function adjust_df{ElType <: Integer}(ni::Vector{ElType}, nj::Vector{ElType}, le
 end
 
 
-function adjust_df{ElType <: Integer}(ni::Matrix{ElType}, nj::Matrix{ElType}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
+function adjust_df{ElType <: Integer}(ni::AbstractMatrix{ElType}, nj::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
     df = 0
     for k in 1:levels_z
         df += adjust_df(ni[:, k], nj[:, k], levels_x, levels_y)
@@ -337,7 +337,7 @@ function nz_adjust_cont_tab{ElType <: Integer}(levels_x::Integer, levels_y::Inte
 end
 
 
-function benjamini_hochberg{ElType <: AbstractFloat}(pvals::Vector{ElType})
+function benjamini_hochberg{ElType <: AbstractFloat}(pvals::AbstractVector{ElType})
     """Accelerated version of that found in MultipleTesting.jl"""
     m = length(pvals)
 

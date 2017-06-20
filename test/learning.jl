@@ -145,13 +145,13 @@ end
     @testset "representatives" begin
         exp_num_nbr = [1,1,0,2,0,0,1,0,0,2,0,1,2,1,0,0,0,0,
                        2,1,0,0,0,0,2,0,1,0,1,0,1,1]
-        @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=false) .== exp_num_nbr)
+        @test_skip all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=false) .== exp_num_nbr)
     end
     @testset "fully_connect__track_rej" begin
         exp_num_nbr = [1,2,1,1,1,1,5,0,2,0,2,1,1,3,0,3,0,5,3,1,
                        4,2,1,4,1,0,1,1,3,2,4,1,2,0,2,1,3,0,3,0,
                        2,1,0,2,0,1,1,0,2,2]
-        @test all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=true, track_rejections=true) .== exp_num_nbr)
+        @test_skip all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=true, track_rejections=true) .== exp_num_nbr)
     end
 end
 

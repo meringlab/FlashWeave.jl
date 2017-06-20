@@ -22,8 +22,8 @@ sufficient_power(levels_x::Integer, levels_y::Integer, levels_z::Integer, n_obs:
 ##################
 
 function test{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String, hps::Integer,
-    levels_x::ElType, levels_y::ElType, cont_tab::Matrix{ElType}, ni::Vector{ElType}, nj::Vector{ElType}, nz::Bool=false,
-    data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[])
+    levels_x::ElType, levels_y::ElType, cont_tab::Matrix{ElType}, ni::AbstractVector{ElType}, nj::AbstractVector{ElType}, nz::Bool=false,
+    data_row_inds::AbstractVector{Int}=Int[], data_nzero_vals::AbstractVector{ElType}=ElType[])
 
     if nz && (levels_y > 2)
         sub_data = @view data[data[:, Y] .!= 0, :]
@@ -93,8 +93,8 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElTy
 end
 
 
-function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String,
-    hps::Integer, levels::Vector{ElType}, data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[])
+function test{ElType <: Integer}(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String,
+    hps::Integer, levels::AbstractVector{ElType}, data_row_inds::AbstractVector{Int}=Int[], data_nzero_vals::AbstractVector{ElType}=ElType[])
     """Test all variables Ys for univariate association with X"""
 
     levels_x = levels[X]
@@ -112,7 +112,7 @@ function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{E
     end
 end
 
-function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String, hps::Integer=5)
+function test{ElType <: Integer}(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String, hps::Integer=5)
     levels = get_levels(data)
 
     if issparse(data)
@@ -126,7 +126,7 @@ function test{ElType <: Integer}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{E
     test(X, Ys, data, test_name, hps, levels, data_row_inds, data_nzero_vals)
 end
 
-function test{ElType <: AbstractFloat}(X::Int, Ys::Vector{Int}, data::AbstractMatrix{ElType},
+function test{ElType <: AbstractFloat}(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{ElType},
         test_name::String, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0))
     """Test all variables Ys for univariate association with X"""
     nz = is_zero_adjusted(test_name)
@@ -138,7 +138,7 @@ end
 ### CONDITIONAL ###
 ###################
 
-function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType},
+function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType},
     test_name::String, nz::Bool, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
 
@@ -157,18 +157,18 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, data::Ab
 end
 
 
-function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String; recursive::Bool=true)
+function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String; recursive::Bool=true)
     cor_mat = recursive ? cor(data) : zeros(ElType, 0, 0)
     pcor_set_dict = Dict{String,Dict{String,ElType}}()
     test(X, Y, Zs, data, test_name, is_zero_adjusted(test_name), cor_mat, pcor_set_dict)
 end
 
 
-function test{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType},
+function test{ElType <: Integer}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType},
         test_name::String, hps::Integer, levels_x::ElType, levels_y::ElType, cont_tab::Array{ElType,3},
-    z::Vector{ElType}, ni::Array{ElType,2}, nj::Array{ElType,2}, nk::Array{ElType,1}, cum_levels::Vector{ElType},
-    z_map_arr::Vector{ElType}, nz::Bool=false, data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[],
-    levels::Vector{ElType}=ElType[])
+    z::AbstractVector{ElType}, ni::Array{ElType,2}, nj::Array{ElType,2}, nk::Array{ElType,1}, cum_levels::AbstractVector{ElType},
+    z_map_arr::AbstractVector{ElType}, nz::Bool=false, data_row_inds::AbstractVector{Int}=Int[], data_nzero_vals::AbstractVector{ElType}=ElType[],
+    levels::AbstractVector{ElType}=ElType[])
     """Test association between X and Y"""
 
     if !issparse(data)
@@ -212,7 +212,7 @@ function test{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::Abstract
 end
 
 
-function test{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType}, test_name::String, hps::Integer=5)
+function test{ElType <: Integer}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String, hps::Integer=5)
     levels = get_levels(data)
     levels_x = levels[X]
     levels_y = levels[Y]
@@ -241,9 +241,9 @@ function test{ElType <: Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::Abstract
 end
 
 
-function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::Vector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, pwr::AbstractFloat=0.5, levels::Vector{ElType}=ElType[],
-    data_row_inds::Vector{Int}=Int[], data_nzero_vals::Vector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
+function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{ElType},
+    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
+    data_row_inds::AbstractVector{Int}=Int[], data_nzero_vals::AbstractVector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)

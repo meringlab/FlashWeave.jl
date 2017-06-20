@@ -2,6 +2,8 @@ __precompile__()
 
 module Cauocc
 
+using StaticArrays
+
 include("statfuns.jl")
 include("misc.jl")
 include("contingency.jl")
