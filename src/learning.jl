@@ -417,10 +417,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         warn("Specify 'time_limit' when using interleaved parallelism to increase speed.")
     end
 
-    if track_rejections && (time_limit != 0.0)
-        warn("Can't use track_rejections with a time_limit, omitting tracking")
-        kwargs[:track_rejections] = false
-    end
+    #if track_rejections && (time_limit != 0.0)
+    #    warn("Can't use track_rejections with a time_limit, omitting tracking")
+    #    kwargs[:track_rejections] = false
+    #end
 
     if recursive_pcor && iscontinuous(test_name)
         warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated

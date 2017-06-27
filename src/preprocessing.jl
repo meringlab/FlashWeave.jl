@@ -156,6 +156,26 @@ end
 
 iscontinuousnorm(norm::String) = norm == "rows" || startswith(norm, "clr")
 
+function discretize_env!{ElType <: Real}(env_data::Matrix{ElType}, norm, n_bins)
+    for i in 1:size(env_data, 2)
+        env_vec = env_data[:, i]
+        try
+            disc_env_vec = convert(Vector{Int}, env_vec)
+            if norm == "clr_nz"
+                disc_env_vec += 1
+            end
+            env_vec = convert(Vector{ElType}, disc_env_vec)
+        catch InexactError
+            if !iscontinuousnorm(norm)
+                disc_env_vec = discretize(env_vec, n_bins)
+                env_vec = convert(Vector{ElType}, disc_env_vec)
+            end
+        end
+        env_data[:, i] .= env_vec
+    end
+end
+            
+
 function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
     disc_method::String="median", verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false, factor_cols::Set{Int}=Set{Int}(),
     prec::Integer=64)
@@ -163,6 +183,8 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
 
+    
+    
     if !isempty(env_cols)
         env_data = data[:, sort(collect(env_cols))]
         data = data[:, map(x -> !(x in env_cols), 1:size(data, 2))]
@@ -194,6 +216,7 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
         zero_mask = data .== minimum(data)
         data[zero_mask] = 0.0
     elseif norm == "binary"
+        n_bins = 2
         data = sign(data)
         data = convert(Matrix{Int}, data)
 
@@ -204,10 +227,10 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
             println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than 2 levels")
         end
 
-        if !isempty(env_cols)
-            env_data = discretize(env_data, nz=false, n_bins=2)
-            env_data = convert(Matrix{Int}, env_data)
-        end
+        #if !isempty(env_cols)
+        #    env_data = discretize(env_data, nz=false, n_bins=2)
+        #    env_data = convert(Matrix{Int}, env_data)
+        #end
     elseif startswith(norm, "binned")
         if startswith(norm, "binned_nz")
             if endswith(norm, "rows")
@@ -236,15 +259,20 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
             println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
         end
 
-        if !isempty(env_cols)
-            env_data = discretize(env_data, nz=false, n_bins=n_bins)
-            #env_data = convert(Matrix{Int}, env_data)
-        end
+        #if !isempty(env_cols)
+        #    env_data = discretize(env_data, nz=false, n_bins=n_bins)
+        #    #env_data = convert(Matrix{Int}, env_data)
+        #end
     else
         error("$norm is no valid normalization method.")
     end
 
     if !isempty(env_cols)
+        #if norm != "binary"
+        #    env_data = discretize(env_data, nz=false, n_bins=2) + 1
+        #end
+        
+        discretize_env!(env_data, norm, n_bins)
         data = hcat(data, convert(typeof(data), env_data))
     end
 
