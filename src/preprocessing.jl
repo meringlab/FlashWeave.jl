@@ -156,7 +156,7 @@ end
 
 iscontinuousnorm(norm::String) = norm == "rows" || startswith(norm, "clr")
 
-function discretize_env!{ElType <: Real}(env_data::Matrix{ElType}, norm, n_bins)
+function discretize_env!{ElType <: Real}(env_data::AbstractMatrix{ElType}, norm, n_bins)
     for i in 1:size(env_data, 2)
         env_vec = env_data[:, i]
         try
@@ -176,9 +176,9 @@ function discretize_env!{ElType <: Real}(env_data::Matrix{ElType}, norm, n_bins)
 end
             
 
-function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
+function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
     disc_method::String="median", verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false, factor_cols::Set{Int}=Set{Int}(),
-    prec::Integer=64)
+    prec::Integer=32, filter_data=true)
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
@@ -187,20 +187,37 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
     
     if !isempty(env_cols)
         env_data = data[:, sort(collect(env_cols))]
+        
+        if issparse(env_data)
+            env_data = full(env_data)
+        end
+        
         data = data[:, map(x -> !(x in env_cols), 1:size(data, 2))]
     end
 
-    unfilt_dims = size(data)
-    col_mask = var(data, 1)[:] .> 0.0
-    data = data[:, col_mask]
-    row_mask = sum(data, 2)[:] .> 0
-    data = data[row_mask, :]
+    if filter_data
+        unfilt_dims = size(data)
+        col_mask = var(data, 1)[:] .> 0.0
+        data = data[:, col_mask]
+        row_mask = sum(data, 2)[:] .> 0
+        data = data[row_mask, :]
+        if !isempty(env_cols)
+            env_data = env_data[row_mask, :]
+        end
+    end
 
+    if issparse(data)
+        if verbose
+            println("\texpanding sparse matrix")
+        end
+        data = full(data)
+    end
+    
     if verbose
         println("\tdiscarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
         println("\nNormalizing data")
     end
-
+    
     if norm == "rows"
         data = convert(Matrix{Float64}, data)
         data = data ./ sum(data, 2)
@@ -287,7 +304,7 @@ function preprocess_data{ElType <: Real}(data::Matrix{ElType}, norm::String; clr
 end
 
 
-function preprocess_data_default{ElType <: Real}(data::Matrix{ElType}, test_name::String; verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false, factor_cols::Set{Int}=Set{Int}(), prec::Integer=32)
+function preprocess_data_default{ElType <: Real}(data::AbstractMatrix{ElType}, test_name::String; verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=false, factor_cols::Set{Int}=Set{Int}(), prec::Integer=32)
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
     data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, env_cols=env_cols, make_sparse=make_sparse, factor_cols=factor_cols, prec=prec)
     data

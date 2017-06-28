@@ -771,7 +771,7 @@ end
 
 
 function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::String="fz"; cluster_sim_threshold::AbstractFloat=0.8, parallel="single",
-    ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0), verbose::Bool=false)
+    ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0), verbose::Bool=false, greedy::Bool=true)
 
     if verbose
         println("Computing pairwise distances")
@@ -786,21 +786,39 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
         entrs = mapslices(x -> entropy(counts(x) ./ length(x)), data, 1)
     elseif stat_type == "mi_nz"
         nz_mask = data .!= 0
+    elseif startswith(stat_type, "fz")
+        sim_mat = abs(sim_mat)
     end
 
+    #greedy_mode = cluster_mode == "greedy"
     unclustered_vars = Set{Int}(1:size(data, 2))
     clust_dict = Dict{Int,Set{Int}}()
-
-    var_order = collect(1:size(data, 2))
-    if ordering == "size"
-        var_sizes = sum(data, 1)
-        sort!(var_order, by=x -> var_sizes[x], rev=true)
+    
+    if greedy
+        var_order = collect(1:size(data, 2))
+        if ordering == "size"
+            var_sizes = sum(data, 1)
+            sort!(var_order, by=x -> var_sizes[x], rev=true)
+        end
+    else
+        var_order = 1:size(data, 2)
     end
 
     if verbose
         println("Clustering")
     end
 
+    if !greedy
+        if verbose
+            println("\tCalculating distances")
+        end
+        dist_mat = similar(sim_mat)
+    end
+                
+    
+    is_mi_stat = startswith(stat_type, "mi")
+    is_fz_stat = startswith(stat_type, "fz")
+            
     for var_A in var_order
         if var_A in unclustered_vars
             pop!(unclustered_vars, var_A)
@@ -809,11 +827,11 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
             for var_B in unclustered_vars
                 sim = sim_mat[var_A, var_B]
 
-                if sim == 0.0
+                if greedy && (sim == 0.0)
                     continue
                 end
 
-                if startswith(stat_type, "mi")
+                if is_mi_stat
                     if stat_type == "mi"
                         entr_A = entrs[var_A]
                         entr_B = entrs[var_B]
@@ -826,17 +844,46 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
                     norm_term = sqrt(entr_A * entr_B)
 
                     sim = norm_term != 0.0 ? abs(sim) / norm_term : 0.0
+                    
                 end
-
-                if sim > cluster_sim_threshold
-                    push!(clust_members, var_B)
-                    pop!(unclustered_vars, var_B)
-                end
+                    
+                if greedy
+                    if sim > cluster_sim_threshold
+                        push!(clust_members, var_B)
+                        pop!(unclustered_vars, var_B)
+                    end
+                else
+                    dist = 1.0 - sim
+                    dist_mat[var_A, var_B] = dist
+                    dist_mat[var_B, var_A] = dist
+                end 
             end
-            clust_dict[var_A] = clust_members
+                
+            if greedy
+                clust_dict[var_A] = clust_members
+            end
         end
     end
 
+    if !greedy
+        eval(Expr(:using,:Clustering))
+        clust_obj = hclust(dist_mat, :average)
+        clusts = cutree(clust_obj, h=1.0 - cluster_sim_threshold)
+        
+        var_sizes = sum(data, 1)
+        
+        for clust_id in unique(clusts)
+            clust_members = findn(clusts .== clust_id)
+            if length(clust_members) > 1
+                clust_sizes = @view var_sizes[clust_members]
+                clust_repres = clust_members[findmax(clust_sizes)[2]]
+            else
+                clust_repres = clust_members[1]
+            end
+            clust_dict[clust_repres] = Set(clust_members)
+        end
+    end 
+    
     (sort(collect(keys(clust_dict))), clust_dict)
 end
 
