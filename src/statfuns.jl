@@ -286,6 +286,7 @@ function mutual_information{ElType <: Integer}(cont_tab::AbstractMatrix{ElType},
             njj = nj[j]
             if cell_value != 0 && nii != 0 && njj != 0
                 cell_mi = cell_value * log((n_obs * cell_value) / (nii * njj))
+                #cell_mi = cell_value * ((log(n_obs) + log(cell_value)) - (log(nii) + log(njj)))
                 mi_stat += cell_mi
             end
         end

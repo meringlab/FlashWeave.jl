@@ -8,7 +8,14 @@ function main(input_args::Vector{String})
     parallel_mode = input_args[5]
     rec_mode = input_args[6]
     univar_mode = input_args[7]
-    n_jobs = parse(Int64, input_args[8])
+    
+    if length(input_args) > 8
+        FDR = input_args[8]
+        n_jobs = parse(Int64, input_args[9])
+    else
+        FDR = "true"
+        n_jobs = parse(Int64, input_args[8])
+    end
 
     println("Starting processes and importing modules")
     tic()
@@ -47,7 +54,7 @@ function main(input_args::Vector{String})
     #repres, clust_dict = Cauocc.cluster_data(data_norm, test_name, parallel=split(parallel_mode, "_")[1])
     #data_norm = data_norm[:, repres]
     #println("Finished after $(toc())s\n")
-    lgl_args = Dict{Symbol,Any}(:test_name => test_name, :parallel => parallel_mode, :verbose => false, :recursive_pcor => rec_mode == "true", :max_k => univar_mode == "true" ? 0 : 3)
+    lgl_args = Dict{Symbol,Any}(:test_name => test_name, :parallel => parallel_mode, :verbose => false, :recursive_pcor => rec_mode == "true", :max_k => univar_mode == "true" ? 0 : 3, :FDR => FDR == "true")
 
     if speed_mode == "fast"
         lgl_args[:convergence_threshold] = 0.05
