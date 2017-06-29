@@ -208,7 +208,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
 
     if is_zero_adjusted(test_name)
-        if !isdiscrete(test_name) || levels[T] > 2
+        if !issparse(data) && (!isdiscrete(test_name) || levels[T] > 2)
             data = @view data[data[:, T] .!= 0, :]
         end
     end
@@ -612,16 +612,40 @@ end
 
 # SPECIALIZED FUNCTIONS AND TYPES
 
-function pw_univar_kernel!{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, stats::AbstractVector{Float64}, pvals::AbstractVector{Float64}, test_name::String, hps::Integer, levels::AbstractVector{ElType}, nz::Bool, data_row_inds::AbstractVector{Int}, data_nzero_vals::AbstractVector{ElType}, cor_mat::Matrix{ElType})
+function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}, stats::AbstractVector{Float64}, alpha::AbstractFloat)
+    nbr_dict = Dict([(X, Dict{Int,Tuple{Float64,Float64}}()) for X in 1:n_vars])
+
+    for X in 1:n_vars-1, Y in X+1:n_vars
+        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+        pval = pvals[pair_index]
+
+        if pval < alpha
+            stat = stats[pair_index]
+            nbr_dict[X][Y] = (stat, pval)
+            nbr_dict[Y][X] = (stat, pval)
+        end
+    end
+    nbr_dict
+end
+
+
+make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))       
+work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))
+ 
+function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
+                            stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
+                            test_name::String, hps::Integer, levels::AbstractVector{ElType},
+                            nz::Bool, data_row_inds::AbstractVector{Int}, data_nzero_vals::AbstractVector{ElType},
+                            cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
-    if nz
+    if !issparse(data) && nz
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
     end
 
-    Ys = collect(X+1:n_vars)
+    Ys = collect(Ys_slice)
 
     if isdiscrete(test_name)
         test_results = test(X, Ys, sub_data, test_name, hps, levels, data_row_inds, data_nzero_vals)
@@ -640,7 +664,7 @@ end
 function pw_univar_kernel{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
     n_vars = size(data, 2)
 
-    if nz
+    if !issparse(data) && nz
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
@@ -656,26 +680,9 @@ function pw_univar_kernel{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, 
 end
 
 
-function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}, stats::AbstractVector{Float64}, alpha::AbstractFloat)
-    nbr_dict = Dict([(X, Dict{Int,Tuple{Float64,Float64}}()) for X in 1:n_vars])
-
-    for X in 1:n_vars-1, Y in X+1:n_vars
-        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
-        pval = pvals[pair_index]
-
-        if pval < alpha
-            stat = stats[pair_index]
-            nbr_dict[X][Y] = (stat, pval)
-            nbr_dict[Y][X] = (stat, pval)
-        end
-    end
-    nbr_dict
-end
-
-
 function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", alpha::AbstractFloat=0.01, hps::Integer=5, FDR::Bool=true,
         levels::AbstractVector{ElType}=ElType[], parallel::String="single", workers_local::Bool=true,
-        cor_mat::Matrix{ElType}=zeros(ElType, 0, 0))
+        cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), chunk_size::Integer=500)
 
     if startswith(test_name, "mi") && isempty(levels)
         levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
@@ -694,51 +701,56 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
         data_nzero_vals = ElType[]
     end
 
+    work_items = collect(work_chunker(n_vars, min(chunk_size, div(n_vars, 3))))
+    
     if startswith(parallel, "single")
-        pvals = zeros(Float64, n_pairs)
+        pvals = ones(Float64, n_pairs)
         stats = zeros(Float64, n_pairs)
 
-        for X in 1:n_vars-1
-            pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
+        for (X, Ys_slice) in work_items
+            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_name, hps, levels, nz, data_row_inds,
+                              data_nzero_vals, cor_mat)
         end
 
-    elseif startswith(parallel, "multi")
-        # if worker processes are on the same machine, use local memory sharing via shared arrays
-        if workers_local
-            shared_pvals = SharedArray(Float64, n_pairs)
-            shared_stats = SharedArray(Float64, n_pairs)
-            @sync @parallel for X in 1:n_vars-1
-                pw_univar_kernel!(X, data, shared_stats, shared_pvals, test_name, hps, levels, nz, data_row_inds,
-                    data_nzero_vals, cor_mat)
-            end
-            stats = shared_stats.s
-            pvals = shared_pvals.s
+    else
+        shuffle!(work_items)
+        if startswith(parallel, "multi")
+            # if worker processes are on the same machine, use local memory sharing via shared arrays
+            if workers_local
+                shared_pvals = SharedArray(Float64, n_pairs)
+                shared_stats = SharedArray(Float64, n_pairs)
+                @sync @parallel for work_item in work_items
+                    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_name, hps, levels, nz, data_row_inds,
+                        data_nzero_vals, cor_mat)
+                end
+                stats = shared_stats.s
+                pvals = shared_pvals.s
 
-        # otherwise make workers store test results remotely and gather them in the end via network
-        else
-            @sync all_test_result_refs = [@spawn pw_univar_kernel(X, data, test_name, hps, levels,
-                                          nz, data_row_inds, data_nzero_vals, cor_mat)
-                                          for X in 1:n_vars-1]
-            all_test_results = map(fetch, all_test_result_refs)
-            pvals = zeros(Float64, n_pairs)
-            stats = zeros(Float64, n_pairs)
+            # otherwise make workers store test results remotely and gather them in the end via network
+            else
+                error("Remote parallelism not needs fixing.")
+                @sync all_test_result_refs = [@spawn pw_univar_kernel(X, data, test_name, hps, levels,
+                                              nz, data_row_inds, data_nzero_vals, cor_mat)
+                                              for X in 1:n_vars-1]
+                all_test_results = map(fetch, all_test_result_refs)
+                pvals = ones(Float64, n_pairs)
+                stats = zeros(Float64, n_pairs)
 
-            i = 1
-            for test_res in all_test_results
-                for t in test_res
-                    stats[i] = t.stat
-                    pvals[i] = t.pval
-                    i += 1
+                i = 1
+                for test_res in all_test_results
+                    for t in test_res
+                        stats[i] = t.stat
+                        pvals[i] = t.pval
+                        i += 1
+                    end
                 end
             end
-        end
 
-    elseif startswith(parallel, "threads")
-        pvals = zeros(Float64, n_pairs)
-        stats = zeros(Float64, n_pairs)
-        Threads.@threads for X in 1:n_vars-1
-            for X in 1:n_vars-1
-                pw_univar_kernel!(X, data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals)
+        elseif startswith(parallel, "threads")
+            pvals = ones(Float64, n_pairs)
+            stats = zeros(Float64, n_pairs)
+            Threads.@threads for work_item in work_items
+                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
             end
         end
     end

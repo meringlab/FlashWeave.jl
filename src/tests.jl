@@ -25,7 +25,7 @@ function test{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, t
     levels_x::ElType, levels_y::ElType, cont_tab::Matrix{ElType}, ni::AbstractVector{ElType}, nj::AbstractVector{ElType}, nz::Bool=false,
     data_row_inds::AbstractVector{Int}=Int[], data_nzero_vals::AbstractVector{ElType}=ElType[])
 
-    if nz && (levels_y > 2)
+    if !issparse(data) && nz && (levels_y > 2)
         sub_data = @view data[data[:, Y] .!= 0, :]
     else
         sub_data = data
@@ -72,7 +72,7 @@ end
 function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String,
     cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false)
 
-    if nz
+    if !issparse(data) && nz
         sub_data = @view data[data[:, Y] .!= 0, :]
     else
         sub_data = data
@@ -142,7 +142,7 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, 
     test_name::String, nz::Bool, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
 
-    if nz
+    if !issparse(data) && nz
         sub_data = @view data[data[:, Y] .!= 0, :]
     else
         sub_data = data

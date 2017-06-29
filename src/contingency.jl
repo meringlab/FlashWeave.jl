@@ -68,8 +68,9 @@ end
 
 # SPARSE DATA
 
-@generated function contingency_table!{T,N,ElType}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{Int},
-        vals::Vector{ElType}, cont_tab::Array{ElType,3}, cum_levels::Vector{ElType}, z_map_arr::Vector{ElType}, levels::N)
+@generated function contingency_table!{T,N,ElType <: Integer}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{ElType,Int},
+        row_inds::Vector{Int}, vals::Vector{ElType}, cont_tab::Array{ElType,3},
+        cum_levels::Vector{ElType}, z_map_arr::Vector{ElType}, levels::N)
     if T <: Tuple{Int}
         n_vars = 3
     elseif T <: Tuple{Int,Int}
@@ -106,6 +107,7 @@ end
             x_nzadj = levels[X] > 2
             y_nzadj = levels[Y] > 2
             skip_row = false
+            #check_mask = !isempty(wanted_row_mask)
         end
         append!(expr.args, nz_init_expr.args)
     end
@@ -208,10 +210,6 @@ end
             level_val = levels_z
             levels_z += 1
         end
-
-        #if gfp_map == 1
-        #    all_Zs_zero_val = level_val
-        #end
     end
 
     # update contingency table
@@ -276,8 +274,8 @@ end
 
 
 
-function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{Int}, vals::Vector{ElType},
-        cont_tab::Matrix{ElType})
+function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{Int},
+        vals::Vector{ElType}, cont_tab::Matrix{ElType})
     fill!(cont_tab, 0)
 
     n_rows, n_cols = size(data)
