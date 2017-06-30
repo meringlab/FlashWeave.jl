@@ -850,8 +850,13 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
                     elseif stat_type == "mi_nz"
                         curr_nz_mask = (nz_mask[:, var_A] & nz_mask[:, var_B])[:]
                         nz_elems = sum(curr_nz_mask)
-                        entr_A = entropy(counts(data[curr_nz_mask, var_A]) ./ nz_elems)
-                        entr_B = entropy(counts(data[curr_nz_mask, var_B]) ./ nz_elems)
+                        
+                        if nz_elems == 0
+                            entr_A = entr_B = 0
+                        else
+                            entr_A = entropy(counts(data[curr_nz_mask, var_A]) ./ nz_elems)
+                            entr_B = entropy(counts(data[curr_nz_mask, var_B]) ./ nz_elems)
+                        end
                     end
                     norm_term = sqrt(entr_A * entr_B)
 
