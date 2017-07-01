@@ -3,9 +3,25 @@ module Misc
 using LightGraphs
 using StatsBase
 
-export HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights
+export PairMeanObj, PairCorObj, HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
 
 const inf_weight = 708.3964185322641
+
+
+type PairMeanObj
+    sum_x::Float64
+    sum_y::Float64
+    n::Int
+end
+
+type PairCorObj
+    cov_xy::Float64
+    var_x::Float64
+    var_y::Float64
+    mean_x::Float64
+    mean_y::Float64
+end
+
 
 type TestResult
     stat :: Float64
@@ -266,5 +282,98 @@ function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::Abstrac
     adj_mat = hcat(reshape(["", header...], size(adj_mat, 2) + 1, 1), adj_mat)
     adj_mat
 end
+
+
+function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
+        red_fun, red_obj, x_nzadj=false, y_nzadj=false)
+    n_rows, n_cols = size(data)
+    num_out_of_bounds = 0
+    row_inds = rowvals(data)
+    vals = nonzeros(data)
+
+    x_i = data.colptr[X]
+    x_row_ind = row_inds[x_i]
+    x_val = vals[x_i]
+
+    if X != n_cols
+        x_bound = data.colptr[X + 1]
+    else
+        x_bound = nnz(data)
+    end
+
+    if x_i == x_bound
+        if x_nzadj
+            return
+        else
+            num_out_of_bounds += 1
+        end
+    end
+
+    y_i = data.colptr[Y]
+    y_row_ind = row_inds[y_i]
+    y_val = vals[y_i]
+
+    if Y != n_cols
+        y_bound = data.colptr[Y + 1]
+    else
+        y_bound = nnz(data) + 1
+    end
+
+    if y_i == y_bound
+        if y_nzadj
+            return
+        else
+            num_out_of_bounds += 1
+        end
+    end
+
+    min_row_ind = min(x_row_ind, y_row_ind)
+
+    while true
+        skip_row = false
+        if x_row_ind == min_row_ind
+            x_entry = x_val
+            x_i += 1
+
+            if x_i < x_bound
+                x_row_ind = row_inds[x_i]
+                x_val = vals[x_i]
+            else
+                num_out_of_bounds += 1
+                x_row_ind = n_rows + 1
+            end
+        else
+            x_entry = zero(eltype(data))
+            skip_row = x_nzadj
+        end
+
+        if y_row_ind == min_row_ind
+            y_entry = y_val
+            y_i += 1
+
+            if y_i < y_bound
+                y_row_ind = row_inds[y_i]
+                y_val = vals[y_i]
+            else
+                num_out_of_bounds += 1
+                y_row_ind = n_rows + 1
+            end
+        else
+            y_entry = zero(eltype(data))
+            skip_row = y_nzadj
+        end
+
+        min_row_ind = min(x_row_ind, y_row_ind)
+
+        if !skip_row
+            red_fun(red_obj, x_entry, y_entry)
+        end
+
+        if num_out_of_bounds >= 2
+            break
+        end
+    end
+end
+
 
 end

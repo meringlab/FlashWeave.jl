@@ -15,7 +15,6 @@ using FlashWeave.StackChannels
 
 function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
     test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
-    data_row_inds::AbstractVector{Int}=Int[], data_nzero_vals::AbstractVector{ElType}=ElType[],
     prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0,
     whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
@@ -59,8 +58,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
         end
 
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps,
-                                   pwr=pwr, levels=levels, data_row_inds=data_row_inds,
-                                   data_nzero_vals=data_nzero_vals, cor_mat=cor_mat,
+                                   pwr=pwr, levels=levels, cor_mat=cor_mat,
                                    pcor_set_dict=pcor_set_dict)
 
         if issig(test_result, alpha)
@@ -91,7 +89,6 @@ end
 
 function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String,
     max_k::Integer, alpha::AbstractFloat, hps::Integer=5, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
-    data_row_inds::AbstractVector{Int}=Int[], data_nzero_vals::AbstractVector{ElType}=ElType[],
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::AbstractVector{Int}=[],
     time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0, whitelist::Set{Int}=Set{Int}(),
     blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
@@ -142,7 +139,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
         end
 
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps,
-                                   levels=levels, data_row_inds=data_row_inds, data_nzero_vals=data_nzero_vals,
+                                   levels=levels,
                                    cor_mat=cor_mat, pcor_set_dict=pcor_set_dict)
 
         if !issig(test_result, alpha)
@@ -208,18 +205,11 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
 
     if is_zero_adjusted(test_name)
-        if !issparse(data) && (!isdiscrete(test_name) || levels[T] > 2)
+        if (!isdiscrete(test_name) || levels[T] > 2)
             data = @view data[data[:, T] .!= 0, :]
         end
     end
 
-    if issparse(data) && isdiscrete(test_name)
-        data_row_inds = rowvals(data)
-        data_nzero_vals = nonzeros(data)
-    else
-        data_row_inds = Int[]
-        data_nzero_vals = ElType[]
-    end
 
     test_variables = filter(x -> x != T, 1:size(data, 2))
     start_time = time_limit > 0.0 ? time() : 0.0
@@ -231,7 +221,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
     if univar_step
         if isdiscrete(test_name)
-            univar_test_results = test(T, test_variables, data, test_name, hps, levels, data_row_inds, data_nzero_vals)
+            univar_test_results = test(T, test_variables, data, test_name, hps, levels)
         else
             univar_test_results = test(T, test_variables, data, test_name, cor_mat)
         end
@@ -292,8 +282,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
             # interleaving phase
             TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k,
-                                                                alpha, hps, pwr, levels, data_row_inds,
-                                                                data_nzero_vals, prev_TPC_dict, time_limit,
+                                                                alpha, hps, pwr, levels, prev_TPC_dict, time_limit,
                                                                 start_time, debug, whitelist, blacklist, cor_mat,
                                                                 pcor_set_dict, rej_dict,
                                                                 track_rejections)
@@ -344,7 +333,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             PC_candidates = convert(Vector{Int}, collect(keys(TPC_dict)))
         end
         PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
-                                                   hps, pwr, levels, data_row_inds, data_nzero_vals,
+                                                   hps, pwr, levels,
                                                    prev_PC_dict, PC_unchecked, time_limit, start_time,
                                                    debug, whitelist, blacklist, cor_mat, pcor_set_dict, rej_dict,
                                                    track_rejections)
@@ -388,7 +377,8 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         fast_elim::Bool=true, precluster_sim::AbstractFloat=0.0,
         weight_type::String="cond_logpval", edge_rule::String="OR", verbose::Bool=true, update_interval::AbstractFloat=30.0,
         edge_merge_fun=maxweight,
-    debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[], recursive_pcor::Bool=true,
+    debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
+    recursive_pcor::Bool=true,
     track_rejections::Bool=false, fully_connect_clusters::Bool=false)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
@@ -417,17 +407,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         warn("Specify 'time_limit' when using interleaved parallelism to increase speed.")
     end
 
-    #if track_rejections && (time_limit != 0.0)
-    #    warn("Can't use track_rejections with a time_limit, omitting tracking")
-    #    kwargs[:track_rejections] = false
-    #end
 
     if recursive_pcor && iscontinuous(test_name)
         warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated
               variables, caution advised")
-        #if max_k == 0
-        #    warn("Set 'recursive_pcor' to false when only computing univariate associations ('max_k' == 0) to gain speed.")
-        #end
     end
 
     if isdiscrete(test_name)
@@ -629,13 +612,13 @@ function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}
 end
 
 
-make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))       
+make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))
 work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))
- 
+
 function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
                             stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
                             test_name::String, hps::Integer, levels::AbstractVector{ElType},
-                            nz::Bool, data_row_inds::AbstractVector{Int}, data_nzero_vals::AbstractVector{ElType},
+                            nz::Bool,
                             cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
@@ -648,7 +631,7 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
     Ys = collect(Ys_slice)
 
     if isdiscrete(test_name)
-        test_results = test(X, Ys, sub_data, test_name, hps, levels, data_row_inds, data_nzero_vals)
+        test_results = test(X, Ys, sub_data, test_name, hps, levels)
     else
         test_results = test(X, Ys, sub_data, test_name, cor_mat)
     end
@@ -663,7 +646,7 @@ end
 
 function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
                             test_name::String, hps::Integer, levels::AbstractVector{ElType},
-                            nz::Bool, data_row_inds::AbstractVector{Int}, data_nzero_vals::AbstractVector{ElType},
+                            nz::Bool,
                             cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
@@ -676,7 +659,7 @@ function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data
     Ys = collect(Ys_slice)
 
     if isdiscrete(test_name)
-        test_results = test(X, Ys, sub_data, test_name, hps, levels, data_row_inds, data_nzero_vals)
+        test_results = test(X, Ys, sub_data, test_name, hps, levels)
     else
         test_results = test(X, Ys, sub_data, test_name, cor_mat)
     end
@@ -696,23 +679,15 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
 
     nz = is_zero_adjusted(test_name)
 
-    if issparse(data) && isdiscrete(test_name)
-        data_row_inds = rowvals(data)
-        data_nzero_vals = nonzeros(data)
-    else
-        data_row_inds = Int[]
-        data_nzero_vals = ElType[]
-    end
 
     work_items = collect(work_chunker(n_vars, min(chunk_size, div(n_vars, 3))))
-    
+
     if startswith(parallel, "single")
         pvals = ones(Float64, n_pairs)
         stats = zeros(Float64, n_pairs)
 
         for (X, Ys_slice) in work_items
-            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_name, hps, levels, nz, data_row_inds,
-                              data_nzero_vals, cor_mat)
+            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_name, hps, levels, nz, cor_mat)
         end
 
     else
@@ -723,8 +698,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
                 shared_pvals = SharedArray(Float64, n_pairs)
                 shared_stats = SharedArray(Float64, n_pairs)
                 @sync @parallel for work_item in work_items
-                    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_name, hps, levels, nz, data_row_inds,
-                        data_nzero_vals, cor_mat)
+                    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_name, hps, levels, nz, cor_mat)
                 end
                 stats = shared_stats.s
                 pvals = shared_pvals.s
@@ -733,7 +707,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
             else
                 #error("Remote parallelism not needs fixing.")
                 @sync all_test_result_refs = [@spawn pw_univar_kernel(work_item[1], work_item[2], test_name, hps, levels,
-                                              nz, data_row_inds, data_nzero_vals, cor_mat)
+                                              nz, cor_mat)
                                               for work_item in work_items]
                 all_test_results = map(fetch, all_test_result_refs)
                 pvals = ones(Float64, n_pairs)
@@ -752,7 +726,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
             pvals = ones(Float64, n_pairs)
             stats = zeros(Float64, n_pairs)
             Threads.@threads for work_item in work_items
-                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
+                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_name, hps, levels, nz, cor_mat)
             end
         end
     end
@@ -794,12 +768,12 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
     if isempty(sim_mat)
         sim_mat = pw_unistat_matrix(data, stat_type, parallel=parallel)
     end
-    
+
     if stat_type == "mi"
         if verbose
             println("Computing entropies")
         end
-        
+
         # can potentially be improved by pre-allocation
         entrs = mapslices(x -> entropy(counts(x) ./ length(x)), data, 1)
     elseif stat_type == "mi_nz"
@@ -811,7 +785,7 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
     #greedy_mode = cluster_mode == "greedy"
     unclustered_vars = Set{Int}(1:size(data, 2))
     clust_dict = Dict{Int,Set{Int}}()
-    
+
     if greedy
         var_order = collect(1:size(data, 2))
         if ordering == "size"
@@ -832,11 +806,11 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
         end
         dist_mat = similar(sim_mat)
     end
-                
-    
+
+
     is_mi_stat = startswith(stat_type, "mi")
     is_fz_stat = startswith(stat_type, "fz")
-            
+
     for var_A in var_order
         if var_A in unclustered_vars
             pop!(unclustered_vars, var_A)
@@ -856,7 +830,7 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
                     elseif stat_type == "mi_nz"
                         curr_nz_mask = (nz_mask[:, var_A] & nz_mask[:, var_B])[:]
                         nz_elems = sum(curr_nz_mask)
-                        
+
                         if nz_elems == 0
                             entr_A = entr_B = norm_term = 0
                         else
@@ -868,9 +842,9 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
                     norm_term = sqrt(entr_A * entr_B)
 
                     sim = norm_term != 0.0 ? abs(sim) / norm_term : 0.0
-                    
+
                 end
-                    
+
                 if greedy
                     if sim > cluster_sim_threshold
                         push!(clust_members, var_B)
@@ -880,9 +854,9 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
                     dist = 1.0 - sim
                     dist_mat[var_A, var_B] = dist
                     dist_mat[var_B, var_A] = dist
-                end 
+                end
             end
-                
+
             if greedy
                 clust_dict[var_A] = clust_members
             end
@@ -891,16 +865,16 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
 
     if !greedy
         eval(Expr(:using,:Clustering))
-                            
+
         if verbose
             println("\tComputing hierarchical clusters")
         end
-        
+
         clust_obj = hclust(dist_mat, :average)
         clusts = cutree(clust_obj, h=1.0 - cluster_sim_threshold)
-        
+
         var_sizes = sum(data, 1)
-        
+
         for clust_id in unique(clusts)
             clust_members = findn(clusts .== clust_id)
             if length(clust_members) > 1
@@ -911,8 +885,8 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
             end
             clust_dict[clust_repres] = Set(clust_members)
         end
-    end 
-    
+    end
+
     (sort(collect(keys(clust_dict))), clust_dict)
 end
 

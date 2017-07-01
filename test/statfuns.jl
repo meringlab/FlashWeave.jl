@@ -19,7 +19,8 @@ ctab12_34[2, 1, 3] = 2
 ctab12_34[2, 2, 4] = 1
 ctab12_34[2, 2, 5] = 1
 
-data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+#data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+data = Array(readtable(joinpath("data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 
 @testset "correlation" begin
     data_clr = FlashWeave.Preprocessing.preprocess_data_default(data, "fz", verbose=false,

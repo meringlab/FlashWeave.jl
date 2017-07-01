@@ -3,13 +3,13 @@ using JLD
 using DataFrames
 using Base.Test
 
-data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+data = Array(readtable(joinpath("data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 data_clr = FlashWeave.Preprocessing.preprocess_data_default(data, "fz", verbose=false, prec=64)
 data_clr_nz = FlashWeave.Preprocessing.preprocess_data_default(data, "fz_nz", verbose=false, prec=64)
 data_bin = FlashWeave.Preprocessing.preprocess_data_default(data, "mi", verbose=false, prec=64)
 data_mi_nz = FlashWeave.Preprocessing.preprocess_data_default(data, "mi_nz", verbose=false, prec=64)
 
-exp_dict = load(joinpath(pwd(), "test", "data", "tests_expected.jld"))
+exp_dict = load(joinpath("data", "tests_expected.jld"))
 
 function compare_test_results(r1::FlashWeave.Misc.TestResult, r2::FlashWeave.Misc.TestResult)
     isapprox(r1.stat, r2.stat, rtol=1e-6) && isapprox(r1.pval, r2.pval, rtol=1e-6) && r1.df == r2.df && r1.suff_power == r2.suff_power

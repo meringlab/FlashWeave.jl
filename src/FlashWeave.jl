@@ -2,8 +2,8 @@ __precompile__()
 
 module FlashWeave
 
-include("statfuns.jl")
 include("misc.jl")
+include("statfuns.jl")
 include("contingency.jl")
 include("tests.jl")
 include("stackchannels.jl")

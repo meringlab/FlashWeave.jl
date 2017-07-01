@@ -172,7 +172,7 @@ end
 
 function discretize{ElType <: AbstractFloat}(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
         rank_method::String="tied", disc_method::String="median")
-    if nz  
+    if nz
         if issparse(X)
             disc_vecs = SparseVector{Int}[]
             for j in 1:size(X, 2)
@@ -228,7 +228,7 @@ function discretize_env{ElType <: Real}(env_data::SparseMatrixCSC{ElType}, norm,
     discretize_env!(env_data_dense, norm, n_bins)
     sparse(env_data_dense)
 end
-            
+
 
 function clrnorm_data(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
     if norm == "clr"
@@ -272,9 +272,9 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
-    
+
     if !isempty(env_cols)
-        env_data = data[:, sort(collect(env_cols))]        
+        env_data = data[:, sort(collect(env_cols))]
         data = data[:, map(x -> !(x in env_cols), 1:size(data, 2))]
     end
 
@@ -289,12 +289,12 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         end
     end
 
-    
+
     if verbose
         println("\tdiscarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
         println("\nNormalizing data")
     end
-    
+
     if norm == "rows"
         data = rownorm_data(data)
     elseif startswith(norm, "clr")
@@ -338,7 +338,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         error("$norm is no valid normalization method.")
     end
 
-    if !isempty(env_cols)   
+    if !isempty(env_cols)
         if issparse(env_data)
             env_data = discretize_env(env_data, norm, n_bins)
         else

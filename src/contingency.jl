@@ -67,9 +67,23 @@ end
 
 
 # SPARSE DATA
+function update!{ElType <: Integer}(ctab::AbstractMatrix{ElType}, x_entry, y_entry)
+    ctab[x_entry+1, y_entry+1] += 1
+end
 
-@generated function contingency_table!{T,N,ElType <: Integer}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{ElType,Int},
-        row_inds::Vector{Int}, vals::Vector{ElType}, cont_tab::Array{ElType,3},
+
+function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
+    cont_tab::Matrix{ElType}, levels_x::Integer, levels_y::Integer, nz::Bool=false)
+    fill!(cont_tab, 0)
+    iter_apply_sparse_rows!(X, Y, data, update!, cont_tab, nz && levels_x > 2, nz && levels_y > 2)
+    if !nz
+        cont_tab[1, 1] = size(data, 1) - sum(cont_tab)
+    end
+end
+
+
+
+@generated function contingency_table!{T <: Tuple,N,ElType <: Integer}(X::Int, Y::Int, Zs::T, data::SparseMatrixCSC{ElType,Int}, cont_tab::Array{ElType,3},
         cum_levels::Vector{ElType}, z_map_arr::Vector{ElType}, levels::N)
     if T <: Tuple{Int}
         n_vars = 3
@@ -93,13 +107,13 @@ end
     expr = quote
         fill!(cont_tab, 0)
         fill!(z_map_arr, -1)
-
+        row_inds = rowvals(data)
+        vals = nonzeros(data)
         n_rows, n_cols = size(data)
         n_vars = 2 + length(Zs)
         min_row_ind = n_rows
         num_out_of_bounds = 0
         levels_z = 1
-        #all_Zs_zero_val = -1
     end
 
     if nz_adjusted
@@ -107,7 +121,6 @@ end
             x_nzadj = levels[X] > 2
             y_nzadj = levels[Y] > 2
             skip_row = false
-            #check_mask = !isempty(wanted_row_mask)
         end
         append!(expr.args, nz_init_expr.args)
     end
@@ -271,87 +284,4 @@ end
 
     expr
 end
-
-
-
-function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::SparseMatrixCSC{ElType,Int}, row_inds::Vector{Int},
-        vals::Vector{ElType}, cont_tab::Matrix{ElType})
-    fill!(cont_tab, 0)
-
-    n_rows, n_cols = size(data)
-    num_out_of_bounds = 0
-
-    x_i = data.colptr[X]
-    x_row_ind = row_inds[x_i]
-    x_val = vals[x_i]
-
-    if X != n_cols
-        x_bound = data.colptr[X + 1]
-    else
-        x_bound = nnz(data)
-    end
-
-    if x_i == x_bound
-        num_out_of_bounds += 1
-    end
-
-    y_i = data.colptr[Y]
-    y_row_ind = row_inds[y_i]
-    y_val = vals[y_i]
-
-    if Y != n_cols
-        y_bound = data.colptr[Y + 1]
-    else
-        y_bound = nnz(data) + 1
-    end
-
-    if y_i == y_bound
-        num_out_of_bounds += 1
-    end
-
-    min_row_ind = min(x_row_ind, y_row_ind)
-
-    while true
-        if x_row_ind == min_row_ind
-            x_entry = x_val
-            x_i += 1
-
-            if x_i < x_bound
-                x_row_ind = row_inds[x_i]
-                x_val = vals[x_i]
-            else
-                num_out_of_bounds += 1
-                x_row_ind = n_rows + 1
-            end
-        else
-            x_entry = 0
-        end
-
-        if y_row_ind == min_row_ind
-            y_entry = y_val
-            y_i += 1
-
-            if y_i < y_bound
-                y_row_ind = row_inds[y_i]
-                y_val = vals[y_i]
-            else
-                num_out_of_bounds += 1
-                y_row_ind = n_rows + 1
-            end
-        else
-            y_entry = 0
-        end
-
-        cont_tab[x_entry + 1, y_entry + 1] += 1
-        min_row_ind = min(x_row_ind, y_row_ind)
-
-        if num_out_of_bounds >= 2
-            break
-        end
-    end
-
-    cont_tab[1, 1] += n_rows - sum(cont_tab)
-end
-
-
 end

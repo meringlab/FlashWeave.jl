@@ -3,7 +3,8 @@ using DataFrames
 using JLD
 using Base.Test
 
-data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+#data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+data = Array(readtable(joinpath("data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 
 exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4,15,23,3,4,8,8,
                                                  13,4,4,22,3,7,12,6,14,11,16,18,11,17,8,6,6,1,
@@ -30,7 +31,7 @@ exp_num_nbr_dict = Dict("mi" => Dict(0 => [24,6,5,14,5,14,16,10,6,6,8,13,4,15,23
                                                     0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,3,0,0,1,0,0,
                                                     0,0,0,0]))
 
-exp_dict = load(joinpath(pwd(), "test", "data", "learning_expected.jld"))
+exp_dict = load(joinpath("data", "learning_expected.jld"))
 
 function make_network(data, test_name, make_sparse=false, prec=32; kwargs...)
     data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
@@ -97,13 +98,8 @@ end
                                             graph_dict = make_network(data, test_name, make_sparse, prec, max_k=max_k, parallel=parallel, time_limit=0.0)
                                             exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)_sparse$(make_sparse)"]
 
-                                            if prec == 32
-                                                rtol = 0.0
-                                                atol = 1e-2
-                                            else
-                                                rtol = 1e-6
-                                                atol = 0.0
-                                            end
+                                            atol = 1e-2
+                                            rtol = 0.0
 
                                             @testset "edge_identity" begin
                                                 @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=rtol, atol=atol)
@@ -137,23 +133,23 @@ end
     @test all(get_num_nbr(data, "mi", false, max_k=0, parallel="single", track_rejections=true) .== exp_num_nbr)
 end
 
-@testset "preclustering" begin
-    test_name = "fz"
-    make_sparse = false
-    max_k = 3
-    precluster_sim = 0.2
-    @testset "representatives" begin
-        exp_num_nbr = [1,1,0,2,0,0,1,0,0,2,0,1,2,1,0,0,0,0,
-                       2,1,0,0,0,0,2,0,1,0,1,0,1,1]
-        @test_skip all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=false) .== exp_num_nbr)
-    end
-    @testset "fully_connect__track_rej" begin
-        exp_num_nbr = [1,2,1,1,1,1,5,0,2,0,2,1,1,3,0,3,0,5,3,1,
-                       4,2,1,4,1,0,1,1,3,2,4,1,2,0,2,1,3,0,3,0,
-                       2,1,0,2,0,1,1,0,2,2]
-        @test_skip all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=true, track_rejections=true) .== exp_num_nbr)
-    end
-end
+#@testset "preclustering" begin
+#    test_name = "fz"
+#    make_sparse = false
+#    max_k = 3
+#    precluster_sim = 0.2
+#    @testset "representatives" begin
+#        exp_num_nbr = [1,1,0,2,0,0,1,0,0,2,0,1,2,1,0,0,0,0,
+#                       2,1,0,0,0,0,2,0,1,0,1,0,1,1]
+#        @test_broken all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=false) .== exp_num_nbr)
+#    end
+#    @testset "fully_connect__track_rej" begin
+#        exp_num_nbr = [1,2,1,1,1,1,5,0,2,0,2,1,1,3,0,3,0,5,3,1,
+#                       4,2,1,4,1,0,1,1,3,2,4,1,2,0,2,1,3,0,3,0,
+#                       2,1,0,2,0,1,1,0,2,2]
+#        @test_broken all(get_num_nbr(data, test_name, make_sparse, max_k=max_k, parallel="single", precluster_sim=precluster_sim, fully_connect_clusters=true, track_rejections=true) .== exp_num_nbr)
+#    end
+#end
 
 # to create expected output
 

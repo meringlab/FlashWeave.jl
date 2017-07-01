@@ -2,7 +2,11 @@ module Statfuns
 
 export cor_nz, pcor, pcor_rec, cor_subset!, fz_pval, mutual_information, mi_pval, adjust_df, oddsratio, nz_adjust_cont_tab, benjamini_hochberg
 
+import Base:cor
+
 using Distributions
+
+using FlashWeave.Misc
 
 
 function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
@@ -32,28 +36,6 @@ function fz_pval(stat::AbstractFloat, n::Int, len_z::Int)
     pval
 end
 
-
-function cor_nz{ElType <: Real}(X::Int, Y::Int, data::Matrix{ElType})
-    """Note: this function is still slow, but not enough of a bottleneck yet to improve"""
-    mask = (data[:, X] .!= 0.0) & (data[:, Y] .!= 0.0)
-
-    sum(mask) > 1 ? cor(data[mask, X], data[mask, Y]) : 0.0
-end
-
-
-function cor_nz{ElType <: AbstractFloat}(data::Matrix{ElType})
-    n_vars = size(data, 2)
-    cor_mat = eye(ElType, n_vars, n_vars)
-
-    for i in 1:n_vars-1
-        for j in i+1:n_vars
-            cor_ij = cor_nz(i, j, data)
-            cor_mat[i, j] = cor_ij
-            cor_mat[j, i] = cor_ij
-        end
-    end
-    cor_mat
-end
 
 function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType})
     sub_data = @view data[:, [X, Y, Zs...]]
@@ -136,16 +118,83 @@ function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{In
     p
 end
 
+function update!(obj::PairMeanObj, x_entry, y_entry)
+    obj.sum_x += x_entry
+    obj.sum_y += y_entry
+    obj.n += 1
+end
 
-function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_mat::AbstractMatrix{ElType}, vars::AbstractVector{Int})
-    var_cors = cor(data[:, vars])
+function update!(obj::PairCorObj, x_entry, y_entry)
+    x_entry_norm = x_entry - obj.mean_x
+    y_entry_norm = y_entry - obj.mean_y
+    obj.cov_xy += x_entry_norm * y_entry_norm
+    obj.var_x += x_entry_norm * x_entry_norm
+    obj.var_y += y_entry_norm * y_entry_norm
+end
 
-    for (i, var_A) in enumerate(vars)
-        for (j, var_B) in enumerate(vars)
-            cor_entry = var_cors[i, j]
-            cor_val = isnan(cor_entry) ? 0.0 : cor_entry
-            cor_mat[var_A, var_B] = cor_val
-            cor_mat[var_B, var_A] = cor_val
+function cor{ElType <: AbstractFloat}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
+     nz::Bool=false)
+     p_mean_obj = PairMeanObj(0.0, 0.0, 0)
+     iter_apply_sparse_rows!(X, Y, data, update!, p_mean_obj, nz, nz)
+
+     n_obs = nz ? p_mean_obj.n : size(data, 1)
+
+     if n_obs == 0
+         return 0.0, 0
+     end
+
+     mean_x = p_mean_obj.sum_x / n_obs
+     mean_y = p_mean_obj.sum_y / n_obs
+     p_cor_obj = PairCorObj(0.0, 0.0, 0.0, mean_x, mean_y)
+     iter_apply_sparse_rows!(X, Y, data, update!, p_cor_obj, nz, nz)
+
+     if !nz
+         z_elems = size(data, 1) - p_mean_obj.n
+         p_cor_obj.cov_xy += (-mean_x * -mean_y) * z_elems
+         p_cor_obj.var_x += (-mean_x * -mean_x) * z_elems
+         p_cor_obj.var_y += (-mean_y * -mean_y) * z_elems
+     end
+
+     p_cor_obj.cov_xy / sqrt(p_cor_obj.var_x * p_cor_obj.var_y), n_obs
+ end
+
+
+function cor{ElType <: AbstractFloat}(data::SparseMatrixCSC{ElType}, nz::Bool)
+    n_vars = size(data, 2)
+    cor_mat = zeros(Float64, n_vars, n_vars)
+    Threads.@threads for X in 1:n_vars-1
+        for Y in X+1:n_vars
+            cor_xy = cor(X, Y, data, nz)
+            cor_mat[X, Y] = cor_xy
+            cor_mat[Y, X] = cor_xy
+        end
+    end
+    cor_mat
+end
+
+
+function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_mat::AbstractMatrix{ElType}, vars::AbstractVector{Int}, nz::Bool)
+    n_vars = length(vars)
+    """CRITICAL: expects zeros to be trimmed from X if nz_test
+    is provided!
+    """
+    if nz
+        sub_data = @view data[data[:, vars[2]] .!= 0.0, vars]
+    else
+        sub_data = @view data[:, vars]
+    end
+
+    sub_cors = cor(sub_data)
+
+    for i in 1:n_vars-1
+        X = vars[i]
+        for j in i+1:n_vars
+            Y = vars[j]
+            #cor_xy = cor(X, Y, data, nz)
+            cor_xy = sub_cors[i, j]
+            cor_val = isnan(cor_xy) ? 0.0 : cor_xy
+            cor_mat[X, Y] = cor_val
+            cor_mat[Y, X] = cor_val
         end
     end
 end
