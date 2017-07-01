@@ -661,7 +661,10 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
 end
 
 
-function pw_univar_kernel{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, test_name, hps, levels, nz, data_row_inds, data_nzero_vals, cor_mat)
+function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
+                            test_name::String, hps::Integer, levels::AbstractVector{ElType},
+                            nz::Bool, data_row_inds::AbstractVector{Int}, data_nzero_vals::AbstractVector{ElType},
+                            cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
     if !issparse(data) && nz
@@ -670,7 +673,7 @@ function pw_univar_kernel{ElType <: Real}(X::Int, data::AbstractMatrix{ElType}, 
         sub_data = data
     end
 
-    Ys = collect(X+1:n_vars)
+    Ys = collect(Ys_slice)
 
     if isdiscrete(test_name)
         test_results = test(X, Ys, sub_data, test_name, hps, levels, data_row_inds, data_nzero_vals)
@@ -728,20 +731,19 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
 
             # otherwise make workers store test results remotely and gather them in the end via network
             else
-                error("Remote parallelism not needs fixing.")
-                @sync all_test_result_refs = [@spawn pw_univar_kernel(X, data, test_name, hps, levels,
+                #error("Remote parallelism not needs fixing.")
+                @sync all_test_result_refs = [@spawn pw_univar_kernel(work_item[1], work_item[2], test_name, hps, levels,
                                               nz, data_row_inds, data_nzero_vals, cor_mat)
-                                              for X in 1:n_vars-1]
+                                              for work_item in work_items]
                 all_test_results = map(fetch, all_test_result_refs)
                 pvals = ones(Float64, n_pairs)
                 stats = zeros(Float64, n_pairs)
 
-                i = 1
-                for test_res in all_test_results
-                    for t in test_res
-                        stats[i] = t.stat
-                        pvals[i] = t.pval
-                        i += 1
+                for ((X, Ys_slice), test_res_chunk) in zip(work_items, all_test_results)
+                    for (Y, test_res) in zip(Ys_slice, test_res_chunk)
+                        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+                        stats[pair_index] = test_res.stat
+                        pvals[pair_index] = test_res.pval
                     end
                 end
             end
@@ -786,14 +788,18 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
     ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0), verbose::Bool=false, greedy::Bool=true)
 
     if verbose
-        println("Computing pairwise distances")
+        println("Computing pairwise similarities")
     end
 
     if isempty(sim_mat)
         sim_mat = pw_unistat_matrix(data, stat_type, parallel=parallel)
     end
-
+    
     if stat_type == "mi"
+        if verbose
+            println("Computing entropies")
+        end
+        
         # can potentially be improved by pre-allocation
         entrs = mapslices(x -> entropy(counts(x) ./ length(x)), data, 1)
     elseif stat_type == "mi_nz"
@@ -822,7 +828,7 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
 
     if !greedy
         if verbose
-            println("\tCalculating distances")
+            println("\tConverting similarities to normalized distances")
         end
         dist_mat = similar(sim_mat)
     end
@@ -852,10 +858,11 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
                         nz_elems = sum(curr_nz_mask)
                         
                         if nz_elems == 0
-                            entr_A = entr_B = 0
+                            entr_A = entr_B = norm_term = 0
                         else
                             entr_A = entropy(counts(data[curr_nz_mask, var_A]) ./ nz_elems)
                             entr_B = entropy(counts(data[curr_nz_mask, var_B]) ./ nz_elems)
+                            norm_term = sqrt(entr_A * entr_B)
                         end
                     end
                     norm_term = sqrt(entr_A * entr_B)
@@ -884,6 +891,11 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
 
     if !greedy
         eval(Expr(:using,:Clustering))
+                            
+        if verbose
+            println("\tComputing hierarchical clusters")
+        end
+        
         clust_obj = hclust(dist_mat, :average)
         clusts = cutree(clust_obj, h=1.0 - cluster_sim_threshold)
         
