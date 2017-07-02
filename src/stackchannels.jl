@@ -8,7 +8,7 @@ import Base: put!, take!, push!, fetch, shift!, show, isready, wait
 
 const DEF_CHANNEL_SZ=32
 
-type StackChannel{T} <: AbstractChannel
+type StackChannel{T} <: AbstractChannel where T
     cond_take::Condition    # waiting for data to become available
     cond_put::Condition     # waiting for a writeable slot
     state::Symbol

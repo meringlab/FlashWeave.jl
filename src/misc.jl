@@ -198,7 +198,7 @@ function maxweight(weight1::Float64, weight2::Float64)
             warn("Opposite signs for the same edge detected. Arbitarily choosing one.")
             return weight1
         else
-            return maximum(abs([weight1, weight2])) * sign1
+            return maximum(abs.([weight1, weight2])) * sign1
         end
     end
 end

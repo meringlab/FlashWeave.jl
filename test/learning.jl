@@ -109,7 +109,7 @@ end
                                                 if parallel == "single"
                                                     @test all(get_num_nbr(graph_dict) .== exp_num_nbr)
                                                 else
-                                                    num_diffs = get_num_nbr(graph_dict) .- exp_num_nbr |> abs |> sum
+                                                    num_diffs = get_num_nbr(graph_dict) .- exp_num_nbr |> x -> abs.(x) |> sum
                                                     @test (test_name == "mi" && num_diffs == 20) || num_diffs == 0
                                                 end
                                             end

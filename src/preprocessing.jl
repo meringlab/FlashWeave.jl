@@ -3,7 +3,7 @@ module Preprocessing
 export preprocess_data, preprocess_data_default
 
 using StatsBase
-using DataFrames
+#using DataFrames
 using FlashWeave.Misc
 using FlashWeave.Learning
 
@@ -50,7 +50,7 @@ end
 function pseudocount_vars_from_sample{ElType <: AbstractFloat}(s::Vector{ElType})
     z_mask = s .== 0
     k = sum(z_mask)
-    Nprod = sum(log(s[!z_mask]))
+    Nprod = sum(log.(s[.!z_mask]))
     return k, Nprod
 end
 
@@ -106,7 +106,7 @@ function clr{ElType <: AbstractFloat}(X::Matrix{ElType}; pseudo_count::ElType=1e
         end
         center_fun = ignore_zeros ? x -> geomean(x[x .!= pseudo_count]) : geomean
 
-        X_trans = log(X_trans ./ mapslices(center_fun, X_trans, 2))
+        X_trans = log.(X_trans ./ mapslices(center_fun, X_trans, 2))
 
         if ignore_zeros
             X_trans[X .== 0.0] = 0.0#minimum(X_trans) - 1
@@ -188,19 +188,19 @@ function discretize{ElType <: AbstractFloat}(X::AbstractMatrix{ElType}; n_bins::
 end
 
 
-function factors_to_binary_cols!(data_df::DataFrame, factor_cols::Vector{Symbol})
-    for f_col in factor_cols
-        f_vec = data_df[:, f_col]
-        f_uniques = unique(f_vec)
-        if length(f_uniques) > 2
-            for unique_val in f_uniques
-                new_col = Symbol("$(f_col)_$unique_val")
-                data_df[new_col] = convert(Vector{Int}, f_vec .== unique_val)
-            end
-            delete!(data_df, f_col)
-        end
-    end
-end
+#function factors_to_binary_cols!(data_df::DataFrame, factor_cols::Vector{Symbol})
+#    for f_col in factor_cols
+#        f_vec = data_df[:, f_col]
+#        f_uniques = unique(f_vec)
+#        if length(f_uniques) > 2
+#            for unique_val in f_uniques
+#                new_col = Symbol("$(f_col)_$unique_val")
+#                data_df[new_col] = convert(Vector{Int}, f_vec .== unique_val)
+#            end
+#            delete!(data_df, f_col)
+#        end
+#    end
+#end
 
 iscontinuousnorm(norm::String) = norm == "rows" || startswith(norm, "clr")
 
@@ -305,7 +305,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
             map!(sign, data.nzval)
             data = convert(SparseMatrixCSC{Int}, data)
         else
-            data = sign(data)
+            data = sign.(data)
             data = convert(Matrix{Int}, data)
         end
 

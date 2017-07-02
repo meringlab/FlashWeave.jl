@@ -2,7 +2,7 @@ module Learning
 
 export LGL, si_HITON_PC
 
-using MultipleTesting
+#using MultipleTesting
 using LightGraphs
 using DataStructures
 using StatsBase
@@ -423,7 +423,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         levels = ElType[]
 
         if recursive_pcor && !is_zero_adjusted(test_name)
-            cor_mat = cor(data)
+            cor_mat = convert(Matrix{eltype(data)}, cor(data))
         else
             cor_mat = zeros(ElType, 0, 0)
         end
@@ -695,8 +695,8 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
         if startswith(parallel, "multi")
             # if worker processes are on the same machine, use local memory sharing via shared arrays
             if workers_local
-                shared_pvals = SharedArray(Float64, n_pairs)
-                shared_stats = SharedArray(Float64, n_pairs)
+                shared_pvals = SharedArray{Float64}(n_pairs)
+                shared_stats = SharedArray{Float64}(n_pairs)
                 @sync @parallel for work_item in work_items
                     pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_name, hps, levels, nz, cor_mat)
                 end
@@ -779,7 +779,7 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
     elseif stat_type == "mi_nz"
         nz_mask = data .!= 0
     elseif startswith(stat_type, "fz")
-        sim_mat = abs(sim_mat)
+        sim_mat = abs.(sim_mat)
     end
 
     #greedy_mode = cluster_mode == "greedy"
