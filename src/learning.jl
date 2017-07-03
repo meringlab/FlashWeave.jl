@@ -20,7 +20,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
 
 
-    is_nz = is_zero_adjusted(test_name)
+    nz = is_zero_adjusted(test_name)
     is_discrete = isdiscrete(test_name)
     is_dense = !issparse(data)
 
@@ -51,7 +51,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
             continue
         end
 
-        if is_nz && is_dense && (!is_discrete || levels[candidate] > 2)
+        if needs_nz_view(candidate, data, test_name, levels)
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
             sub_data = data
@@ -94,7 +94,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
     blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,Float64}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
 
-    is_nz = is_zero_adjusted(test_name)
+    nz = is_zero_adjusted(test_name)
     is_discrete = isdiscrete(test_name)
     is_dense = !issparse(data)
 
@@ -132,7 +132,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
             continue
         end
 
-        if is_nz && is_dense && (!is_discrete || levels[candidate] > 2)
+        if needs_nz_view(candidate, data, test_name, levels)
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
             sub_data = data
@@ -170,7 +170,6 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
 end
 
 
-
 function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
     pwr::Float64=0.5, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
         blacklist::Set{Int}=Set{Int}(),
@@ -205,12 +204,12 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
 
     if is_zero_adjusted(test_name)
-        if (!isdiscrete(test_name) || levels[T] > 2)
+        if needs_nz_view(T, data, test_name, levels)
             data = @view data[data[:, T] .!= 0, :]
         end
     end
-
-
+    
+    
     test_variables = filter(x -> x != T, 1:size(data, 2))
     start_time = time_limit > 0.0 ? time() : 0.0
 
@@ -499,14 +498,13 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     end
 
 
-    if verbose
-        println("Running si_HITON_PC for each variable..")
-        tic()
-    end
-
     if max_k == 0 && global_univar
         nbr_dict = all_univar_nbrs
     else
+        if verbose
+            println("Running si_HITON_PC for each variable..")
+            tic()
+        end
 
         if parallel == "single" || nprocs() == 1
             nbr_results = [si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, cor_mat=cor_mat,
@@ -542,10 +540,13 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
                 rej_dict[target_var] = nbr_state.state_rejections
             end
         end
+        
+        if verbose 
+            toc()
+        end
     end
 
     if verbose
-        toc()
         println("Postprocessing..")
         tic()
     end
@@ -624,7 +625,7 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
                             cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
-    if !issparse(data) && nz
+    if needs_nz_view(X, data, test_name, levels)
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
@@ -652,7 +653,7 @@ function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data
                             cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
-    if !issparse(data) && nz
+    if needs_nz_view(X, data, test_name, levels)
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
@@ -708,7 +709,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
             # otherwise make workers store test results remotely and gather them in the end via network
             else
                 #error("Remote parallelism not needs fixing.")
-                @sync all_test_result_refs = [@spawn pw_univar_kernel(work_item[1], work_item[2], test_name, hps, levels,
+                @sync all_test_result_refs = [@spawn pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, levels,
                                               nz, cor_mat)
                                               for work_item in work_items]
                 all_test_results = map(fetch, all_test_result_refs)

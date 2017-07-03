@@ -26,16 +26,16 @@ sufficient_power(levels_x::Integer, levels_y::Integer, levels_z::Integer, n_obs:
 function test{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String, hps::Integer,
     levels_x::ElType, levels_y::ElType, cont_tab::Matrix{ElType}, ni::AbstractVector{ElType}, nj::AbstractVector{ElType}, nz::Bool=false)
 
-    if !issparse(data) && nz && (levels_y > 2)
-        sub_data = @view data[data[:, Y] .!= 0, :]
-    else
-        sub_data = data
-    end
+    #if needs_nz_view(candidate, data, nz, levels)
+    #    sub_data = @view data[data[:, Y] .!= 0, :]
+    #else
+    #    sub_data = data
+    #end
 
     if !issparse(data)
-        contingency_table!(X, Y, sub_data, cont_tab)
+        contingency_table!(X, Y, data, cont_tab)
     else
-        contingency_table!(X, Y, sub_data, cont_tab, levels_x, levels_y, nz)
+        contingency_table!(X, Y, data, cont_tab, levels_x, levels_y, nz)
     end
 
     if nz
@@ -76,7 +76,7 @@ function test{ElType <: Integer}(X::Int, Ys::AbstractVector{Int}, data::Abstract
     is provided!
 
     Test all variables Ys for univariate association with X"""
-
+    
     levels_x = levels[X]
 
     if levels_x < 2
@@ -101,7 +101,7 @@ end
 ### continuous
 
 function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String,
-    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false)
+    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false, Y_adjusted::Bool=true)
 
     if isempty(data)
         p_stat = 0.0
@@ -112,16 +112,16 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElTy
             if issparse(data)
                 p_stat, n_obs = cor(X, Y, data, nz)
             else
-                if nz
+                if nz && !Y_adjusted
                     sub_data = @view data[data[:, Y] .!= 0, :]
                 else
-                    sub_data = @view data[:, :]
+                    sub_data = data
                 end
 
                 sub_x_vec = @view sub_data[:, X]
                 sub_y_vec = @view sub_data[:, Y]
                 p_stat = cor(sub_x_vec, sub_y_vec)
-                n_obs = size(sub_data, 1)
+                n_obs = size(data, 1)
             end
         else
             p_stat = cor_mat[X, Y]
@@ -141,10 +141,12 @@ function test{ElType <: AbstractFloat}(X::Int, Ys::AbstractVector{Int}, data::Ab
         test_name::String, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0))
     """CRITICAL: expects zeros to be trimmed from X if nz_test
     is provided!
-
+    
     Test all variables Ys for univariate association with X"""
+    
     nz = is_zero_adjusted(test_name)
-    map(Y -> test(X, Y, data, test_name, cor_mat, nz), Ys)
+    
+    map(Y -> test(X, Y, data, test_name, cor_mat, nz, false), Ys)
 end
 
 
@@ -156,16 +158,16 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, 
     test_name::String, nz::Bool, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
 
-    if !issparse(data) && nz
-        sub_data = @view data[data[:, Y] .!= 0, :]
-    else
-        sub_data = data
-    end
+    #if needs_nz_view(Y, data, nz)
+    #    sub_data = @view data[data[:, Y] .!= 0, :]
+    #else
+    #    sub_data = data
+    #end
 
     if test_name == "fz" || test_name == "fz_nz"
-        p_stat = isempty(cor_mat) ? pcor(X, Y, Zs, sub_data) : pcor_rec(X, Y, Zs, cor_mat, pcor_set_dict)
+        p_stat = isempty(cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, cor_mat, pcor_set_dict)
         df = 0
-        pval = fz_pval(p_stat, size(sub_data, 1), 0)
+        pval = fz_pval(p_stat, size(data, 1), 0)
     end
     Misc.TestResult(p_stat, pval, df, true)
 end
@@ -188,7 +190,7 @@ function test{ElType <: Integer}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::
     if !issparse(data)
         levels_z = contingency_table!(X, Y, Zs, data, cont_tab, z, cum_levels, z_map_arr)
     else
-        Zs_tup = tuple(Zs...)
+        Zs_tup = Tuple(Zs)
         cont_levels = nz ? levels : nothing
         levels_z = contingency_table!(X, Y, Zs_tup, data, cont_tab, cum_levels, z_map_arr,
                                       cont_levels)
@@ -248,8 +250,8 @@ end
 
 
 function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
-    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
+    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, pwr::AbstractFloat=0.5,
+        levels::AbstractVector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)

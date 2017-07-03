@@ -40,7 +40,7 @@ end
 function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType})
     sub_data = @view data[:, [X, Y, Zs...]]
 
-    if size(sub_data, 1) < 5
+    if size(sub_data, 1) < 1
         return 0.0
     end
 
@@ -178,12 +178,13 @@ function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_
     """CRITICAL: expects zeros to be trimmed from X if nz_test
     is provided!
     """
-    if nz
-        sub_data = @view data[data[:, vars[2]] .!= 0.0, vars]
-    else
-        sub_data = @view data[:, vars]
-    end
-
+    #if nz
+    #    sub_data = @view data[data[:, vars[2]] .!= 0.0, vars]
+    #else
+    #    sub_data = @view data[:, vars]
+    #end
+    #sub_cors = cor(sub_data)
+    sub_data = @view data[:, vars]
     sub_cors = cor(sub_data)
 
     for i in 1:n_vars-1

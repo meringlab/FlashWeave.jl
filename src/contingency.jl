@@ -113,7 +113,7 @@ end
         n_vars = 2 + length(Zs)
         min_row_ind = n_rows
         num_out_of_bounds = 0
-        levels_z = 1
+        levels_z = one(ElType)
     end
 
     if nz_adjusted
@@ -199,14 +199,14 @@ end
                 end
             else
                 $(zero_expr)
-                $(nzentry_name) = 0
+                $(nzentry_name) = zero(ElType)
             end
         end
         append!(loop_expr.args, i_expr.args)
     end
 
     # compute mapping of the conditioning set
-    append!(loop_expr.args, [:(gfp_map = 1)])
+    append!(loop_expr.args, [:(gfp_map = one(ElType))])
     for i_Zs in 1:n_vars-2
         var_name, nzi_name, nzrow_name, nzval_name, nzbound_name, nzentry_name = var_name_dict[i_Zs + 2]
         i_Zs_expr = quote
@@ -221,7 +221,7 @@ end
         if level_val == -1
             z_map_arr[gfp_map] = levels_z
             level_val = levels_z
-            levels_z += 1
+            levels_z += one(ElType)
         end
     end
 

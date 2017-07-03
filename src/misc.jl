@@ -3,7 +3,7 @@ module Misc
 using LightGraphs
 using StatsBase
 
-export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
+export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
 
 const inf_weight = 708.3964185322641
 
@@ -88,6 +88,13 @@ isdiscrete(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
 iscontinuous(test_name::String) = test_name in ["fz", "fz_nz"]
 is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
 is_mi_test(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
+
+function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_name::String, levels::Vector{ElType})
+    nz = is_zero_adjusted(test_name)
+    disc = isdiscrete(test_name)
+    is_nz_var = !disc || (levels[X] > 2)
+    nz && is_nz_var && !issparse(data)#(!issparse(data) || !disc) #(!isdiscrete(test_name) || levels[X] > 2)
+end
 
 signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)
 
