@@ -3,7 +3,7 @@ module Misc
 using LightGraphs
 using StatsBase
 
-export PairMeanObj, PairCorObj, HitonState, TestResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
+export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
 
 const inf_weight = 708.3964185322641
 
@@ -22,7 +22,6 @@ type PairCorObj
     mean_y::Float64
 end
 
-
 type TestResult
     stat :: Float64
     pval :: Float64
@@ -37,6 +36,11 @@ type HitonState
     state_rejections :: Dict{Int,Tuple{Tuple,TestResult}}
 end
 
+type LGLResult
+    graph::Dict{Int,Dict{Int,Float64}}
+    rejections::Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}
+    unfinished_states::Dict{Int, HitonState}
+end
 
 type IndexPair
     min_ind :: Int

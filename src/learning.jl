@@ -431,9 +431,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
     pcor_set_dict = Dict{String,Dict{String,ElType}}()
 
-    if track_rejections
-        rej_dict = Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
-    end
+    #if track_rejections
+    rej_dict = Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
+    unfinished_state_dict = Dict{Int, HitonState}()
+    #end
 
     if global_univar
         # precompute univariate associations and sort variables (fewest neighbors first)
@@ -532,6 +533,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
         nbr_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
 
+        if time_limit != 0.0
+            unfinished_state_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results) if nbr_state.phase != "F"])
+        end
+
         if track_rejections
             for (target_var, nbr_state) in zip(target_vars, nbr_results)
                 rej_dict[target_var] = nbr_state.state_rejections
@@ -565,7 +570,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         for (clust_repres, clust_members) in clust_dict
             for member in clust_members
                 if member != clust_repres
-                    graph_dict[member] = Dict{Int64,Float64}()
+                    graph_dict[member] = Dict{Int,Float64}()
 
                     for nbr in keys(graph_dict[clust_repres])
                         graph_dict[member][nbr] = graph_dict[clust_repres][nbr]
@@ -578,18 +583,15 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         end
     end
 
-    return_dict = convert(Dict{Int,Dict{Int, Float64}}, graph_dict)
+    #return_dict = convert(Dict{Int,Dict{Int, Float64}}, graph_dict)
+    result_obj = LGLResult(graph_dict, rej_dict, unfinished_state_dict)
 
     if verbose
         println("Complete.")
         toc()
     end
 
-    if track_rejections
-        return return_dict, rej_dict
-    else
-        return return_dict
-    end
+    result_obj
 end
 
 
