@@ -95,7 +95,7 @@ end
         return quote error("Sparse matrices are only supported with max_k <= 3") end
     end
 
-    if N <: Vector{Int}
+    if N <: Vector{ElType}
         nz_adjusted = true
     elseif N <: Void
         nz_adjusted = false

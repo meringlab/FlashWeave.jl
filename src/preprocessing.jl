@@ -87,11 +87,15 @@ end
 
 function clr{ElType <: AbstractFloat}(X::SparseMatrixCSC{ElType})
     """Specialized version for sparse matrices that always excludes zero entries (thereby no need for pseudo counts)"""
-    dest = similar(X)
+    dest = full(similar(X))
     gmeans_vec = mapslices_sparse_nz(geomean, X', 2)
     broadcast!(/, dest, X, gmeans_vec)
-    map!(log, dest.nzval)
-    dest
+    #dest_sparse = sparse(dest)
+    #map!(log, dest_sparse.nzval)
+    zmask = dest .== 0.0
+    dest = log.(dest)
+    dest[zmask] = 0.0
+    sparse(dest)
 end
 
 
@@ -119,19 +123,23 @@ end
 
 function discretize{ElType <: AbstractFloat}(x_vec::Vector{ElType}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median")
     if disc_method == "median"
-        if rank_method == "dense"
-            x_vec = denserank(x_vec)
-        elseif rank_method == "tied"
-            x_vec = tiedrank(x_vec)
+        if isempty(x_vec)
+            disc_vec = x_vec
         else
-            error("$rank_method not a valid ranking method")
+            if rank_method == "dense"
+                x_vec = denserank(x_vec)
+            elseif rank_method == "tied"
+                x_vec = tiedrank(x_vec)
+            else
+                error("$rank_method not a valid ranking method")
+            end
+
+            x_vec /= maximum(x_vec)
+
+            # compute step, add small number to avoid a separate bin for rank 1.0
+            step = (1.0 / n_bins) + 1e-5
+            disc_vec = map(x -> Int(floor((x) / step)), x_vec)
         end
-
-        x_vec /= maximum(x_vec)
-
-        # compute step, add small number to avoid a separate bin for rank 1.0
-        step = (1.0 / n_bins) + 1e-5
-        disc_vec = map(x -> Int(floor((x) / step)), x_vec)
 
     elseif disc_method == "mean"
         if n_bins > 2

@@ -512,16 +512,20 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         else
             # embarassingly parallel
             if parallel == "multi_ep"
-                @sync nbr_results_refs = [@spawn si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels,
-                                          cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
+                #@sync nbr_results_refs = [@spawn si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels,
+                #                          cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
 
-                nbr_results = map(fetch, nbr_results_refs)
+                #nbr_results = map(fetch, nbr_results_refs)
+                nbr_results = @parallel (vcat) for x in target_vars
+                    si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels,
+                                cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, kwargs...)
+                end
 
             # interleaved parallelism
             elseif endswith(parallel, "il")
                 il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs,
                                                convergence_threshold, cor_mat, parallel=parallel, edge_rule=edge_rule,
-                                               verbose=verbose)
+                                               verbose=verbose, workers_local=workers_local)
                 nbr_results = [il_dict[target_var] for target_var in target_vars]
             else
                 error("'$parallel' not a valid parallel mode")
@@ -709,20 +713,36 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
             # otherwise make workers store test results remotely and gather them in the end via network
             else
                 #error("Remote parallelism not needs fixing.")
-                @sync all_test_result_refs = [@spawn pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, levels,
+                #@sync all_test_result_refs = [@spawn pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, levels,
+                #                              nz, cor_mat)
+                #                              for work_item in work_items]
+                #all_test_results = map(fetch, all_test_result_refs)
+                all_test_results = @parallel (vcat) for work_item in work_items
+                    pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, levels,
                                               nz, cor_mat)
-                                              for work_item in work_items]
-                all_test_results = map(fetch, all_test_result_refs)
+                end
+                
                 pvals = ones(Float64, n_pairs)
                 stats = zeros(Float64, n_pairs)
-
-                for ((X, Ys_slice), test_res_chunk) in zip(work_items, all_test_results)
-                    for (Y, test_res) in zip(Ys_slice, test_res_chunk)
+                                     
+                i = 0
+                for (X, Ys_slice) in work_items
+                    for Y in Ys_slice
+                        i += 1
+                        test_res = all_test_results[i]
                         pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
                         stats[pair_index] = test_res.stat
                         pvals[pair_index] = test_res.pval
                     end
-                end
+                end 
+
+                #for ((X, Ys_slice), test_res_chunk) in zip(work_items, all_test_results)
+                #    for (Y, test_res) in zip(Ys_slice, test_res_chunk)
+                #        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+                #        stats[pair_index] = test_res.stat
+                #        pvals[pair_index] = test_res.pval
+                #    end
+                #end
             end
 
         elseif startswith(parallel, "threads")
@@ -901,6 +921,7 @@ function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels
             target_var, univar_nbrs, prev_state, skip_nbrs = take!(shared_job_q)
             # if kill signal
             if target_var == -1
+                put!(shared_result_q, (0, myid()))
                 return
             end
 
@@ -928,10 +949,10 @@ end
 function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType}, all_univar_nbrs::Dict{Int,Dict{Int,Tuple{Float64,Float64}}},
      levels::AbstractVector{ElType}, update_interval::Real, GLL_args::Dict{Symbol,Any},
         convergence_threshold::AbstractFloat, cor_mat::Matrix{ElType}; conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi", edge_rule::String="OR",
-        verbose::Bool=true)
+        verbose::Bool=true, workers_local::Bool=true)
     jobs_total = length(target_vars)
 
-    if startswith(parallel, "multi")
+    if startswith(parallel, "multi") || startswith(parallel, "threads")
         n_workers = nprocs() - 1
         job_q_buff_size = n_workers * 2
         @assert n_workers > 0 "Need to add workers for parallel processing."
@@ -962,8 +983,17 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     end
 
 
+    if verbose
+        println("Starting workers and sending data..")
+        tic()
+    end
     worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
-
+    
+    if verbose
+        println("Done. Starting inference..")
+        toc() 
+    end
+                                                
     remaining_jobs = jobs_total
 
     graph_dict = Dict{Int, HitonState}()
@@ -981,7 +1011,6 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     last_update_time = start_time
     check_convergence = false
     converged = false
-
 
     while remaining_jobs > 0
         target_var, nbr_result = take!(shared_result_q)
@@ -1024,6 +1053,10 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
                     put!(shared_job_q, kill_signal)
                     kill_signals_sent += 1
                 end
+            end
+        elseif isa(nbr_result, Int)
+            if !workers_local
+                rmprocs(nbr_result)
             end
         else
             println(nbr_result)
@@ -1098,13 +1131,20 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
 
 
     end
-
+                                                
+    if !workers_local
+        rmprocs(workers())
+    end
+                                                
     graph_dict
 end
 
 
-function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String="cont"; niche_adjust::Bool=false, make_sparse::Bool=false, maxk::Integer=3, alpha::AbstractFloat=0.01,
-     threads::Integer=1, preclust_sim::AbstractFloat=0.0, feed_forward::Bool=true, join_rule::String="OR", verbose::Bool=true, kwargs...)
+function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String="cont"; niche_adjust::Bool=false,
+                                       make_sparse::Bool=false, maxk::Integer=3, alpha::AbstractFloat=0.01,
+                                       normalize::Bool=true, parallel::Union{Bool,Void}=nothing,
+                                       preclust_sim::AbstractFloat=0.0, feed_forward::Bool=true,
+                                       join_rule::String="OR", verbose::Bool=true, kwargs...)
 
     if mode == "cont"
         test_name = "fz"
@@ -1119,35 +1159,34 @@ function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String
     end
 
     if feed_forward
-        if threads < 2
-            threads = 2
+        if !parallel
             parallel_mode = "single_il"
         else
             parallel_mode = "multi_il"
         end
     else
-        parallel_mode = threads > 1 ? "multi_ep" : "single"
-    end
-
-    if nprocs() < threads
-        error("Add $(threads - nprocs()) processes before running this function.")
-        #if verbose
-        #    println("Adding workers")
-        #end
-        #addprocs(threads - procs())
+        parallel_mode = parallel ? "multi_ep" : "single"
     end
 
     if verbose
         println("Normalizing")
     end
 
-    data_norm = preprocess_data_default(data, test_name, make_sparse=make_sparse)
+    data_norm = normalize ? preprocess_data_default(data, test_name, make_sparse=make_sparse) : data
 
     if verbose
-        println("Inferring network")
+        println("Inferring network\n")
+        println("\tSettings:")
+        println("\t\tmode - $mode")
+        println("\t\tniche_adjust - $niche_adjust")
+        println("\t\tmax_k - $max_k")
+        println("\t\tsparse - $make_sparse")
+        println("\t\tfeed_forward - $feed_forward")
+        println("\t\tpreclustering - $(preclust_sim != 0.0)")
+        println("\t\tworkers - $(nprocs())")
     end
 
-    graph_dict = LGL(data_norm, test_name=test_name, max_k=max_k, alpha=alpha, preclust_sim=preclust_sim, parallel=parallel_mode, edge_rule=join_rule, verbose=verbose; kwargs...)
+    lgl_results = LGL(data_norm, test_name=test_name, max_k=max_k, alpha=alpha, preclust_sim=preclust_sim, parallel=parallel_mode, edge_rule=join_rule, verbose=verbose; kwargs...)
 end
 
 end
