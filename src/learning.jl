@@ -14,7 +14,7 @@ using FlashWeave.StackChannels
 
 
 function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
+    test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
     prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0,
     whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
@@ -58,6 +58,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
         end
 
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps,
+                                   n_obs_min=n_obs_min,
                                    pwr=pwr, levels=levels, cor_mat=cor_mat,
                                    pcor_set_dict=pcor_set_dict, debug=debug)
 
@@ -88,7 +89,7 @@ end
 
 
 function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String,
-    max_k::Integer, alpha::AbstractFloat, hps::Integer=5, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
+    max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
     prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::AbstractVector{Int}=[],
     time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0, whitelist::Set{Int}=Set{Int}(),
     blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
@@ -139,7 +140,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
         end
 
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps,
-                                   levels=levels,
+                                   n_obs_min=n_obs_min, levels=levels,
                                    cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, debug=debug)
 
         if !issig(test_result, alpha)
@@ -170,7 +171,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
 end
 
 
-function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5,
+function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
     pwr::Float64=0.5, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
         blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{ElType}=ElType[],
@@ -223,7 +224,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             univar_test_results = test(T, test_variables, data, test_name, hps, levels)
         else
             uni_cor_mat = is_zero_adjusted(test_name) ? zeros(ElType, 0, 0) : cor_mat
-            univar_test_results = test(T, test_variables, data, test_name, uni_cor_mat)
+            univar_test_results = test(T, test_variables, data, test_name, n_obs_min, uni_cor_mat)
         end
     end
 
@@ -288,7 +289,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
             # interleaving phase
             TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k,
-                                                                alpha, hps, pwr, levels, prev_TPC_dict, time_limit,
+                                                                alpha, hps, n_obs_min, pwr, levels, prev_TPC_dict, time_limit,
                                                                 start_time, debug, whitelist, blacklist, cor_mat,
                                                                 pcor_set_dict, rej_dict,
                                                                 track_rejections)
@@ -339,7 +340,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             PC_candidates = convert(Vector{Int}, collect(keys(TPC_dict)))
         end
         PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
-                                                   hps, pwr, levels,
+                                                   hps, n_obs_min, pwr, levels,
                                                    prev_PC_dict, PC_unchecked, time_limit, start_time,
                                                    debug, whitelist, blacklist, cor_mat, pcor_set_dict, rej_dict,
                                                    track_rejections)
@@ -378,7 +379,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 end
 
 
-function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01, hps::Integer=5, pwr::AbstractFloat=0.5,
+function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5,
     convergence_threshold::AbstractFloat=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
         fast_elim::Bool=true, precluster_sim::AbstractFloat=0.0,
         weight_type::String="cond_logpval", edge_rule::String="OR", verbose::Bool=true, update_interval::AbstractFloat=30.0,
@@ -392,7 +393,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     fast_elim: currently always on
     """
 
-    kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :pwr => pwr, :FDR => FDR,
+    kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min, :pwr => pwr, :FDR => FDR,
     :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
     :time_limit => time_limit, :track_rejections => track_rejections)
 
@@ -449,7 +450,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
             tic()
         end
 
-        all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, FDR=FDR,
+        all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                               levels=levels, parallel=parallel, workers_local=workers_local,
                                               cor_mat=cor_mat)
         var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
@@ -635,7 +636,7 @@ work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_
 
 function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
                             stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
-                            test_name::String, hps::Integer, levels::AbstractVector{ElType},
+                            test_name::String, hps::Integer, n_obs_min::Integer, levels::AbstractVector{ElType},
                             nz::Bool,
                             cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
@@ -651,7 +652,7 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
     if isdiscrete(test_name)
         test_results = test(X, Ys, sub_data, test_name, hps, levels)
     else
-        test_results = test(X, Ys, sub_data, test_name, cor_mat)
+        test_results = test(X, Ys, sub_data, test_name, n_obs_min, cor_mat)
     end
 
     for (Y, test_res) in zip(Ys, test_results)
@@ -663,7 +664,7 @@ end
 
 
 function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
-                            test_name::String, hps::Integer, levels::AbstractVector{ElType},
+                            test_name::String, hps::Integer, n_obs_min::Integer, levels::AbstractVector{ElType},
                             nz::Bool,
                             cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
@@ -679,12 +680,12 @@ function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data
     if isdiscrete(test_name)
         test_results = test(X, Ys, sub_data, test_name, hps, levels)
     else
-        test_results = test(X, Ys, sub_data, test_name, cor_mat)
+        test_results = test(X, Ys, sub_data, test_name, n_obs_min, cor_mat)
     end
 end
 
 
-function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", alpha::AbstractFloat=0.01, hps::Integer=5, FDR::Bool=true,
+function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", alpha::AbstractFloat=0.01, hps::Integer=5, n_obs_min::Integer=0, FDR::Bool=true,
         levels::AbstractVector{ElType}=ElType[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), chunk_size::Integer=500)
 
@@ -705,7 +706,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
         stats = zeros(Float64, n_pairs)
 
         for (X, Ys_slice) in work_items
-            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_name, hps, levels, nz, cor_mat)
+            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_name, hps, n_obs_min, levels, nz, cor_mat)
         end
 
     else
@@ -716,7 +717,8 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
                 shared_pvals = SharedArray{Float64}(n_pairs)
                 shared_stats = SharedArray{Float64}(n_pairs)
                 @sync @parallel for work_item in work_items
-                    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_name, hps, levels, nz, cor_mat)
+                    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_name, hps, n_obs_min,
+                                                                    levels, nz, cor_mat)
                 end
                 stats = shared_stats.s
                 pvals = shared_pvals.s
@@ -729,7 +731,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
                 #                              for work_item in work_items]
                 #all_test_results = map(fetch, all_test_result_refs)
                 all_test_results = @parallel (vcat) for work_item in work_items
-                    pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, levels,
+                    pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, n_obs_min, levels,
                                               nz, cor_mat)
                 end
                 
@@ -760,7 +762,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
             pvals = ones(Float64, n_pairs)
             stats = zeros(Float64, n_pairs)
             Threads.@threads for work_item in work_items
-                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_name, hps, levels, nz, cor_mat)
+                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_name, hps, n_obs_min, levels, nz, cor_mat)
             end
         end
     end

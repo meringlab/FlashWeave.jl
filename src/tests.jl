@@ -100,17 +100,22 @@ end
 
 ### continuous
 
-function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String,
-    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false, Y_adjusted::Bool=false, n_obs::Int=size(data, 1))
+function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String, n_obs_min::Integer=0,
+    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false, Y_adjusted::Bool=false)
 
     if isempty(data)
         p_stat = 0.0
         df = 0
         pval = 1.0
+        n_obs = 0
     elseif test_name == "fz" || test_name == "fz_nz"
         if isempty(cor_mat)
             if issparse(data)
                 p_stat, n_obs = cor(X, Y, data, nz)
+                
+                if n_obs < n_obs_min
+                    p_stat = 0.0
+                end
             else
                 if nz && !Y_adjusted
                     sub_data = @view data[data[:, Y] .!= 0, :]
@@ -122,16 +127,22 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElTy
                     p_stat = 0.0
                     n_obs = 0
                 else
-                    sub_x_vec = @view sub_data[:, X]
-                    sub_y_vec = @view sub_data[:, Y]
-
-                    p_stat = cor(sub_x_vec, sub_y_vec)
                     n_obs = size(sub_data, 1)
+                    
+                    if n_obs >= n_obs_min
+                        sub_x_vec = @view sub_data[:, X]
+                        sub_y_vec = @view sub_data[:, Y]
+
+                        p_stat = cor(sub_x_vec, sub_y_vec)
+                    else
+                        p_stat = 0.0
+                    end
                 end
             end
         else
-            p_stat = cor_mat[X, Y]
             n_obs = size(data, 1)
+            p_stat = n_obs >= n_obs_min ? cor_mat[X, Y] : 0.0
+            
         end
 
         df = 0
@@ -139,12 +150,12 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElTy
     else
         error("$test_name is not a valid test for continuous data")
     end
-    TestResult(p_stat, pval, df, true)
+    TestResult(p_stat, pval, df, n_obs >= n_obs_min)
 end
 
 
 function test{ElType <: AbstractFloat}(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{ElType},
-        test_name::String, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0))
+        test_name::String, n_obs_min::Integer=0, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0))
     """CRITICAL: expects zeros to be trimmed from X if nz_test
     is provided!
     
@@ -152,7 +163,7 @@ function test{ElType <: AbstractFloat}(X::Int, Ys::AbstractVector{Int}, data::Ab
     
     nz = is_zero_adjusted(test_name)
     
-    map(Y -> test(X, Y, data, test_name, cor_mat, nz, false), Ys)
+    map(Y -> test(X, Y, data, test_name, n_obs_min, cor_mat, nz, false), Ys)
 end
 
 
@@ -160,8 +171,9 @@ end
 ### CONDITIONAL ###
 ###################
 
+
 function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, nz::Bool, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
+    test_name::String, n_obs_min::Integer, nz::Bool, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
     """Critical: expects zeros to be trimmed from both X and Y if nz is true"""
 
@@ -172,18 +184,26 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, 
     #end
 
     if test_name == "fz" || test_name == "fz_nz"
-        p_stat = isempty(cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, cor_mat, pcor_set_dict)
+        n_obs = size(data, 1)
+        
+        if n_obs >= n_obs_min
+            p_stat = isempty(cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, cor_mat, pcor_set_dict)
+            pval = fz_pval(p_stat, n_obs, 0)
+        else
+            p_stat = 0.0
+            pval = 1.0
+        end
+        
         df = 0
-        pval = fz_pval(p_stat, size(data, 1), 0)
     end
-    Misc.TestResult(p_stat, pval, df, true)
+    Misc.TestResult(p_stat, pval, df, n_obs >= n_obs_min)
 end
 
 
-function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String; recursive::Bool=true)
+function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String; recursive::Bool=true, n_obs_min::Integer=0)
     cor_mat = recursive ? cor(data) : zeros(ElType, 0, 0)
     pcor_set_dict = Dict{String,Dict{String,ElType}}()
-    test(X, Y, Zs, data, test_name, is_zero_adjusted(test_name), cor_mat, pcor_set_dict)
+    test(X, Y, Zs, data, test_name, n_obs_min, is_zero_adjusted(test_name), cor_mat, pcor_set_dict)
 end
 
 
@@ -257,7 +277,7 @@ end
 
 
 function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, pwr::AbstractFloat=0.5,
+    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5,
         levels::AbstractVector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), debug::Int=0)
 
@@ -281,6 +301,10 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
         z_map_arr = zeros(ElType, max_levels_z)
         num_lowpwr_tests = 0
     elseif nz
+        if n_obs_min > size(data, 1)
+            return TestResult(0.0, 1.0, 0.0, false), Int[]
+        end      
+            
         empty!(pcor_set_dict)
 
         # compute correlations on the current subset of variables
