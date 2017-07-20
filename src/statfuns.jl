@@ -11,7 +11,7 @@ using FlashWeave.Misc
 
 function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
     sample_factor = n - len_z - 3
-
+    
     if sample_factor > 0
         return (sqrt(sample_factor) / 2.0) * log((1.0 + p) / (1.0 - p))
     else
@@ -133,30 +133,38 @@ function update!(obj::PairCorObj, x_entry, y_entry)
 end
 
 function cor{ElType <: AbstractFloat}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
-     nz::Bool=false)
-     p_mean_obj = PairMeanObj(0.0, 0.0, 0)
-     iter_apply_sparse_rows!(X, Y, data, update!, p_mean_obj, nz, nz)
+    nz::Bool=false)
+    p_mean_obj = PairMeanObj(0.0, 0.0, 0)
+    iter_apply_sparse_rows!(X, Y, data, update!, p_mean_obj, nz, nz)
 
-     n_obs = nz ? p_mean_obj.n : size(data, 1)
+    n_obs = nz ? p_mean_obj.n : size(data, 1)
 
-     if n_obs == 0
-         return 0.0, 0
-     end
+    if n_obs == 0
+        return 0.0, 0
+    end
 
-     mean_x = p_mean_obj.sum_x / n_obs
-     mean_y = p_mean_obj.sum_y / n_obs
-     p_cor_obj = PairCorObj(0.0, 0.0, 0.0, mean_x, mean_y)
-     iter_apply_sparse_rows!(X, Y, data, update!, p_cor_obj, nz, nz)
+    mean_x = p_mean_obj.sum_x / n_obs
+    mean_y = p_mean_obj.sum_y / n_obs
+    p_cor_obj = PairCorObj(0.0, 0.0, 0.0, mean_x, mean_y)
+    iter_apply_sparse_rows!(X, Y, data, update!, p_cor_obj, nz, nz)
 
-     if !nz
-         z_elems = size(data, 1) - p_mean_obj.n
-         p_cor_obj.cov_xy += (-mean_x * -mean_y) * z_elems
-         p_cor_obj.var_x += (-mean_x * -mean_x) * z_elems
-         p_cor_obj.var_y += (-mean_y * -mean_y) * z_elems
-     end
+    if !nz
+        z_elems = size(data, 1) - p_mean_obj.n
+        p_cor_obj.cov_xy += (-mean_x * -mean_y) * z_elems
+        p_cor_obj.var_x += (-mean_x * -mean_x) * z_elems
+        p_cor_obj.var_y += (-mean_y * -mean_y) * z_elems
+    end
+    
+    p = p_cor_obj.cov_xy / sqrt(p_cor_obj.var_x * p_cor_obj.var_y)
 
-     p_cor_obj.cov_xy / sqrt(p_cor_obj.var_x * p_cor_obj.var_y), n_obs
- end
+    if p > 1.0
+        p = 1.0
+    elseif p < -1.0
+        p = -1.0
+    end
+    
+    p, n_obs
+end
 
 
 function cor{ElType <: AbstractFloat}(data::SparseMatrixCSC{ElType}, nz::Bool)
@@ -173,10 +181,9 @@ function cor{ElType <: AbstractFloat}(data::SparseMatrixCSC{ElType}, nz::Bool)
 end
 
 
-function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_mat::AbstractMatrix{ElType}, vars::AbstractVector{Int}, nz::Bool)
+function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_mat::AbstractMatrix{ElType}, vars::AbstractVector{Int})
     n_vars = length(vars)
-    """CRITICAL: expects zeros to be trimmed from X if nz_test
-    is provided!
+    """CRITICAL: expects zeros to be trimmed from X and Y in zero-ignoring mode!
     """
     #if nz
     #    sub_data = @view data[data[:, vars[2]] .!= 0.0, vars]

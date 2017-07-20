@@ -51,7 +51,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
             continue
         end
 
-        if needs_nz_view(candidate, data, test_name, levels)
+        if needs_nz_view(candidate, data, test_name, levels, false)
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
             sub_data = data
@@ -59,7 +59,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
 
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps,
                                    pwr=pwr, levels=levels, cor_mat=cor_mat,
-                                   pcor_set_dict=pcor_set_dict)
+                                   pcor_set_dict=pcor_set_dict, debug=debug)
 
         if issig(test_result, alpha)
             push!(TPC, candidate)
@@ -132,7 +132,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
             continue
         end
 
-        if needs_nz_view(candidate, data, test_name, levels)
+        if needs_nz_view(candidate, data, test_name, levels, false)
             sub_data = @view data[data[:, candidate] .!= 0, :]
         else
             sub_data = data
@@ -140,7 +140,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
 
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps,
                                    levels=levels,
-                                   cor_mat=cor_mat, pcor_set_dict=pcor_set_dict)
+                                   cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, debug=debug)
 
         if !issig(test_result, alpha)
             deleteat!(PC, findin(PC, candidate))
@@ -204,7 +204,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
 
     if is_zero_adjusted(test_name)
-        if needs_nz_view(T, data, test_name, levels)
+        if needs_nz_view(T, data, test_name, levels, true)
             data = @view data[data[:, T] .!= 0, :]
         end
     end
@@ -222,7 +222,8 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         if isdiscrete(test_name)
             univar_test_results = test(T, test_variables, data, test_name, hps, levels)
         else
-            univar_test_results = test(T, test_variables, data, test_name, cor_mat)
+            uni_cor_mat = is_zero_adjusted(test_name) ? zeros(ElType, 0, 0) : cor_mat
+            univar_test_results = test(T, test_variables, data, test_name, uni_cor_mat)
         end
     end
 
@@ -240,13 +241,19 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         univar_nbrs = Dict([(nbr, (stat, pval)) for (nbr, stat, pval) in help_zip if pval < alpha])
     end
 
-
     if debug > 0
         println("\t", collect(zip(test_variables, univar_nbrs)))
     end
 
     # if conditioning should be performed
     if max_k > 0
+        # needed for sparse matrices (should stay sparse for univariate computations and then
+        # be converted to a view for conditioning)
+        if issparse(data) && is_zero_adjusted(test_name)
+            if needs_nz_view(T, data, test_name, levels, false)
+                data = @view data[data[:, T] .!= 0, :]
+            end
+        end
 
         if prev_state.phase != "E"
 
@@ -501,6 +508,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     if max_k == 0 && global_univar
         nbr_dict = all_univar_nbrs
     else
+        if recursive_pcor && is_zero_adjusted(test_name)
+            cor_mat = zeros(ElType, size(data, 2), size(data, 2))
+        end
+                        
         if verbose
             println("Running si_HITON_PC for each variable..")
             tic()
@@ -629,7 +640,7 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
                             cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
-    if needs_nz_view(X, data, test_name, levels)
+    if needs_nz_view(X, data, test_name, levels, true)
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
@@ -657,7 +668,7 @@ function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data
                             cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
-    if needs_nz_view(X, data, test_name, levels)
+    if needs_nz_view(X, data, test_name, levels, true)
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
@@ -959,7 +970,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     elseif startswith(parallel, "single")
         n_workers = 1
         job_q_buff_size = 1
-        @assert nprocs() > 1 "Need to have one additional worker for interleaved mode."
+        #@assert nprocs() > 1 "Need to have one additional worker for interleaved mode."
     else
         error("$parallel not a valid execution mode.")
     end

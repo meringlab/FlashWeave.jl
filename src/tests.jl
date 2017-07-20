@@ -101,7 +101,7 @@ end
 ### continuous
 
 function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String,
-    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false, Y_adjusted::Bool=true)
+    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false, Y_adjusted::Bool=false, n_obs::Int=size(data, 1))
 
     if isempty(data)
         p_stat = 0.0
@@ -126,7 +126,7 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElTy
                     sub_y_vec = @view sub_data[:, Y]
 
                     p_stat = cor(sub_x_vec, sub_y_vec)
-                    n_obs = size(data, 1)
+                    n_obs = size(sub_data, 1)
                 end
             end
         else
@@ -163,6 +163,7 @@ end
 function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType},
     test_name::String, nz::Bool, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
+    """Critical: expects zeros to be trimmed from both X and Y if nz is true"""
 
     #if needs_nz_view(Y, data, nz)
     #    sub_data = @view data[data[:, Y] .!= 0, :]
@@ -258,7 +259,7 @@ end
 function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{ElType},
     test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, pwr::AbstractFloat=0.5,
         levels::AbstractVector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
+    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), debug::Int=0)
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
     lowest_sig_Zs = Int[]
@@ -284,7 +285,11 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
 
         # compute correlations on the current subset of variables
         if !isempty(cor_mat)
-            cor_subset!(data, cor_mat, [X, Y, Z_total...], nz)
+            cor_subset!(data, cor_mat, [X, Y, Z_total...])
+            
+            if debug > 2
+                println(cor_mat[[X, Y, Z_total...], [X, Y, Z_total...]])
+            end
         end
     end
 
@@ -301,6 +306,10 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
             end
             num_tests += 1
 
+            if debug > 2
+                println("\t subset ", Zs, " : ", test_result)
+            end
+            
             # if discrete test didn't have enough power, check if
             # the threshold of number of unreliable tests has been reached
             if discrete_test & !test_result.suff_power
@@ -313,7 +322,7 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
             else
                 if !issig(test_result, alpha)
                     return test_result, Zs
-                elseif test_result.pval > lowest_sig_result.pval
+                elseif test_result.pval >= lowest_sig_result.pval
                     lowest_sig_result = test_result
                     lowest_sig_Zs = Zs
                 end

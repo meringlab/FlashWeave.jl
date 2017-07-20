@@ -89,11 +89,11 @@ iscontinuous(test_name::String) = test_name in ["fz", "fz_nz"]
 is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
 is_mi_test(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
 
-function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_name::String, levels::Vector{ElType})
+function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_name::String, levels::Vector{ElType}, univar::Bool)
     nz = is_zero_adjusted(test_name)
     disc = isdiscrete(test_name)
     is_nz_var = !disc || (levels[X] > 2)
-    nz && is_nz_var && !issparse(data)#(!issparse(data) || !disc) #(!isdiscrete(test_name) || levels[X] > 2)
+    nz && is_nz_var && (!issparse(data) || !univar)
 end
 
 signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)
