@@ -326,7 +326,7 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
                 test_result = test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z,
                                    ni, nj, nk, cum_levels, z_map_arr, nz, levels)
             else
-                test_result = test(X, Y, Zs, data, test_name, nz, cor_mat, pcor_set_dict)
+                test_result = test(X, Y, Zs, data, test_name, n_obs_min, nz, cor_mat, pcor_set_dict)
             end
             num_tests += 1
 
