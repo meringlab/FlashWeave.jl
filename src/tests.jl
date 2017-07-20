@@ -118,10 +118,16 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElTy
                     sub_data = data
                 end
 
-                sub_x_vec = @view sub_data[:, X]
-                sub_y_vec = @view sub_data[:, Y]
-                p_stat = cor(sub_x_vec, sub_y_vec)
-                n_obs = size(data, 1)
+                if isempty(sub_data)
+                    p_stat = 0.0
+                    n_obs = 0
+                else
+                    sub_x_vec = @view sub_data[:, X]
+                    sub_y_vec = @view sub_data[:, Y]
+
+                    p_stat = cor(sub_x_vec, sub_y_vec)
+                    n_obs = size(data, 1)
+                end
             end
         else
             p_stat = cor_mat[X, Y]

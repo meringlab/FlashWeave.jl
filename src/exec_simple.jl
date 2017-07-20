@@ -1,3 +1,12 @@
+println("Starting processes and importing modules")
+tic()
+if endswith(ARGS[5], "_il")
+    #addprocs(1)
+end
+
+using FlashWeave
+toc()
+
 function main(input_args::Vector{String})
 
     println("Parsing args")
@@ -11,44 +20,49 @@ function main(input_args::Vector{String})
     
     if length(input_args) > 8
         FDR = input_args[8]
-        n_jobs = parse(Int64, input_args[9])
+        #n_jobs = parse(Int64, input_args[9])
     else
         FDR = "true"
-        n_jobs = parse(Int64, input_args[8])
+        #n_jobs = parse(Int64, input_args[8])
     end
 
-    println("Starting processes and importing modules")
-    tic()
-    if parallel_mode == "single_il"
-        addprocs(1)
-    elseif n_jobs > 1
-        addprocs(n_jobs - 1)
-    end
+    #println("Starting processes and importing modules")
+    #tic()
+    #if parallel_mode == "single_il"
+    #    addprocs(1)
+    #elseif n_jobs > 1
+    #    addprocs(n_jobs - 1)
+    #end
 
-    eval(Expr(:using,:FlashWeave))
+    #eval(Expr(:using,:FlashWeave))
 
-    println("Finished after $(toc())s\n")
+    #println("Finished after $(toc())s\n")
 
     println("Reading data")
     tic()
     data_full = readdlm(input_path, '\t')
     header = convert(Array{String,1}, data_full[1, 2:end])
-    #data = convert(Array{Int,2}, round(data_full[2:end, 2:end], 0))
-    data = convert(Array{Float64,2}, data_full[2:end, 2:end])
-    println("Finished after $(toc())s\n")
-
+    #data = convert(Matrix{Int}, round.(data_full[2:end, 2:end], 0))
+    data = convert(Matrix{Float64}, data_full[2:end, 2:end])
+    #println(typeof(data))
+    #println(test_name)
+    #println(typeof(data) <: AbstractMatrix{Real})
+    #println(data)
+    #println("Finished after $(toc())s\n")
+    toc()
+    
     println("Normalizing data")
     tic()
     skip_cols = Set([x for x in 1:length(header) if startswith(header[x], "ENV")])
     data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols)
-
+    #data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=true, env_cols=skip)
     #if test_name == "fz_nz"
     #    zero_mask = data_norm .== minimum(data_norm)
     #    data_norm[zero_mask] = 0.0
     #end
 
-    println("Finished after $(toc())s\n")
-
+    #println("Finished after $(toc())s\n")
+    toc()
     #println("Clustering data")
     #tic()
     #repres, clust_dict = Cauocc.cluster_data(data_norm, test_name, parallel=split(parallel_mode, "_")[1])
@@ -68,9 +82,9 @@ function main(input_args::Vector{String})
 
     println("Learning network")
     tic()
-    graph_dict = LGL(data_norm; lgl_args...)
-    println("Finished after $(toc())s\n")
-
+    graph_dict = LGL(data_norm; lgl_args...).graph
+    #println("Finished after $(toc())s\n")
+    toc()
     #println("Adding cluster edges")
 
 
@@ -78,8 +92,8 @@ function main(input_args::Vector{String})
     tic()
     adj_matrix = FlashWeave.Misc.dict_to_adjmat(graph_dict, header)
     writedlm(output_path, adj_matrix, '\t')
-    println("Finished after $(toc())s\n")
-
+    #println("Finished after $(toc())s\n")
+    toc()
 end
 
 main(ARGS)
