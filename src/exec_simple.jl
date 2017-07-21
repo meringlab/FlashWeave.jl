@@ -1,8 +1,8 @@
 println("Starting processes and importing modules")
 tic()
-if endswith(ARGS[5], "_il")
-    #addprocs(1)
-end
+#if endswith(ARGS[5], "_il")
+#    #addprocs(1)
+#end
 
 using FlashWeave
 toc()
@@ -54,7 +54,7 @@ function main(input_args::Vector{String})
     println("Normalizing data")
     tic()
     skip_cols = Set([x for x in 1:length(header) if startswith(header[x], "ENV")])
-    data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols)
+    data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header)
     #data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=true, env_cols=skip)
     #if test_name == "fz_nz"
     #    zero_mask = data_norm .== minimum(data_norm)

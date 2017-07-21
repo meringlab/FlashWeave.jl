@@ -71,7 +71,7 @@ function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, 
 end
 
 
-function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, cor_mat::AbstractMatrix{ElType}, pcor_set_dict::Dict{String,Dict{String,ElType}})
+function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, cor_mat::AbstractMatrix{ElType}, pcor_set_dict::Dict{String,Dict{String,ElType}}, cache_result::Bool=true)
     XY_key = join((X, Y), "_")
     Zs_key = join(Zs, "_")
 
@@ -108,11 +108,13 @@ function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{In
         end
 
 
-        if !haskey(pcor_set_dict, XY_key)
-            pcor_set_dict[XY_key] = Dict{String, ElType}()
-        end
+        if cache_result
+            if !haskey(pcor_set_dict, XY_key)
+                pcor_set_dict[XY_key] = Dict{String, ElType}()
+            end
 
-        pcor_set_dict[XY_key][Zs_key] = p
+            pcor_set_dict[XY_key][Zs_key] = p
+        end
     end
 
     p

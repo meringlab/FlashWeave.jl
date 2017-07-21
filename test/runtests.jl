@@ -14,7 +14,7 @@ for test_module in ["preprocessing.jl", "misc.jl", "contingency.jl", "statfuns.j
 
     println("\nTesting $test_module")
     if test_module == "learning.jl"
-        println("(this will take a moment)")
+        println("(this can take a couple of minutes)")
     end
     include(test_module)
 end

@@ -174,7 +174,7 @@ end
 
 function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType},
     test_name::String, n_obs_min::Integer, nz::Bool, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}())
+    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), cache_result::Bool=true)
     """Critical: expects zeros to be trimmed from both X and Y if nz is true"""
 
     #if needs_nz_view(Y, data, nz)
@@ -187,7 +187,7 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, 
         n_obs = size(data, 1)
         
         if n_obs >= n_obs_min
-            p_stat = isempty(cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, cor_mat, pcor_set_dict)
+            p_stat = isempty(cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, cor_mat, pcor_set_dict, cache_result)
             pval = fz_pval(p_stat, n_obs, 0)
         else
             p_stat = 0.0
@@ -326,7 +326,7 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
                 test_result = test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z,
                                    ni, nj, nk, cum_levels, z_map_arr, nz, levels)
             else
-                test_result = test(X, Y, Zs, data, test_name, n_obs_min, nz, cor_mat, pcor_set_dict)
+                test_result = test(X, Y, Zs, data, test_name, n_obs_min, nz, cor_mat, pcor_set_dict, subset_size < max_k)
             end
             num_tests += 1
 

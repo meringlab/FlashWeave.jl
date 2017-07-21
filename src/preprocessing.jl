@@ -276,7 +276,7 @@ end
 
 function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
     disc_method::String="median", verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=issparse(data), factor_cols::Set{Int}=Set{Int}(),
-    prec::Integer=32, filter_data=true)
+    prec::Integer=32, filter_data=true, header::Vector{String}=String[])
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
@@ -294,6 +294,10 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         data = data[row_mask, :]
         if !isempty(env_cols)
             env_data = env_data[row_mask, :]
+        end
+        
+        if !isempty(header)
+            header = header[col_mask]
         end
     end
 
@@ -318,10 +322,14 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         end
 
         unreduced_vars = size(data, 2)
-        data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]]
-
+        bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]
+        data = data[:, bin_mask]
+        
+        if !isempty(header)
+            header = header[bin_mask]
+        end
         if verbose
-            println("\tremoved $(unreduced_vars - size(data, 2)) variables with more or less than 2 levels")
+            println("\tremoved $(unreduced_vars - size(data, 2)) variables with not exactly 2 levels")
         end
 
     elseif startswith(norm, "binned")
@@ -337,7 +345,12 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         end
 
         unreduced_vars = size(data, 2)
-        data = data[:, (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== n_bins)[:]]
+        bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== n_bins)[:]
+        data = data[:, bin_mask]
+        
+        if !isempty(header)
+            header = header[bin_mask]
+        end
 
         if verbose
             println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
@@ -369,13 +382,18 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         end
         data = convert(Matrix{T}, data)
     end
-    data
+    
+    if !isempty(header)
+        return data, header
+    else
+        return data
+    end
 end
 
 
-function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String; verbose::Bool=true, make_sparse::Bool=issparse(data), env_cols::Set{Int}=Set{Int}(), factor_cols::Set{Int}=Set{Int}(), prec::Integer=32) where ElType <: Real
+function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String; verbose::Bool=true, make_sparse::Bool=issparse(data), env_cols::Set{Int}=Set{Int}(), factor_cols::Set{Int}=Set{Int}(), prec::Integer=32, header::Vector{String}=String[]) where ElType <: Real
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
-    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, env_cols=env_cols, prec=prec)
+    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, env_cols=env_cols, prec=prec, header=header)
     data
 end
 
