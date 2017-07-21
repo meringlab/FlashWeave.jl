@@ -62,7 +62,7 @@ end
                                     for prec in [32, 64]
                                         @testset "precision $prec" begin
                                             graph_dict = make_network(data, test_name, make_sparse, prec, max_k=max_k, parallel=parallel, time_limit=0.0)
-                                            exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)_sparse$(make_sparse)"]
+                                            exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]
 
                                             atol = 1e-2
                                             rtol = 0.0
