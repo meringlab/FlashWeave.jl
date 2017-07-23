@@ -304,7 +304,7 @@ function map_edge_keys{T}(nbr_dict::Dict{Int,OrderedDict{Int,T}}, key_map_dict::
 end
 
 
-function dict_to_adjmat(graph_dict::Dict{Int,OrderedDict{Int,Float64}}, header::AbstractVector{String})
+function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::AbstractVector{String})
     #n_nodes = length(graph_dict)
     n_vars = length(header)
     adj_mat = zeros(Float64, (n_vars, n_vars))

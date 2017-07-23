@@ -348,7 +348,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             prev_PC_dict = prev_state.state_results
             
             if no_red_tests || fast_elim
-                TPC_dict = state.inter_results
+                TPC_dict = prev_state.inter_results
             end
             
             PC_unchecked = prev_state.unchecked_vars
