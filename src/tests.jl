@@ -279,7 +279,7 @@ end
 function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{ElType},
     test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5,
         levels::AbstractVector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), debug::Int=0)
+    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), debug::Int=0, Z_wanted::AbstractVector{Int}=Int[])
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
     lowest_sig_Zs = Int[]
@@ -290,6 +290,7 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
     if discrete_test
         levels_x = levels[X]
         levels_y = levels[Y]
+        
         max_levels = maximum(levels)
         max_levels_z = sum([max_levels^(i+1) for i in 1:max_k])
         cont_tab = zeros(ElType, levels_x, levels_y, max_levels_z)
@@ -316,10 +317,10 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
             end
         end
     end
-
-    for subset_size in 1:max_k
-        Z_combos = combinations(Z_total, subset_size)
-
+    
+    for subset_size in max_k:-1:1
+        Z_combos = isempty(Z_wanted) ? combinations(Z_total, subset_size) : combinations_with_whitelist(Z_total, Z_wanted, subset_size)
+        
         for Zs in Z_combos
             if discrete_test
                 make_cum_levels!(cum_levels, Zs, levels)
@@ -334,22 +335,11 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
                 println("\t subset ", Zs, " : ", test_result)
             end
             
-            # if discrete test didn't have enough power, check if
-            # the threshold of number of unreliable tests has been reached
-            if discrete_test & !test_result.suff_power
-                num_lowpwr_tests += 1
-
-                if num_lowpwr_tests / num_tests >= 1 - pwr
-                    lowest_sig_result.suff_power = false
-                    return lowest_sig_result, Zs
-                end
-            else
-                if !issig(test_result, alpha)
-                    return test_result, Zs
-                elseif test_result.pval >= lowest_sig_result.pval
-                    lowest_sig_result = test_result
-                    lowest_sig_Zs = Zs
-                end
+            if !issig(test_result, alpha)
+                return test_result, Zs
+            elseif test_result.pval >= lowest_sig_result.pval
+                lowest_sig_result = test_result
+                lowest_sig_Zs = Zs
             end
         end
     end

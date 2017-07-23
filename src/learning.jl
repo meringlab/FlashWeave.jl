@@ -14,8 +14,9 @@ using FlashWeave.StackChannels
 
 
 function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
-    prev_TPC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0,
+    test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5,
+        levels::AbstractVector{ElType}=ElType[],
+    prev_TPC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0,
     whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
 
@@ -26,7 +27,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
 
     if isempty(prev_TPC_dict)
         TPC = [candidates[1]]
-        TPC_dict = Dict{Int,Tuple{Float64,Float64}}(TPC[1] => (-1.0, -1.0))
+        TPC_dict = OrderedDict{Int,Tuple{Float64,Float64}}(TPC[1] => (-1.0, -1.0))
         OPEN = candidates[2:end]
     else
         TPC = collect(keys(prev_TPC_dict))
@@ -89,8 +90,9 @@ end
 
 
 function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String,
-    max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5, levels::AbstractVector{ElType}=ElType[],
-    prev_PC_dict::Dict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::AbstractVector{Int}=[],
+    max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5, fast_elim::Bool=true,
+        no_red_tests::Bool=false, levels::AbstractVector{ElType}=ElType[],
+    prev_PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::AbstractVector{Int}=[],
     time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0, whitelist::Set{Int}=Set{Int}(),
     blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,Float64}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false)
@@ -99,24 +101,24 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
     is_discrete = isdiscrete(test_name)
     is_dense = !issparse(data)
 
-    if !isempty(PC_unchecked) && !isempty(prev_PC_dict)
+    if !isempty(prev_PC_dict)
         PC_dict = prev_PC_dict
         PC_candidates = PC_unchecked
     else
-        PC_dict = Dict{Int,Tuple{Float64,Float64}}()
+        PC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
         PC_candidates = TPC
     end
 
-    PC = copy(TPC)
     n_candidates = length(PC_candidates)
 
     if n_candidates < 1
         if n_candidates == 1
-            PC_dict[PC_candidates[1]] = (NaN64, alpha - alpha * 0.1)
+            PC_dict[PC_candidates[1]] = (NaN64, NaN64)
         end
         return PC_dict, Int[]
     end
 
+    PC = copy(TPC)
     for (cand_index, candidate) in enumerate(PC_candidates)
         PC_nocand = PC[PC .!= candidate]
 
@@ -139,12 +141,26 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
             sub_data = data
         end
 
+        if no_red_tests
+            if cand_index == length(PC_candidates)
+                PC_dict[candidate] = (NaN64, NaN64)
+                break
+            else
+                Z_wanted = @view PC_candidates[cand_index+1:end]
+            end
+        else
+            Z_wanted = Int[]
+        end
+        
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps,
                                    n_obs_min=n_obs_min, levels=levels,
-                                   cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, debug=debug)
+                                   cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, debug=debug, Z_wanted=Z_wanted)
 
         if !issig(test_result, alpha)
-            deleteat!(PC, findin(PC, candidate))
+            
+            if fast_elim
+                deleteat!(PC, findin(PC, candidate))
+            end
 
             if track_rejections
                 rej_dict[candidate] = (tuple(lowest_sig_Zs...), test_result)
@@ -172,18 +188,18 @@ end
 
 
 function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
-    pwr::Float64=0.5, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
+    pwr::Float64=0.5, fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
         blacklist::Set{Int}=Set{Int}(),
-        univar_nbrs::Dict{Int,Tuple{Float64,Float64}}=Dict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{ElType}=ElType[],
+        univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{ElType}=ElType[],
     univar_step::Bool=true, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(),
-    prev_state::HitonState=HitonState("S", Dict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
+    prev_state::HitonState=HitonState("S", OrderedDict(), OrderedDict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
 
     if debug > 0
         println("Finding neighbors for $T")
     end
 
-    state = HitonState("S", Dict(), [], Dict())
+    state = HitonState("S", OrderedDict(), OrderedDict(), [], Dict())
     rej_dict = Dict{Int, Tuple{Tuple,TestResult}}()
 
     if isdiscrete(test_name)
@@ -270,7 +286,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 candidate_pval_pairs = [(candidate, univar_nbrs[candidate][2]) for candidate in keys(univar_nbrs)]
                 sort!(candidate_pval_pairs, by=x -> x[2])
                 candidates = map(x -> x[1], candidate_pval_pairs)
-                prev_TPC_dict = Dict{Int,Tuple{Float64,Float64}}()
+                prev_TPC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
             end
 
             if debug > 0
@@ -280,7 +296,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
             if isempty(candidates)
                 state.phase = "F"
-                state.state_results = Dict{Int,Tuple{Float64,Float64}}()
+                state.state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
                 state.unchecked_vars = Int[]
                 state.state_rejections = rej_dict
 
@@ -313,6 +329,8 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 return state
             end
 
+            state.inter_results = TPC_dict
+                            
             if debug > 0
                 println("After interleaving:", length(TPC_dict), " ", collect(keys(TPC_dict)))
 
@@ -328,6 +346,11 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         # elimination phase
         if prev_state.phase == "E"
             prev_PC_dict = prev_state.state_results
+            
+            if no_red_tests || fast_elim
+                TPC_dict = state.inter_results
+            end
+            
             PC_unchecked = prev_state.unchecked_vars
             PC_candidates = convert(Vector{Int}, [keys(prev_PC_dict)..., PC_unchecked...])
 
@@ -335,12 +358,13 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 rej_dict = prev_state.state_rejections
             end
         else
-            prev_PC_dict = Dict{Int,Tuple{Float64,Float64}}()
+            prev_PC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
             PC_unchecked = Int[]
             PC_candidates = convert(Vector{Int}, collect(keys(TPC_dict)))
         end
+        
         PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
-                                                   hps, n_obs_min, pwr, levels,
+                                                   hps, n_obs_min, pwr, fast_elim, no_red_tests, levels,
                                                    prev_PC_dict, PC_unchecked, time_limit, start_time,
                                                    debug, whitelist, blacklist, cor_mat, pcor_set_dict, rej_dict,
                                                    track_rejections)
@@ -357,6 +381,16 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             state.state_rejections = rej_dict
 
             return state
+        end
+                        
+        # if redundant tests were skipped in elimination phase, check
+        # if lower weights were previously found during interleaving phase
+        if no_red_tests || fast_elim
+            for nbr in keys(PC_dict)
+                if haskey(TPC_dict, nbr) && TPC_dict[nbr][2] > PC_dict[nbr][2] || isnan(PC_dict[nbr][2])
+                    PC_dict[nbr] = TPC_dict[nbr]
+                end
+            end
         end
 
         if debug > 1
@@ -381,7 +415,7 @@ end
 
 function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5,
     convergence_threshold::AbstractFloat=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
-        fast_elim::Bool=true, precluster_sim::AbstractFloat=0.0,
+        fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
         weight_type::String="cond_logpval", edge_rule::String="OR", verbose::Bool=true, update_interval::AbstractFloat=30.0,
         edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
@@ -393,9 +427,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     fast_elim: currently always on
     """
 
-    kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min, :pwr => pwr, :FDR => FDR,
-    :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
-    :time_limit => time_limit, :track_rejections => track_rejections)
+    kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min, :pwr => pwr,
+                  :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
+                  :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
+                  :time_limit => time_limit, :track_rejections => track_rejections)
 
     if time_limit == -1.0
         if parallel == "multi_il"
@@ -414,6 +449,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         warn("Specify 'time_limit' when using interleaved parallelism to increase speed.")
     end
 
+    if time_limit != 0.0 && !fast_elim
+        warn("Setting fast_elim to true because time_limit has been specified")
+        fast_elim = true
+    end
 
     if recursive_pcor && iscontinuous(test_name)
         warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated
@@ -615,7 +654,7 @@ end
 # SPECIALIZED FUNCTIONS AND TYPES
 
 function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}, stats::AbstractVector{Float64}, alpha::AbstractFloat)
-    nbr_dict = Dict([(X, Dict{Int,Tuple{Float64,Float64}}()) for X in 1:n_vars])
+    nbr_dict = Dict([(X, OrderedDict{Int,Tuple{Float64,Float64}}()) for X in 1:n_vars])
 
     for X in 1:n_vars-1, Y in X+1:n_vars
         pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
@@ -959,7 +998,7 @@ function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels
 end
 
 
-function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType}, all_univar_nbrs::Dict{Int,Dict{Int,Tuple{Float64,Float64}}},
+function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType}, all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}},
      levels::AbstractVector{ElType}, update_interval::Real, GLL_args::Dict{Symbol,Any},
         convergence_threshold::AbstractFloat, cor_mat::Matrix{ElType}; conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi", edge_rule::String="OR",
         verbose::Bool=true, workers_local::Bool=true)
@@ -985,7 +1024,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     queued_jobs = 0
     waiting_vars = Stack(Int)
     for (i, target_var) in enumerate(reverse(target_vars))
-        job = (target_var, all_univar_nbrs[target_var], HitonState("S", Dict(), [], Dict()), Set{Int}())
+        job = (target_var, all_univar_nbrs[target_var], HitonState("S", OrderedDict(), OrderedDict(), [], Dict()), Set{Int}())
 
         if i < jobs_total - n_workers
             push!(waiting_vars, target_var)
@@ -1062,7 +1101,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
 
                 # kill workers if not needed anymore
                 if remaining_jobs < n_workers
-                    kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState("S", Dict(), [], Dict()), Set{Int}())
+                    kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState("S", OrderedDict(), OrderedDict(), [], Dict()), Set{Int}())
                     put!(shared_job_q, kill_signal)
                     kill_signals_sent += 1
                 end
@@ -1081,7 +1120,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
                 next_var = pop!(waiting_vars)
                 var_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, next_var)) : Set(neighbors(graph, next_var))
 
-                job = (next_var, all_univar_nbrs[next_var], HitonState("S", Dict(), [], Dict()), var_nbrs)
+                job = (next_var, all_univar_nbrs[next_var], HitonState("S", OrderedDict(), OrderedDict(), [], Dict()), var_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
 

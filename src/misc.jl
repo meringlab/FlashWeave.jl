@@ -2,8 +2,10 @@ module Misc
 
 using LightGraphs
 using StatsBase
+using Combinatorics
+using DataStructures
 
-export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
+export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, combinations_with_whitelist, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
 
 const inf_weight = 708.3964185322641
 
@@ -31,7 +33,8 @@ end
 
 type HitonState
     phase :: String
-    state_results :: Dict{Int,Tuple{Float64,Float64}}
+    state_results :: OrderedDict{Int,Tuple{Float64,Float64}}
+    inter_results :: OrderedDict{Int,Tuple{Float64,Float64}}
     unchecked_vars :: Vector{Int}
     state_rejections :: Dict{Int,Tuple{Tuple,TestResult}}
 end
@@ -45,6 +48,39 @@ end
 type IndexPair
     min_ind :: Int
     sec_ind :: Int
+end
+
+
+import Combinatorics:Combinations
+import Base:start,next,done
+
+immutable CombinationsWL{T,S}
+    c::Combinations{T}
+    wl::S
+end
+
+start(c::CombinationsWL) = start(c.c)
+next(c::CombinationsWL, s) = next(c.c, s)
+
+function done(c::CombinationsWL, s)
+    if done(c.c, s)
+        return true
+    else
+        (comb, next_s) = next(c.c, s)
+        return !(comb[1] in c.wl)
+    end
+end
+
+function combinations_with_whitelist(a::AbstractVector{T}, wl::AbstractVector{T}, t::Integer) where T <: Integer
+    wl_set = Set(wl)
+    
+    a_wl = copy(wl)
+    for e in a
+        if !(e in wl_set)
+            push!(a_wl, e)
+        end
+    end
+    CombinationsWL(combinations(a_wl, t), wl_set)    
 end
 
 
@@ -80,7 +116,6 @@ function min_sec_indices!(ind_pair::IndexPair, index_vec::AbstractVector{Int})
     ind_pair.min_ind = min_ind
     ind_pair.sec_ind = sec_ind
 end
-
 
 stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
@@ -132,7 +167,7 @@ function workers_all_local()
 end
 
 
-function make_weights(PC_dict::Dict{Int,Tuple{Float64,Float64}}, univar_nbrs::Dict{Int,Tuple{Float64,Float64}}, weight_type::String)
+function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}, weight_type::String)
     # create weights
     nbr_dict = Dict{Int,Float64}()
     weight_kind = String(split(weight_type, "_")[2])
@@ -245,7 +280,7 @@ function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
 end
 
 
-function map_edge_keys{T}(nbr_dict::Dict{Int,Dict{Int,T}}, key_map_dict::Dict{Int,Int})
+function map_edge_keys{T}(nbr_dict::Dict{Int,OrderedDict{Int,T}}, key_map_dict::Dict{Int,Int})
     new_nbr_dict = similar(nbr_dict)
 
     for (key, sub_dict) in nbr_dict
@@ -269,7 +304,7 @@ function map_edge_keys{T}(nbr_dict::Dict{Int,Dict{Int,T}}, key_map_dict::Dict{In
 end
 
 
-function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::AbstractVector{String})
+function dict_to_adjmat(graph_dict::Dict{Int,OrderedDict{Int,Float64}}, header::AbstractVector{String})
     #n_nodes = length(graph_dict)
     n_vars = length(header)
     adj_mat = zeros(Float64, (n_vars, n_vars))
