@@ -209,7 +209,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
         if levels[T] < 2
             state.phase = "F"
-            state.state_results = Dict{Int,Tuple{Float64,Float64}}()
+            state.state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
             state.unchecked_vars = Int[]
             state.state_rejections = rej_dict
 
@@ -261,128 +261,140 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
     if debug > 0
         println("\t", collect(zip(test_variables, univar_nbrs)))
     end
-
+            
+                    
     # if conditioning should be performed
     if max_k > 0
-        # needed for sparse matrices (should stay sparse for univariate computations and then
-        # be converted to a view for conditioning)
-        if issparse(data) && is_zero_adjusted(test_name)
-            if needs_nz_view(T, data, test_name, levels, false)
-                data = @view data[data[:, T] .!= 0, :]
+        # if the global network has converged
+        if prev_state.phase == "C"
+            if !isempty(prev_state.inter_results)
+                PC_dict = prev_state.state_results
+                TPC_dict = prev_state.inter_results
+            else
+                PC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
+                TPC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
             end
-        end
+        else
+            # needed for sparse matrices (should stay sparse for univariate computations and then
+            # be converted to a view for conditioning)
+            if issparse(data) && is_zero_adjusted(test_name)
+                if needs_nz_view(T, data, test_name, levels, false)
+                    data = @view data[data[:, T] .!= 0, :]
+                end
+            end    
 
-        if prev_state.phase != "E"
+            if prev_state.phase == "I" || prev_state.phase == "S"#prev_state.phase != "E" && prev_state.phase != "C"
 
-            if prev_state.phase == "I"
-                prev_TPC_dict = prev_state.state_results
-                candidates = prev_state.unchecked_vars
+                if prev_state.phase == "I"
+                    prev_TPC_dict = prev_state.state_results
+                    candidates = prev_state.unchecked_vars
+
+                    if track_rejections
+                        rej_dict = prev_state.state_rejections
+                    end
+                else
+                    # sort candidates
+                    candidate_pval_pairs = [(candidate, univar_nbrs[candidate][2]) for candidate in keys(univar_nbrs)]
+                    sort!(candidate_pval_pairs, by=x -> x[2])
+                    candidates = map(x -> x[1], candidate_pval_pairs)
+                    prev_TPC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
+                end
+
+                if debug > 0
+                    println("\tnumber of candidates:", length(candidates), candidates[1:min(length(candidates), 20)])
+                    println("\nINTERLEAVING\n")
+                end
+
+                if isempty(candidates)
+                    state.phase = "F"
+                    state.state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
+                    state.unchecked_vars = Int[]
+                    state.state_rejections = rej_dict
+
+                    return state
+                end
+
+                # interleaving phase
+                TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k,
+                                                                    alpha, hps, n_obs_min, levels, prev_TPC_dict, time_limit,
+                                                                    start_time, debug, whitelist, blacklist, cor_mat,
+                                                                    pcor_set_dict, rej_dict,
+                                                                    track_rejections)
+
+                # set test stats of the initial candidate to its univariate association results
+                if prev_state.phase == "S"
+                    TPC_dict[candidates[1]] = univar_nbrs[candidates[1]]
+                end
+
+                if !isempty(candidates_unchecked)
+
+                    if debug > 0
+                        println("Time limit exceeded, reporting incomplete results")
+                    end
+
+                    state.phase = "I"
+                    state.state_results = TPC_dict
+                    state.unchecked_vars = candidates_unchecked
+                    state.state_rejections = rej_dict
+
+                    return state
+                end
+
+                state.inter_results = TPC_dict
+
+                if debug > 0
+                    println("After interleaving:", length(TPC_dict), " ", collect(keys(TPC_dict)))
+
+                    if debug > 1
+                        println(TPC_dict)
+                    end
+
+                    println("\nELIMINATION\n")
+                end
+            end
+
+
+            # elimination phase
+            if prev_state.phase == "E"
+                prev_PC_dict = prev_state.state_results
+
+                if no_red_tests || fast_elim
+                    TPC_dict = prev_state.inter_results
+                end
+
+                PC_unchecked = prev_state.unchecked_vars
+                PC_candidates = convert(Vector{Int}, [keys(prev_PC_dict)..., PC_unchecked...])
 
                 if track_rejections
                     rej_dict = prev_state.state_rejections
                 end
             else
-                # sort candidates
-                candidate_pval_pairs = [(candidate, univar_nbrs[candidate][2]) for candidate in keys(univar_nbrs)]
-                sort!(candidate_pval_pairs, by=x -> x[2])
-                candidates = map(x -> x[1], candidate_pval_pairs)
-                prev_TPC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
+                prev_PC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
+                PC_unchecked = Int[]
+                PC_candidates = convert(Vector{Int}, collect(keys(TPC_dict)))
             end
 
-            if debug > 0
-                println("\tnumber of candidates:", length(candidates), candidates[1:min(length(candidates), 20)])
-                println("\nINTERLEAVING\n")
-            end
+            PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
+                                                       hps, n_obs_min, fast_elim, no_red_tests, levels,
+                                                       prev_PC_dict, PC_unchecked, time_limit, start_time,
+                                                       debug, whitelist, blacklist, cor_mat, pcor_set_dict, rej_dict,
+                                                       track_rejections)
 
-            if isempty(candidates)
-                state.phase = "F"
-                state.state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
-                state.unchecked_vars = Int[]
-                state.state_rejections = rej_dict
-
-                return state
-            end
-
-            # interleaving phase
-            TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k,
-                                                                alpha, hps, n_obs_min, levels, prev_TPC_dict, time_limit,
-                                                                start_time, debug, whitelist, blacklist, cor_mat,
-                                                                pcor_set_dict, rej_dict,
-                                                                track_rejections)
-
-            # set test stats of the initial candidate to its univariate association results
-            if prev_state.phase == "S"
-                TPC_dict[candidates[1]] = univar_nbrs[candidates[1]]
-            end
-
-            if !isempty(candidates_unchecked)
+            if !isempty(TPC_unchecked)
 
                 if debug > 0
                     println("Time limit exceeded, reporting incomplete results")
                 end
 
-                state.phase = "I"
-                state.state_results = TPC_dict
-                state.unchecked_vars = candidates_unchecked
+                state.phase = "E"
+                state.state_results = PC_dict
+                state.unchecked_vars = TPC_unchecked
                 state.state_rejections = rej_dict
 
                 return state
             end
-
-            state.inter_results = TPC_dict
-                            
-            if debug > 0
-                println("After interleaving:", length(TPC_dict), " ", collect(keys(TPC_dict)))
-
-                if debug > 1
-                    println(TPC_dict)
-                end
-
-                println("\nELIMINATION\n")
-            end
-        end
-
-
-        # elimination phase
-        if prev_state.phase == "E" || prev_state.phase == "C"
-            prev_PC_dict = prev_state.state_results
-            
-            if no_red_tests || fast_elim
-                TPC_dict = prev_state.inter_results
-            end
-            
-            PC_unchecked = prev_state.phase == "E" ? prev_state.unchecked_vars : Int[]
-            PC_candidates = convert(Vector{Int}, [keys(prev_PC_dict)..., PC_unchecked...])
-
-            if track_rejections
-                rej_dict = prev_state.state_rejections
-            end
-        else
-            prev_PC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
-            PC_unchecked = Int[]
-            PC_candidates = convert(Vector{Int}, collect(keys(TPC_dict)))
         end
         
-        PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
-                                                   hps, n_obs_min, fast_elim, no_red_tests, levels,
-                                                   prev_PC_dict, PC_unchecked, time_limit, start_time,
-                                                   debug, whitelist, blacklist, cor_mat, pcor_set_dict, rej_dict,
-                                                   track_rejections)
-
-        if !isempty(TPC_unchecked)
-
-            if debug > 0
-                println("Time limit exceeded, reporting incomplete results")
-            end
-
-            state.phase = "E"
-            state.state_results = PC_dict
-            state.unchecked_vars = TPC_unchecked
-            state.state_rejections = rej_dict
-
-            return state
-        end
-                        
         # if redundant tests were skipped in elimination phase, check
         # if lower weights were previously found during interleaving phase
         if no_red_tests || fast_elim
@@ -561,16 +573,11 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
             tic()
         end
 
-        if nonsparse_cond && !endswith("parallel", "il")
+        if nonsparse_cond && !endswith(parallel, "il")
             data = full(data)
         end
                         
-        if parallel == "single" || nprocs() == 1
-            
-            if nonsparse_cond
-                data = full(data)
-            end
-                            
+        if parallel == "single" || nprocs() == 1                            
             nbr_results = [si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, cor_mat=cor_mat,
                            pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
         else
