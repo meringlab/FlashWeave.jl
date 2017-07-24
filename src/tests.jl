@@ -277,7 +277,7 @@ end
 
 
 function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5,
+    test_name::String, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, n_obs_min::Integer=0,
         levels::AbstractVector{ElType}=ElType[], cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), debug::Int=0, Z_wanted::AbstractVector{Int}=Int[])
 
@@ -300,7 +300,6 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
         nk = zeros(ElType, max_levels_z)
         cum_levels = zeros(ElType, max_k + 1)
         z_map_arr = zeros(ElType, max_levels_z)
-        num_lowpwr_tests = 0
     elseif nz
         if n_obs_min > size(data, 1)
             return TestResult(0.0, 1.0, 0.0, false), Int[]

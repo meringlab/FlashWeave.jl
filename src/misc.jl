@@ -216,6 +216,35 @@ function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMa
     levels_z
 end
 
+function dict_to_graph(graph_dict)
+    G = Graph(length(graph_dict))
+    for var_A in keys(graph_dict)
+        for var_B in keys(graph_dict[var_A])
+            add_edge!(G, var_A, var_B)
+        end
+    end
+    G           
+end
+
+
+function edit_distance(graph_dict1::Dict, graph_dict2::Dict)
+    G1 = dict_to_graph(graph_dict1)
+    G2 = dict_to_graph(graph_dict2)
+    edit_distance(G1, G2)
+end
+
+function jaccard_similarity(graph_dict1::Dict, graph_dict2::Dict)
+    G1 = dict_to_graph(graph_dict1)
+    G2 = dict_to_graph(graph_dict2)
+    jaccard_similarity(G1, G2)
+end
+
+function jaccard_similarity(G1::LightGraphs.Graph, G2::LightGraphs.Graph)
+    edge_set1 = Set(map(Tuple, edges(G1)))
+    edge_set2 = Set(map(Tuple, edges(G2)))
+    length(intersect(edge_set1, edge_set2)) / length(union(edge_set1, edge_set2))        
+end
+
 
 function print_network_stats(graph::LightGraphs.Graph)
     n_nodes = nv(graph)

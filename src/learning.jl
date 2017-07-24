@@ -14,7 +14,7 @@ using FlashWeave.StackChannels
 
 
 function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5,
+    test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0,
         levels::AbstractVector{ElType}=ElType[],
     prev_TPC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0,
     whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
@@ -60,7 +60,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
 
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps,
                                    n_obs_min=n_obs_min,
-                                   pwr=pwr, levels=levels, cor_mat=cor_mat,
+                                   levels=levels, cor_mat=cor_mat,
                                    pcor_set_dict=pcor_set_dict, debug=debug)
 
         if issig(test_result, alpha)
@@ -90,7 +90,7 @@ end
 
 
 function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String,
-    max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5, fast_elim::Bool=true,
+    max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, fast_elim::Bool=true,
         no_red_tests::Bool=false, levels::AbstractVector{ElType}=ElType[],
     prev_PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::AbstractVector{Int}=[],
     time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0, whitelist::Set{Int}=Set{Int}(),
@@ -188,7 +188,7 @@ end
 
 
 function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
-    pwr::Float64=0.5, fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
+    fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
         blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{ElType}=ElType[],
     univar_step::Bool=true, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
@@ -305,7 +305,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
             # interleaving phase
             TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k,
-                                                                alpha, hps, n_obs_min, pwr, levels, prev_TPC_dict, time_limit,
+                                                                alpha, hps, n_obs_min, levels, prev_TPC_dict, time_limit,
                                                                 start_time, debug, whitelist, blacklist, cor_mat,
                                                                 pcor_set_dict, rej_dict,
                                                                 track_rejections)
@@ -364,7 +364,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         end
         
         PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
-                                                   hps, n_obs_min, pwr, fast_elim, no_red_tests, levels,
+                                                   hps, n_obs_min, fast_elim, no_red_tests, levels,
                                                    prev_PC_dict, PC_unchecked, time_limit, start_time,
                                                    debug, whitelist, blacklist, cor_mat, pcor_set_dict, rej_dict,
                                                    track_rejections)
@@ -387,7 +387,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         # if lower weights were previously found during interleaving phase
         if no_red_tests || fast_elim
             for nbr in keys(PC_dict)
-                if haskey(TPC_dict, nbr) && TPC_dict[nbr][2] > PC_dict[nbr][2] || isnan(PC_dict[nbr][2])
+                if haskey(TPC_dict, nbr) && (TPC_dict[nbr][2] > PC_dict[nbr][2] || isnan(PC_dict[nbr][2]))
                     PC_dict[nbr] = TPC_dict[nbr]
                 end
             end
@@ -413,11 +413,11 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 end
 
 
-function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01, hps::Integer=5, n_obs_min::Integer=0, pwr::AbstractFloat=0.5,
+function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01, hps::Integer=5, n_obs_min::Integer=0, 
     convergence_threshold::AbstractFloat=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
         fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
-        weight_type::String="cond_logpval", edge_rule::String="OR", verbose::Bool=true, update_interval::AbstractFloat=30.0,
-        edge_merge_fun=maxweight,
+        weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=false, 
+        verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true,
     track_rejections::Bool=false, fully_connect_clusters::Bool=false)
@@ -427,7 +427,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     fast_elim: currently always on
     """
 
-    kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min, :pwr => pwr,
+    kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min,
                   :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
                   :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
                   :time_limit => time_limit, :track_rejections => track_rejections)
@@ -557,7 +557,16 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
             tic()
         end
 
+        if nonsparse_cond && !endswith("parallel", "il")
+            data = full(data)
+        end
+                        
         if parallel == "single" || nprocs() == 1
+            
+            if nonsparse_cond
+                data = full(data)
+            end
+                            
             nbr_results = [si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, cor_mat=cor_mat,
                            pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
         else
@@ -575,8 +584,8 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
             # interleaved parallelism
             elseif endswith(parallel, "il")
                 il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs,
-                                               convergence_threshold, cor_mat, parallel=parallel, edge_rule=edge_rule,
-                                               verbose=verbose, workers_local=workers_local)
+                                              convergence_threshold, cor_mat, parallel=parallel, edge_rule=edge_rule,
+                                              nonsparse_cond=nonsparse_cond, verbose=verbose, workers_local=workers_local)
                 nbr_results = [il_dict[target_var] for target_var in target_vars]
             else
                 error("'$parallel' not a valid parallel mode")
@@ -966,8 +975,12 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
 end
 
 
-function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels::AbstractVector{ElType}, cor_mat::Matrix{ElType}, edge_rule::String, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel,
+function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels::AbstractVector{ElType}, cor_mat::Matrix{ElType}, edge_rule::String, nonsparse_cond::Bool, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel,
                             GLL_fun, GLL_args::Dict{Symbol,Any})
+    if nonsparse_cond
+        data = full(data)
+    end
+     
     while true
         try
             target_var, univar_nbrs, prev_state, skip_nbrs = take!(shared_job_q)
@@ -1000,7 +1013,7 @@ end
 
 function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType}, all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}},
      levels::AbstractVector{ElType}, update_interval::Real, GLL_args::Dict{Symbol,Any},
-        convergence_threshold::AbstractFloat, cor_mat::Matrix{ElType}; conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi", edge_rule::String="OR",
+        convergence_threshold::AbstractFloat, cor_mat::Matrix{ElType}; conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi", edge_rule::String="OR", nonsparse_cond::Bool=false,
         verbose::Bool=true, workers_local::Bool=true)
     jobs_total = length(target_vars)
 
@@ -1039,7 +1052,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
         println("Starting workers and sending data..")
         tic()
     end
-    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
+    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, nonsparse_cond, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
     
     if verbose
         println("Done. Starting inference..")
