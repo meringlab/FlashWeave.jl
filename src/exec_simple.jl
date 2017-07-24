@@ -20,6 +20,8 @@ function main(input_args::Vector{String})
     univar_mode = input_args[7]
     FDR = input_args[8]
     make_sparse = input_args[9]
+    normalize = input_args[10]
+    write_table = input_args[11]
 
     #println("Starting processes and importing modules")
     #tic()
@@ -52,10 +54,17 @@ function main(input_args::Vector{String})
     end
     toc()
     
-    println("Normalizing data")
-    tic()
-    skip_cols = Set([x for x in 1:length(header) if startswith(header[x], "ENV")])
-    data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
+    if normalize == "true"
+        println("Normalizing data")
+        tic()
+
+        skip_cols = Set([x for x in 1:length(header) if startswith(header[x], "ENV")])
+
+        data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
+        toc()
+    else
+        data_norm = data
+    end
     #data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=true, env_cols=skip)
     #if test_name == "fz_nz"
     #    zero_mask = data_norm .== minimum(data_norm)
@@ -63,7 +72,7 @@ function main(input_args::Vector{String})
     #end
 
     #println("Finished after $(toc())s\n")
-    toc()
+    #toc()
     #println("Clustering data")
     #tic()
     #repres, clust_dict = Cauocc.cluster_data(data_norm, test_name, parallel=split(parallel_mode, "_")[1])
@@ -88,13 +97,14 @@ function main(input_args::Vector{String})
     toc()
     #println("Adding cluster edges")
 
-
-    println("Converting output and writing to file")
-    tic()
-    adj_matrix = FlashWeave.Misc.dict_to_adjmat(graph_dict, header)
-    writedlm(output_path, adj_matrix, '\t')
-    #println("Finished after $(toc())s\n")
-    toc()
+    if write_table == "true"
+        println("Converting output and writing to file")
+        tic()
+        adj_matrix = FlashWeave.Misc.dict_to_adjmat(graph_dict, header)
+        writedlm(output_path, adj_matrix, '\t')
+        #println("Finished after $(toc())s\n")
+        toc()
+    end
 end
 
 main(ARGS)

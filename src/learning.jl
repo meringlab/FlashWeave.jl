@@ -1215,6 +1215,7 @@ function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String
                                        preclust_sim::AbstractFloat=0.0, feed_forward::Bool=true,
                                        join_rule::String="OR", verbose::Bool=true, kwargs...)
 
+    start_time = time()
     if mode == "cont"
         test_name = "fz"
     elseif mode == "disc" || mode == "bin"
@@ -1255,7 +1256,15 @@ function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String
         println("\t\tworkers - $(nprocs())")
     end
 
+    params_dict = Dict(:test_name=>test_name, :max_k=>max_k, :alpha=>alpha, :preclust_sim=>preclust_sim,
+                     :parallel=>parallel_mode, :edge_rule=>join_rule)
+    merge!(params_dict, kwargs)
     lgl_results = LGL(data_norm, test_name=test_name, max_k=max_k, alpha=alpha, preclust_sim=preclust_sim, parallel=parallel_mode, edge_rule=join_rule, verbose=verbose; kwargs...)
+                                                
+    time_taken = time() - start_time()
+    stats_dict = Dict(:time_taken=>time_taken, :converged=>!isempty(lgl_results.unfinished_states))
+    meta_dict = Dict("params"=>params_dict, "stats"=>stats_dict)
+    lgl_results, meta_dict
 end
 
 end

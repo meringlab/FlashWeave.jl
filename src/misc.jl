@@ -4,6 +4,7 @@ using LightGraphs
 using StatsBase
 using Combinatorics
 using DataStructures
+using JLD2
 
 export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, combinations_with_whitelist, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
 
@@ -357,6 +358,62 @@ function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::Abstrac
     adj_mat = hcat(reshape(["", header...], size(adj_mat, 2) + 1, 1), adj_mat)
     adj_mat
 end
+#type LGLResult
+#    graph::Dict{Int,Dict{Int,Float64}}
+#    rejections::Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}
+#    unfinished_states::Dict{Int, HitonState}
+#end
+function translate_graph_dict(graph_dict::Dict, header::Vector{})
+    new_graph_dict = similar(graph_dict)
+    for (key, nbr_dict) in graph_dict
+        new_nbr_dict = similar(nbr_dict)
+        for nbr in keys(nbr_dict)
+            new_nbr_dict[header[nbr]] = nbr_dict[nbr]
+        end
+        new_graph_dict[header[key]] = new_nbr_dict
+    end
+    new_graph_dict
+end
+
+function translate_results!(results::LGLResult, header::Vector{String})
+    results.graph = translate_graph_dict(results.graph, header)
+    results.rejections = translate_graph_dict(results.rejections, header)
+    results.unfinished_states = String[header[x] for x in results.unfinished_states]
+end
+
+
+function save_network(results::LGLResult, out_path::String; meta_dict::Dict=Dict(), fmt::String="auto",
+        header::Vector{String}=String[])
+    if fmt == "auto"
+        fmt = split(out_path, ".")[end]
+    end
+    
+    if fmt == "jld"
+        save(out_path, "results", results, "meta_data", meta_dict)
+    else
+        base_path = splitext(out_path)[1]
+        meta_path = join([base_path, "_meta_data.txt"])
+        
+        if !isempty(meta_dict)
+            open(meta_path, "w") do meta_f
+                for key in keys(meta_dict)
+                    write(meta_f, string(key), " : ", string(meta_dict[key]))
+                end
+            end
+        end
+        
+        if fmt == "adj"
+            if isempty(header)
+                error("fmt \"adj\" can only be used if header is provided")
+            end
+            adj_mat = dict_to_adjmat(results.graph, header)
+            writedlm(out_path, adj_mat, '\t')
+        else
+            error("fmt \"$fmt\" is not a valid output format.")
+        end
+    end
+end
+
 
 
 function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
