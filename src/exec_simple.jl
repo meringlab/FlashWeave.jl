@@ -5,6 +5,7 @@ tic()
 #end
 
 using FlashWeave
+using JLD
 toc()
 
 function main(input_args::Vector{String})
@@ -17,14 +18,8 @@ function main(input_args::Vector{String})
     parallel_mode = input_args[5]
     rec_mode = input_args[6]
     univar_mode = input_args[7]
-    
-    if length(input_args) > 8
-        FDR = input_args[8]
-        #n_jobs = parse(Int64, input_args[9])
-    else
-        FDR = "true"
-        #n_jobs = parse(Int64, input_args[8])
-    end
+    FDR = input_args[8]
+    make_sparse = input_args[9]
 
     #println("Starting processes and importing modules")
     #tic()
@@ -40,21 +35,27 @@ function main(input_args::Vector{String})
 
     println("Reading data")
     tic()
-    data_full = readdlm(input_path, '\t')
-    header = convert(Array{String,1}, data_full[1, 2:end])
-    #data = convert(Matrix{Int}, round.(data_full[2:end, 2:end], 0))
-    data = convert(Matrix{Float64}, data_full[2:end, 2:end])
-    #println(typeof(data))
-    #println(test_name)
-    #println(typeof(data) <: AbstractMatrix{Real})
-    #println(data)
-    #println("Finished after $(toc())s\n")
+    if endswith(input_path, ".jld")
+        data_dict = load(input_path)
+        data = data_dict["data"]
+        header = data_dict["header"]
+    else
+        data_full = readdlm(input_path, '\t')
+        header = convert(Array{String,1}, data_full[1, 2:end])
+        #data = convert(Matrix{Int}, round.(data_full[2:end, 2:end], 0))
+        data = convert(Matrix{Float64}, data_full[2:end, 2:end])
+        #println(typeof(data))
+        #println(test_name)
+        #println(typeof(data) <: AbstractMatrix{Real})
+        #println(data)
+        #println("Finished after $(toc())s\n")
+    end
     toc()
     
     println("Normalizing data")
     tic()
     skip_cols = Set([x for x in 1:length(header) if startswith(header[x], "ENV")])
-    data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header)
+    data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
     #data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=true, env_cols=skip)
     #if test_name == "fz_nz"
     #    zero_mask = data_norm .== minimum(data_norm)

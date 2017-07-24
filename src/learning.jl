@@ -344,14 +344,14 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
 
         # elimination phase
-        if prev_state.phase == "E"
+        if prev_state.phase == "E" || prev_state.phase == "C"
             prev_PC_dict = prev_state.state_results
             
             if no_red_tests || fast_elim
                 TPC_dict = prev_state.inter_results
             end
             
-            PC_unchecked = prev_state.unchecked_vars
+            PC_unchecked = prev_state.phase == "E" ? prev_state.unchecked_vars : Int[]
             PC_candidates = convert(Vector{Int}, [keys(prev_PC_dict)..., PC_unchecked...])
 
             if track_rejections
@@ -401,12 +401,16 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
     end
 
 
-    #nbr_dict = make_weights(PC_dict, univar_nbrs, weight_type)
-    #
-    #nbr_dict
-    state.phase = "F"
+    # if previous state had converged, keep this information
+    if prev_state.phase == "C"
+        state.phase = "C"
+        state.unchecked_vars = prev_state.unchecked_vars
+    else
+        state.phase = "F"
+        state.unchecked_vars = Int[]
+    end
+    
     state.state_results = PC_dict
-    state.unchecked_vars = Int[]
     state.state_rejections = rej_dict
 
     state
@@ -595,8 +599,8 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
         nbr_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
 
-        if time_limit != 0.0
-            unfinished_state_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results) if nbr_state.phase != "F"])
+        if time_limit != 0.0 || convergence_threshold != 0.0
+            unfinished_state_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results) if !isempty(nbr_state.unchecked_vars)])
         end
 
         if track_rejections
@@ -1086,7 +1090,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
             # node has not yet finished computing
             if curr_state.phase != "F"
                 if converged
-                    curr_state.unchecked_vars = Int[]
+                    curr_state.phase = "C"
                 end
 
                 skip_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, target_var)) : Set(neighbors(graph, target_var))

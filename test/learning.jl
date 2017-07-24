@@ -1,6 +1,6 @@
 using FlashWeave
 using DataFrames
-using JLD
+using JLD2
 using Base.Test
 
 #data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
