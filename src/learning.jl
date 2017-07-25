@@ -607,7 +607,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         nbr_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
 
         if time_limit != 0.0 || convergence_threshold != 0.0
-            unfinished_state_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results) if !isempty(nbr_state.unchecked_vars)])
+            unfinished_state_dict = Dict([(target_var, nbr_state) for (target_var, nbr_state) in zip(target_vars, nbr_results) if !isempty(nbr_state.unchecked_vars)])
         end
 
         if track_rejections
@@ -1095,7 +1095,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
             curr_state = nbr_result
 
             # node has not yet finished computing
-            if curr_state.phase != "F"
+            if curr_state.phase != "F" && curr_state.phase != "C"
                 if converged
                     curr_state.phase = "C"
                 end
