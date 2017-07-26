@@ -5,7 +5,7 @@ tic()
 #end
 
 using FlashWeave
-using JLD
+using JLD2
 toc()
 
 function main(input_args::Vector{String})
@@ -58,7 +58,7 @@ function main(input_args::Vector{String})
         println("Normalizing data")
         tic()
 
-        skip_cols = Set([x for x in 1:length(header) if startswith(header[x], "ENV")])
+        skip_cols = Int[x for x in 1:length(header) if startswith(header[x], "ENV")]
 
         data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
         toc()

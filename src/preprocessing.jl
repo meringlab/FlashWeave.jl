@@ -275,15 +275,21 @@ function rownorm_data(data::AbstractMatrix)
 end
 
 function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
-    disc_method::String="median", verbose::Bool=true, env_cols::Set{Int}=Set{Int}(), make_sparse::Bool=issparse(data), factor_cols::Set{Int}=Set{Int}(),
+    disc_method::String="median", verbose::Bool=true, env_cols::Vector{Int}=Int[], make_sparse::Bool=issparse(data), factor_cols::Vector{Int}=Int[],
     prec::Integer=32, filter_data=true, header::Vector{String}=String[])
     if verbose
         println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     end
 
     if !isempty(env_cols)
-        env_data = data[:, sort(collect(env_cols))]
-        data = data[:, map(x -> !(x in env_cols), 1:size(data, 2))]
+        env_data = data[:, env_cols]
+        noenv_mask = map(x -> !(x in env_cols), 1:size(data, 2))
+        data = data[:, noenv_mask]
+        
+        if !isempty(header)
+            env_header = header[env_cols]
+            header = header[noenv_mask]
+        end
     end
 
     if filter_data
@@ -366,6 +372,10 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
             discretize_env!(env_data, norm, n_bins)
         end
         data = hcat(data, convert(typeof(data), env_data))
+        
+        if !isempty(header)
+            append!(header, env_header)
+        end
     end
 
     target_base_type_str = iscontinuousnorm(norm) ? "Float" : "Int"
@@ -391,7 +401,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
 end
 
 
-function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String; verbose::Bool=true, make_sparse::Bool=issparse(data), env_cols::Set{Int}=Set{Int}(), factor_cols::Set{Int}=Set{Int}(), prec::Integer=32, header::Vector{String}=String[]) where ElType <: Real
+function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String; verbose::Bool=true, make_sparse::Bool=issparse(data), env_cols::Vector{Int}=Int[], factor_cols::Vector{Int}=Int[], prec::Integer=32, header::Vector{String}=String[]) where ElType <: Real
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
     data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, env_cols=env_cols, prec=prec, header=header)
     data

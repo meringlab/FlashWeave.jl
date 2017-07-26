@@ -32,18 +32,18 @@ type TestResult
     suff_power :: Bool
 end
 
-type HitonState
+type HitonState{T}
     phase :: String
-    state_results :: OrderedDict{Int,Tuple{Float64,Float64}}
-    inter_results :: OrderedDict{Int,Tuple{Float64,Float64}}
-    unchecked_vars :: Vector{Int}
-    state_rejections :: Dict{Int,Tuple{Tuple,TestResult}}
+    state_results :: OrderedDict{T,Tuple{Float64,Float64}}
+    inter_results :: OrderedDict{T,Tuple{Float64,Float64}}
+    unchecked_vars :: Vector{T}
+    state_rejections :: Dict{T,Tuple{Tuple,TestResult}}
 end
 
-type LGLResult
-    graph::Dict{Int,Dict{Int,Float64}}
-    rejections::Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}
-    unfinished_states::Dict{Int, HitonState}
+type LGLResult{T}
+    graph::Dict{T,Dict{T,Float64}}
+    rejections::Dict{T, Dict{T, Tuple{Tuple,TestResult}}}
+    unfinished_states::Dict{T, HitonState}
 end
 
 type IndexPair
@@ -227,7 +227,7 @@ function dict_to_graph(graph_dict)
     G           
 end
 
-
+import LightGraphs:edit_distance
 function edit_distance(graph_dict1::Dict, graph_dict2::Dict)
     G1 = dict_to_graph(graph_dict1)
     G2 = dict_to_graph(graph_dict2)
@@ -358,27 +358,29 @@ function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::Abstrac
     adj_mat = hcat(reshape(["", header...], size(adj_mat, 2) + 1, 1), adj_mat)
     adj_mat
 end
-#type LGLResult
-#    graph::Dict{Int,Dict{Int,Float64}}
-#    rejections::Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}
-#    unfinished_states::Dict{Int, HitonState}
-#end
-function translate_graph_dict(graph_dict::Dict, header::Vector{})
-    new_graph_dict = similar(graph_dict)
+
+
+function translate_hiton_state(state::HitonState, header::Vector{String})
+    trans_state_results = Dict{String,Float64}([(header[key], val) for (key, val) in state.state_results])
+    trans_inter_results = Dict{String,Float64}([(header[key], val) for (key, val) in state.inter_results])
+    trans_unchecked_vars = map(String, state.unchecked_vars)
+    trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(header[key], (Tuple(map(String, Zs)), test_res)) for (key, (Zs, test_res)) in state.state_results])
+    HitonState{String}(trans_state_results, trans_inter_results, trans_unchecked_vars, trans_state_rejections)
+end
+
+function translate_graph_dict(graph_dict::Dict{Int,Dict{Int,T}}, header::Vector{String}) where T <:Any
+    new_graph_dict = Dict{String,Dict{String,Float64}}()
     for (key, nbr_dict) in graph_dict
-        new_nbr_dict = similar(nbr_dict)
-        for nbr in keys(nbr_dict)
-            new_nbr_dict[header[nbr]] = nbr_dict[nbr]
-        end
-        new_graph_dict[header[key]] = new_nbr_dict
+        new_graph_dict[header[key]] = Dict{String,Float64}([(header[key], val) for (key, val) in nbr_dict])
     end
     new_graph_dict
 end
 
-function translate_results!(results::LGLResult, header::Vector{String})
-    results.graph = translate_graph_dict(results.graph, header)
-    results.rejections = translate_graph_dict(results.rejections, header)
-    results.unfinished_states = String[header[x] for x in results.unfinished_states]
+function translate_results(results::LGLResult, header::Vector{String})
+    trans_graph = translate_graph_dict(results.graph, header)
+    trans_rejections = translate_graph_dict(results.rejections, header)
+    trans_unfinished_states = Dict{String,HitonState{String}}([(header[key], translate_hiton_state(val)) for (key, val) in results.unfinished_states])
+    LGLResult{String}(trans_graph, trans_rejections, trans_unfinished_states)
 end
 
 

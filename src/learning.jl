@@ -193,13 +193,13 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{ElType}=ElType[],
     univar_step::Bool=true, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(),
-    prev_state::HitonState=HitonState("S", OrderedDict(), OrderedDict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
+    prev_state::HitonState{Int}=HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
 
     if debug > 0
         println("Finding neighbors for $T")
     end
 
-    state = HitonState("S", OrderedDict(), OrderedDict(), [], Dict())
+    state = HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict())
     rej_dict = Dict{Int, Tuple{Tuple,TestResult}}()
 
     if isdiscrete(test_name)
@@ -417,22 +417,24 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
     if prev_state.phase == "C"
         state.phase = "C"
         state.unchecked_vars = prev_state.unchecked_vars
+        state.state_rejections = prev_state.state_rejections
     else
         state.phase = "F"
         state.unchecked_vars = Int[]
+        state.state_rejections = rej_dict
     end
     
     state.state_results = PC_dict
-    state.state_rejections = rej_dict
 
     state
 end
 
 
-function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01, hps::Integer=5, n_obs_min::Integer=0, 
+function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
+                        hps::Integer=5, n_obs_min::Integer=20, 
     convergence_threshold::AbstractFloat=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
         fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
-        weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=false, 
+        weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=true, 
         verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true,
@@ -475,6 +477,13 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
               variables, caution advised")
     end
 
+    if test_name != "fz_nz" && n_obs_min != 0
+        if n_obs_min != 20
+            warn("n_obs_min can only be used with test 'fz_nz', setting it to 0.")
+        end
+        n_obs_min = 0
+    end
+                    
     if isdiscrete(test_name)
         if verbose
             println("Computing levels..")
@@ -495,7 +504,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
     #if track_rejections
     rej_dict = Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
-    unfinished_state_dict = Dict{Int, HitonState}()
+    unfinished_state_dict = Dict{Int, HitonState{Int}}()
     #end
 
     if global_univar
@@ -660,7 +669,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     end
 
     #return_dict = convert(Dict{Int,Dict{Int, Float64}}, graph_dict)
-    result_obj = LGLResult(graph_dict, rej_dict, unfinished_state_dict)
+    result_obj = LGLResult{Int}(graph_dict, rej_dict, unfinished_state_dict)
 
     if verbose
         println("Complete.")
@@ -992,6 +1001,8 @@ function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels
         data = full(data)
     end
      
+    const converged = false
+                                                
     while true
         try
             target_var, univar_nbrs, prev_state, skip_nbrs = take!(shared_job_q)
@@ -1001,6 +1012,12 @@ function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels
                 return
             end
 
+            if prev_state.phase == "C"
+                converged = true
+            elseif converged
+                prev_state.phase = "C"
+            end
+                                                        
             if edge_rule == "AND"
                 nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels,
                                         prev_state=prev_state, blacklist=skip_nbrs, cor_mat=cor_mat,
@@ -1048,7 +1065,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     queued_jobs = 0
     waiting_vars = Stack(Int)
     for (i, target_var) in enumerate(reverse(target_vars))
-        job = (target_var, all_univar_nbrs[target_var], HitonState("S", OrderedDict(), OrderedDict(), [], Dict()), Set{Int}())
+        job = (target_var, all_univar_nbrs[target_var], HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), Set{Int}())
 
         if i < jobs_total - n_workers
             push!(waiting_vars, target_var)
@@ -1072,7 +1089,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
                                                 
     remaining_jobs = jobs_total
 
-    graph_dict = Dict{Int, HitonState}()
+    graph_dict = Dict{Int, HitonState{Int}}()
 
     # this graph is just used for efficiently keeping track of graph stats during the run
     graph = Graph(length(target_vars))
@@ -1091,7 +1108,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     while remaining_jobs > 0
         target_var, nbr_result = take!(shared_result_q)
         queued_jobs -= 1
-        if isa(nbr_result, HitonState)
+        if isa(nbr_result, HitonState{Int})
             curr_state = nbr_result
 
             # node has not yet finished computing
@@ -1125,7 +1142,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
 
                 # kill workers if not needed anymore
                 if remaining_jobs < n_workers
-                    kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState("S", OrderedDict(), OrderedDict(), [], Dict()), Set{Int}())
+                    kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), Set{Int}())
                     put!(shared_job_q, kill_signal)
                     kill_signals_sent += 1
                 end
@@ -1144,7 +1161,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
                 next_var = pop!(waiting_vars)
                 var_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, next_var)) : Set(neighbors(graph, next_var))
 
-                job = (next_var, all_univar_nbrs[next_var], HitonState("S", OrderedDict(), OrderedDict(), [], Dict()), var_nbrs)
+                job = (next_var, all_univar_nbrs[next_var], HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), var_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
 
