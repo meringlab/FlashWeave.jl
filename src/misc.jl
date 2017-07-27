@@ -360,7 +360,7 @@ function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::Abstrac
 end
 
 
-function translate_hiton_state(state::HitonState, header::Vector{String})
+function translate_hiton_state(state::HitonState{Int}, header::Vector{String})
     trans_state_results = Dict{String,Float64}([(header[key], val) for (key, val) in state.state_results])
     trans_inter_results = Dict{String,Float64}([(header[key], val) for (key, val) in state.inter_results])
     trans_unchecked_vars = map(String, state.unchecked_vars)
@@ -379,7 +379,13 @@ end
 function translate_results(results::LGLResult, header::Vector{String})
     trans_graph = translate_graph_dict(results.graph, header)
     trans_rejections = translate_graph_dict(results.rejections, header)
-    trans_unfinished_states = Dict{String,HitonState{String}}([(header[key], translate_hiton_state(val)) for (key, val) in results.unfinished_states])
+    for (key, nbr_dict) in trans_rejections
+        for (nbr, (Zs, test_res)) in nbr_dict
+            trans_rejections[key][nbr] = (Tuple(map(x -> header[x], Zs)), test_res)
+        end
+    end
+    
+    trans_unfinished_states = Dict{String,HitonState{String}}([(header[key], translate_hiton_state(val, header)) for (key, val) in results.unfinished_states])
     LGLResult{String}(trans_graph, trans_rejections, trans_unfinished_states)
 end
 
