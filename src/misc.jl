@@ -6,7 +6,7 @@ using Combinatorics
 using DataStructures
 using JLD2
 
-export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, combinations_with_whitelist, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!
+export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, combinations_with_whitelist, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!, make_chunks, work_chunker
 
 const inf_weight = 708.3964185322641
 
@@ -364,14 +364,14 @@ function translate_hiton_state(state::HitonState, header::Vector{String})
     trans_state_results = Dict{String,Float64}([(header[key], val) for (key, val) in state.state_results])
     trans_inter_results = Dict{String,Float64}([(header[key], val) for (key, val) in state.inter_results])
     trans_unchecked_vars = map(String, state.unchecked_vars)
-    trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(header[key], (Tuple(map(String, Zs)), test_res)) for (key, (Zs, test_res)) in state.state_results])
+    trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(header[key], (Tuple(map(x -> header[x], Zs)), test_res)) for (key, (Zs, test_res)) in state.state_results])
     HitonState{String}(trans_state_results, trans_inter_results, trans_unchecked_vars, trans_state_rejections)
 end
 
 function translate_graph_dict(graph_dict::Dict{Int,Dict{Int,T}}, header::Vector{String}) where T <:Any
-    new_graph_dict = Dict{String,Dict{String,Float64}}()
+    new_graph_dict = Dict{String,Dict{String,T}}()
     for (key, nbr_dict) in graph_dict
-        new_graph_dict[header[key]] = Dict{String,Float64}([(header[key], val) for (key, val) in nbr_dict])
+        new_graph_dict[header[key]] = Dict{String,T}([(header[key], val) for (key, val) in nbr_dict])
     end
     new_graph_dict
 end
@@ -508,6 +508,10 @@ function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMat
         end
     end
 end
+
+make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))
+work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))
+
 
 
 end

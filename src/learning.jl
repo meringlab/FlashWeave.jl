@@ -13,6 +13,7 @@ using FlashWeave.Statfuns
 using FlashWeave.StackChannels
 
 
+
 function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
     test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0,
         levels::AbstractVector{ElType}=ElType[],
@@ -187,11 +188,12 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
 end
 
 
+
 function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
     fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
         blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{ElType}=ElType[],
-    univar_step::Bool=true, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
+    univar_step::Bool=isempty(univar_nbrs), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
     pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(),
     prev_state::HitonState{Int}=HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
 
@@ -234,6 +236,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
     if debug > 0
         println("UNIVARIATE")
     end
+    
 
     if univar_step
         if isdiscrete(test_name)
@@ -242,7 +245,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             uni_cor_mat = is_zero_adjusted(test_name) ? zeros(ElType, 0, 0) : cor_mat
             univar_test_results = test(T, test_variables, data, test_name, n_obs_min, uni_cor_mat)
         end
-    end
+    end    
 
 
     # if local FDR was specified, apply it here
@@ -254,8 +257,13 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             pvals = benjamini_hochberg(pvals)
         end
 
-        help_zip = zip(test_variables, map(x -> x.stat, univar_test_results), pvals)
-        univar_nbrs = Dict([(nbr, (stat, pval)) for (nbr, stat, pval) in help_zip if pval < alpha])
+        #univar_nbrs = Dict{Int,Tuple{Float64,Float64}}()
+        empty!(univar_nbrs)
+        for (nbr, stat, pval) in zip(test_variables, map(x -> x.stat, univar_test_results), pvals)
+            if pval < alpha
+                univar_nbrs[nbr] = (stat, pval)
+            end
+        end        
     end
 
     if debug > 0
@@ -437,7 +445,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=true, 
         verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
-    recursive_pcor::Bool=true,
+    recursive_pcor::Bool=true, correct_reliable_only::Bool=true,
     track_rejections::Bool=false, fully_connect_clusters::Bool=false)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
@@ -516,7 +524,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
         all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                               levels=levels, parallel=parallel, workers_local=workers_local,
-                                              cor_mat=cor_mat)
+                                              cor_mat=cor_mat, correct_reliable_only=correct_reliable_only)
         var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
         target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
 
@@ -616,7 +624,13 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         nbr_dict = Dict([(target_var, nbr_state.state_results) for (target_var, nbr_state) in zip(target_vars, nbr_results)])
 
         if time_limit != 0.0 || convergence_threshold != 0.0
-            unfinished_state_dict = Dict([(target_var, nbr_state) for (target_var, nbr_state) in zip(target_vars, nbr_results) if !isempty(nbr_state.unchecked_vars)])
+            
+            unfinished_state_dict = Dict{Int,HitonState{Int}}()
+            for(target_var, nbr_state) in zip(target_vars, nbr_results)
+                if !isempty(nbr_state.unchecked_vars)
+                    unfinished_state_dict[target_var] = nbr_state
+                end
+            end
         end
 
         if track_rejections
@@ -696,17 +710,13 @@ function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}
         end
     end
     nbr_dict
-end
+end                
 
-
-make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))
-work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))
 
 function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
                             stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
                             test_name::String, hps::Integer, n_obs_min::Integer, levels::AbstractVector{ElType},
-                            nz::Bool,
-                            cor_mat::Matrix{ElType})
+                            nz::Bool, cor_mat::Matrix{ElType}, correct_reliable_only::Bool=false)
     n_vars = size(data, 2)
 
     if needs_nz_view(X, data, test_name, levels, true)
@@ -725,16 +735,23 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
 
     for (Y, test_res) in zip(Ys, test_results)
         pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
-        stats[pair_index] = test_res.stat
-        pvals[pair_index] = test_res.pval
+                                                    
+        if correct_reliable_only && !test_res.suff_power
+            curr_stat = curr_pval = NaN64
+        else
+            curr_stat = test_res.stat
+            curr_pval = test_res.pval
+        end
+            
+        stats[pair_index] = curr_stat
+        pvals[pair_index] = curr_pval
     end
 end
 
 
 function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
                             test_name::String, hps::Integer, n_obs_min::Integer, levels::AbstractVector{ElType},
-                            nz::Bool,
-                            cor_mat::Matrix{ElType})
+                            nz::Bool, cor_mat::Matrix{ElType})
     n_vars = size(data, 2)
 
     if needs_nz_view(X, data, test_name, levels, true)
@@ -755,7 +772,7 @@ end
 
 function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", alpha::AbstractFloat=0.01, hps::Integer=5, n_obs_min::Integer=0, FDR::Bool=true,
         levels::AbstractVector{ElType}=ElType[], parallel::String="single", workers_local::Bool=true,
-        cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), chunk_size::Integer=500)
+        cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), chunk_size::Integer=500, correct_reliable_only::Bool=true)
 
     if startswith(test_name, "mi") && isempty(levels)
         levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
@@ -774,7 +791,8 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
         stats = zeros(Float64, n_pairs)
 
         for (X, Ys_slice) in work_items
-            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_name, hps, n_obs_min, levels, nz, cor_mat)
+            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_name, hps, n_obs_min, levels, nz, cor_mat,
+                correct_reliable_only)
         end
 
     else
@@ -786,7 +804,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
                 shared_stats = SharedArray{Float64}(n_pairs)
                 @sync @parallel for work_item in work_items
                     pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_name, hps, n_obs_min,
-                                                                    levels, nz, cor_mat)
+                                                                    levels, nz, cor_mat, correct_reliable_only)
                 end
                 stats = shared_stats.s
                 pvals = shared_pvals.s
@@ -812,31 +830,48 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
                         i += 1
                         test_res = all_test_results[i]
                         pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
-                        stats[pair_index] = test_res.stat
-                        pvals[pair_index] = test_res.pval
+                        
+                        if correct_reliable_only && !test_res.suff_power
+                            curr_stat = curr_pval = NaN64
+                        else
+                            curr_stat = test_res.stat
+                            curr_pval = test_res.pval
+                        end
+            
+                        stats[pair_index] = curr_stat
+                        pvals[pair_index] = curr_pval
                     end
-                end 
-
-                #for ((X, Ys_slice), test_res_chunk) in zip(work_items, all_test_results)
-                #    for (Y, test_res) in zip(Ys_slice, test_res_chunk)
-                #        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
-                #        stats[pair_index] = test_res.stat
-                #        pvals[pair_index] = test_res.pval
-                #    end
-                #end
+                end
             end
 
         elseif startswith(parallel, "threads")
             pvals = ones(Float64, n_pairs)
             stats = zeros(Float64, n_pairs)
             Threads.@threads for work_item in work_items
-                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_name, hps, n_obs_min, levels, nz, cor_mat)
+                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_name, hps, n_obs_min, levels, nz,
+                    cor_mat, correct_reliable_only)
             end
         end
     end
 
     if FDR
-        pvals = benjamini_hochberg(pvals)
+        if correct_reliable_only && any(isnan(x) for x in pvals)
+            reliable_mask = .!isnan.(pvals)
+            reliable_pvals = pvals[reliable_mask]
+            reliable_pvals = benjamini_hochberg(reliable_pvals)
+            
+            rel_pval_i = 1
+            for (i, is_reliable_elem) in enumerate(reliable_mask)
+                if is_reliable_elem
+                    pvals[i] = reliable_pvals[rel_pval_i]
+                    rel_pval_i += 1
+                else
+                    pvals[i] = NaN64
+                end
+            end
+        else
+            pvals = benjamini_hochberg(pvals)
+        end
     end
 
     condensed_stats_to_dict(n_vars, pvals, stats, alpha)
