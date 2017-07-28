@@ -360,33 +360,33 @@ function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::Abstrac
 end
 
 
-function translate_hiton_state(state::HitonState{Int}, header::Vector{String})
-    trans_state_results = Dict{String,Float64}([(header[key], val) for (key, val) in state.state_results])
-    trans_inter_results = Dict{String,Float64}([(header[key], val) for (key, val) in state.inter_results])
-    trans_unchecked_vars = map(String, state.unchecked_vars)
-    trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(header[key], (Tuple(map(x -> header[x], Zs)), test_res)) for (key, (Zs, test_res)) in state.state_results])
-    HitonState{String}(trans_state_results, trans_inter_results, trans_unchecked_vars, trans_state_rejections)
+function translate_hiton_state(state::HitonState{T1}, trans_dict::Dict{T1,T2}) where {T1,T2}
+    trans_state_results = Dict{T2,Float64}([(trans_dict[key], val) for (key, val) in state.state_results])
+    trans_inter_results = Dict{T2,Float64}([(trans_dict[key], val) for (key, val) in state.inter_results])
+    trans_unchecked_vars = map(T2, state.unchecked_vars)
+    trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(trans_dict[key], (Tuple(map(x -> trans_dict[x], Zs)), test_res)) for (key, (Zs, test_res)) in state.state_results])
+    HitonState{T2}(trans_state_results, trans_inter_results, trans_unchecked_vars, trans_state_rejections)
 end
 
-function translate_graph_dict(graph_dict::Dict{Int,Dict{Int,T}}, header::Vector{String}) where T <:Any
-    new_graph_dict = Dict{String,Dict{String,T}}()
+function translate_graph_dict(graph_dict::Dict{T1,Dict{T1,S}}, trans_dict::Dict{T1,T2}) where {T1,T2,S}
+    new_graph_dict = Dict{T2,Dict{T2,S}}()
     for (key, nbr_dict) in graph_dict
-        new_graph_dict[header[key]] = Dict{String,T}([(header[key], val) for (key, val) in nbr_dict])
+        new_graph_dict[trans_dict[key]] = Dict{T2,S}([(trans_dict[key], val) for (key, val) in nbr_dict])
     end
     new_graph_dict
 end
 
-function translate_results(results::LGLResult, header::Vector{String})
-    trans_graph = translate_graph_dict(results.graph, header)
-    trans_rejections = translate_graph_dict(results.rejections, header)
+function translate_results(results::LGLResult{T1}, trans_dict::Dict{T1,T2}) where {T1,T2}
+    trans_graph = translate_graph_dict(results.graph, trans_dict)
+    trans_rejections = translate_graph_dict(results.rejections, trans_dict)
     for (key, nbr_dict) in trans_rejections
         for (nbr, (Zs, test_res)) in nbr_dict
-            trans_rejections[key][nbr] = (Tuple(map(x -> header[x], Zs)), test_res)
+            trans_rejections[key][nbr] = (Tuple(map(x -> trans_dict[x], Zs)), test_res)
         end
     end
     
-    trans_unfinished_states = Dict{String,HitonState{String}}([(header[key], translate_hiton_state(val, header)) for (key, val) in results.unfinished_states])
-    LGLResult{String}(trans_graph, trans_rejections, trans_unfinished_states)
+    trans_unfinished_states = Dict{T2,HitonState{T2}}([(trans_dict[key], translate_hiton_state(val, trans_dict)) for (key, val) in results.unfinished_states])
+    LGLResult{T2}(trans_graph, trans_rejections, trans_unfinished_states)
 end
 
 
