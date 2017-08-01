@@ -24,7 +24,7 @@ sufficient_power(levels_x::Integer, levels_y::Integer, levels_z::Integer, n_obs:
 ### discrete
 
 function test{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String, hps::Integer,
-    levels_x::ElType, levels_y::ElType, cont_tab::Matrix{ElType}, ni::AbstractVector{ElType}, nj::AbstractVector{ElType}, nz::Bool=false)
+    levels_x::ElType, levels_y::ElType, cont_tab::Matrix{ElType}, ni::AbstractVector{ElType}, nj::AbstractVector{ElType}, nz::Bool=false, n_obs_min::Int=0)
 
     #if needs_nz_view(candidate, data, nz, levels)
     #    sub_data = @view data[data[:, Y] .!= 0, :]
@@ -49,7 +49,7 @@ function test{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, t
     n_obs = sum(sub_cont_tab)
 
     if is_mi_test(test_name)
-        if !sufficient_power(levels_x, levels_y, n_obs, hps)
+        if n_obs < n_obs_min || !sufficient_power(levels_x, levels_y, n_obs, hps)
             mi_stat = 0.0
             df = 0
             pval = 1.0
@@ -71,7 +71,7 @@ end
 
 
 function test{ElType <: Integer}(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String,
-    hps::Integer, levels::AbstractVector{ElType})
+    hps::Integer, levels::AbstractVector{ElType}, n_obs_min::Int=0)
     """CRITICAL: expects zeros to be trimmed from X if nz_test
     is provided!
 
@@ -88,7 +88,7 @@ function test{ElType <: Integer}(X::Int, Ys::AbstractVector{Int}, data::Abstract
         nj = zeros(ElType, max_level_y)
         nz = is_zero_adjusted(test_name)
 
-        return map(Y -> test(X, Y, data, test_name, hps, levels_x, levels[Y], cont_tab, ni, nj, nz), Ys)
+        return map(Y -> test(X, Y, data, test_name, hps, levels_x, levels[Y], cont_tab, ni, nj, nz, n_obs_min), Ys)
     end
 end
 

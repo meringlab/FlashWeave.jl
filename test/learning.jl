@@ -59,7 +59,7 @@ end
                         @testset "sparse $make_sparse" begin
                             for parallel in ["single", "multi_il"]
                                 @testset "parallel $parallel" begin
-                                    graph_dict = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=0.0, correct_reliable_only=false)
+                                    graph_dict = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=0.0, correct_reliable_only=false, n_obs_min=0)
                                     exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]
 
                                     atol = 1e-2
@@ -80,7 +80,8 @@ end
 
 @testset "precision_32" begin
     @testset "mi_sparse_single" begin
-        graph_dict = make_network(data, "mi", true, 32, max_k=3, parallel="single", time_limit=0.0, correct_reliable_only=false)
+        graph_dict = make_network(data, "mi", true, 32, max_k=3, parallel="single", time_limit=0.0, 
+            correct_reliable_only=false, n_obs_min=0)
         exp_graph_dict = exp_dict["exp_mi_maxk3_parasingle"]
         @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=0.0, atol=1e-2)
     end
@@ -97,7 +98,7 @@ end
 @testset "no_red_tests_OFF" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
         graph_dict = make_network(data, test_name, false, 64, max_k=3, parallel="single", time_limit=0.0, no_red_tests=false,
-                                  correct_reliable_only=false)
+                                  correct_reliable_only=false, n_obs_min=0)
         exp_graph_dict = exp_dict["exp_$(test_name)_maxk3_parasingle"]
         atol = 1e-2
         rtol = 0.0

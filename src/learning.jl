@@ -505,7 +505,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         end
         
         if verbose
-            println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability of results.")
+            println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
         end
     end
             
@@ -735,7 +735,7 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
     Ys = collect(Ys_slice)
 
     if isdiscrete(test_name)
-        test_results = test(X, Ys, sub_data, test_name, hps, levels)
+        test_results = test(X, Ys, sub_data, test_name, hps, levels, n_obs_min)
     else
         test_results = test(X, Ys, sub_data, test_name, n_obs_min, cor_mat)
     end
@@ -770,7 +770,7 @@ function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data
     Ys = collect(Ys_slice)
 
     if isdiscrete(test_name)
-        test_results = test(X, Ys, sub_data, test_name, hps, levels)
+        test_results = test(X, Ys, sub_data, test_name, hps, levels, n_obs_min)
     else
         test_results = test(X, Ys, sub_data, test_name, n_obs_min, cor_mat)
     end
