@@ -439,7 +439,7 @@ end
 
 
 function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
-                        hps::Integer=5, n_obs_min::Integer=20, 
+                        hps::Integer=5, n_obs_min::Integer=-1, 
     convergence_threshold::AbstractFloat=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
         fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
         weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=true, 
@@ -452,12 +452,6 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
     fast_elim: currently always on
     """
-
-    kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min,
-                  :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
-                  :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
-                  :time_limit => time_limit, :track_rejections => track_rejections)
-
     if time_limit == -1.0
         if parallel == "multi_il"
             time_limit = round(log2(size(data, 2)))
@@ -483,14 +477,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     if recursive_pcor && iscontinuous(test_name)
         warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated
               variables, caution advised")
-    end
-
-    if test_name != "fz_nz" && n_obs_min != 0
-        if n_obs_min != 20
-            warn("n_obs_min can only be used with test 'fz_nz', setting it to 0.")
-        end
-        n_obs_min = 0
-    end
+    end    
                     
     if isdiscrete(test_name)
         if verbose
@@ -507,6 +494,26 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
             cor_mat = zeros(ElType, 0, 0)
         end
     end
+    
+        
+    if n_obs_min < 0
+        if test_name == "mi_nz"
+            max_levels = maximum(levels) - 1
+            n_obs_min = hps * max_levels^(max_k+2) + 1
+        else
+            n_obs_min = 20
+        end
+        
+        if verbose
+            println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability of results.")
+        end
+    end
+            
+
+    kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min,
+                  :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
+                  :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
+                  :time_limit => time_limit, :track_rejections => track_rejections)
 
     pcor_set_dict = Dict{String,Dict{String,ElType}}()
 

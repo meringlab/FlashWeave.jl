@@ -218,7 +218,7 @@ function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMa
 end
 
 function dict_to_graph(graph_dict)
-    G = Graph(length(graph_dict))
+    G = Graph(maximum(keys(graph_dict)))
     for var_A in keys(graph_dict)
         for var_B in keys(graph_dict[var_A])
             add_edge!(G, var_A, var_B)
@@ -227,12 +227,15 @@ function dict_to_graph(graph_dict)
     G           
 end
 
-import LightGraphs:edit_distance
-function edit_distance(graph_dict1::Dict, graph_dict2::Dict)
-    G1 = dict_to_graph(graph_dict1)
-    G2 = dict_to_graph(graph_dict2)
-    edit_distance(G1, G2)
-end
+function neighbor_distances(G1, G2, G2_sps=zeros(Float64, 0, 0))
+    """Shortest path distances in G2, for each edge present in G1"""
+    if isempty(G2_sps)
+        G2_sps = convert(Matrix{Float64}, floyd_warshall_shortest_paths(G2).dists)
+    end
+    G2_sps[G2_sps .> nv(G2)] = NaN64
+    nbr_dists = [G2_sps[e.src, e.dst] for e in edges(G1)]
+    nbr_dists
+end 
 
 function jaccard_similarity(graph_dict1::Dict, graph_dict2::Dict)
     G1 = dict_to_graph(graph_dict1)
@@ -361,11 +364,11 @@ end
 
 
 function translate_hiton_state(state::HitonState{T1}, trans_dict::Dict{T1,T2}) where {T1,T2}
-    trans_state_results = Dict{T2,Float64}([(trans_dict[key], val) for (key, val) in state.state_results])
-    trans_inter_results = Dict{T2,Float64}([(trans_dict[key], val) for (key, val) in state.inter_results])
-    trans_unchecked_vars = map(T2, state.unchecked_vars)
-    trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(trans_dict[key], (Tuple(map(x -> trans_dict[x], Zs)), test_res)) for (key, (Zs, test_res)) in state.state_results])
-    HitonState{T2}(trans_state_results, trans_inter_results, trans_unchecked_vars, trans_state_rejections)
+    trans_state_results = OrderedDict{T2,Tuple{Float64,Float64}}([(trans_dict[key], val) for (key, val) in state.state_results])
+    trans_inter_results = OrderedDict{T2,Tuple{Float64,Float64}}([(trans_dict[key], val) for (key, val) in state.inter_results]) 
+    trans_unchecked_vars = T2[trans_dict[x] for x in state.unchecked_vars]
+    trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(trans_dict[key], (Tuple(map(x -> trans_dict[x], Zs)), test_res)) for (key, (Zs, test_res)) in state.state_rejections])
+    HitonState{T2}(state.phase, trans_state_results, trans_inter_results, trans_unchecked_vars, trans_state_rejections)
 end
 
 function translate_graph_dict(graph_dict::Dict{T1,Dict{T1,S}}, trans_dict::Dict{T1,T2}) where {T1,T2,S}
@@ -389,6 +392,10 @@ function translate_results(results::LGLResult{T1}, trans_dict::Dict{T1,T2}) wher
     LGLResult{T2}(trans_graph, trans_rejections, trans_unfinished_states)
 end
 
+function translate_results(results::LGLResult{T1}, header::Vector{T2}) where {T1,T2}
+    trans_dict = Dict{T1,T2}(enumerate(header))
+    translate_results(results, trans_dict)
+end
 
 function save_network(results::LGLResult, out_path::String; meta_dict::Dict=Dict(), fmt::String="auto",
         header::Vector{String}=String[])
