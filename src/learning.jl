@@ -449,7 +449,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=true, 
         verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
-    recursive_pcor::Bool=true, correct_reliable_only::Bool=true,
+    recursive_pcor::Bool=true, correct_reliable_only::Bool=true, feed_forward::Bool=true,
     track_rejections::Bool=false, fully_connect_clusters::Bool=false)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
@@ -457,19 +457,24 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     fast_elim: currently always on
     """
     if time_limit == -1.0
-        if parallel == "multi_il"
+        if parallel == "multi_il" && feed_forward
             time_limit = round(log2(size(data, 2)))
             println("Setting 'time_limit' to $time_limit s.")
         else
             time_limit = 0.0
         end
     end
-
+    
+    if time_limit != 0.0 && !feed_forward
+        warn("Time limit is only useful in combination with feed_forward, setting it to 0.")
+        time_limit = 0.0
+    end
+            
     workers_local = workers_all_local()
 
     if time_limit != 0.0 && parallel != "multi_il"
         warn("Using time_limit without interleaved parallelism is not advised.")
-    elseif parallel == "multi_il" && time_limit == 0.0
+    elseif parallel == "multi_il" && time_limit == 0.0 && feed_forward
         warn("Specify 'time_limit' when using interleaved parallelism to increase speed.")
     end
 
@@ -478,6 +483,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         fast_elim = true
     end
 
+    
     if recursive_pcor && iscontinuous(test_name)
         warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated
               variables, caution advised")
@@ -624,7 +630,8 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
             elseif endswith(parallel, "il")
                 il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs,
                                               convergence_threshold, cor_mat, parallel=parallel, edge_rule=edge_rule,
-                                              nonsparse_cond=nonsparse_cond, verbose=verbose, workers_local=workers_local)
+                                              nonsparse_cond=nonsparse_cond, verbose=verbose, workers_local=workers_local,
+                                              feed_forward=feed_forward)
                 nbr_results = [il_dict[target_var] for target_var in target_vars]
             else
                 error("'$parallel' not a valid parallel mode")
@@ -1088,7 +1095,7 @@ end
 function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType}, all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}},
      levels::AbstractVector{ElType}, update_interval::Real, GLL_args::Dict{Symbol,Any},
         convergence_threshold::AbstractFloat, cor_mat::Matrix{ElType}; conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi", edge_rule::String="OR", nonsparse_cond::Bool=false,
-        verbose::Bool=true, workers_local::Bool=true)
+        verbose::Bool=true, workers_local::Bool=true, feed_forward::Bool=true)
     jobs_total = length(target_vars)
 
     if startswith(parallel, "multi") || startswith(parallel, "threads")
@@ -1149,7 +1156,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     start_time = time()
     last_update_time = start_time
     check_convergence = false
-    converged = false, 
+    converged = false
 
     while remaining_jobs > 0
         target_var, nbr_result = take!(shared_result_q)
@@ -1162,8 +1169,13 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
                 if converged
                     curr_state.phase = "C"
                 end
-
-                skip_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, target_var)) : Set(neighbors(graph, target_var))
+                
+                if feed_forward
+                    skip_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, target_var)) : Set(neighbors(graph, target_var))
+                else
+                    skip_nbrs= Set{Int}()
+                end
+                
                 job = (target_var, all_univar_nbrs[target_var], curr_state, skip_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
@@ -1176,7 +1188,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
                     add_edge!(graph, target_var, nbr)
                 end
 
-                if edge_rule == "AND"
+                if feed_forward && edge_rule == "AND"
                     for a_var in target_vars
                         if !haskey(curr_state.state_results, a_var)
                             add_edge!(blacklist_graph, target_var, a_var)
@@ -1205,8 +1217,13 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
         if !isempty(waiting_vars) && queued_jobs < job_q_buff_size
             for i in 1:job_q_buff_size - queued_jobs
                 next_var = pop!(waiting_vars)
-                var_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, next_var)) : Set(neighbors(graph, next_var))
-
+                
+                if feed_forward
+                    var_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, next_var)) : Set(neighbors(graph, next_var))
+                else
+                    var_nbrs = Set{Int}()
+                end
+                
                 job = (next_var, all_univar_nbrs[next_var], HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), var_nbrs)
                 put!(shared_job_q, job)
                 queued_jobs += 1
