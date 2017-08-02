@@ -168,14 +168,23 @@ function workers_all_local()
 end
 
 
-function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}, weight_type::String)
+function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}, weight_type::String, test_name::String)
     # create weights
     nbr_dict = Dict{Int,Float64}()
     weight_kind = String(split(weight_type, "_")[2])
+
     if startswith(weight_type, "uni")
         nbr_dict = Dict([(nbr, signed_weight(univar_nbrs[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
     else
-        nbr_dict = Dict([(nbr, signed_weight(PC_dict[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
+        if startswith(test_name, "mi")
+            nbr_dict = Dict{Int, Float64}()
+            for nbr in keys(PC_dict)
+                edge_sign = sign(univar_nbrs[nbr][1])
+                nbr_dict[nbr] = edge_sign * abs(signed_weight(PC_dict[nbr]..., weight_kind))
+            end
+        else     
+            nbr_dict = Dict([(nbr, signed_weight(PC_dict[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
+        end
     end
 
     nbr_dict

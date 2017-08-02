@@ -40,12 +40,16 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
     n_candidates = length(OPEN)
     for (cand_index, candidate) in enumerate(OPEN)
         if debug > 0
-            println("\tTesting candidate $candidate ($cand_index out of $n_candidates) conditioned on $TPC")
+            println("\tTesting candidate $candidate ($cand_index out of $n_candidates) conditioned on $TPC, current set size: $(length(TPC))")
         end
 
         if !isempty(whitelist) && candidate in whitelist
             push!(TPC, candidate)
             TPC_dict[candidate] = (NaN64, NaN64)
+            
+            if debug > 0
+                println("\tin whitelist")
+            end
             continue
         end
 
@@ -69,14 +73,14 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
             TPC_dict[candidate] = (test_result.stat, test_result.pval)
 
             if debug > 0
-                println("\taccepted: ", test_result)
+                println("\taccepted: ", test_result, " $(length(pcor_set_dict))")
             end
         else
             if track_rejections
-                rej_dict[candidate] = (tuple(lowest_sig_Zs...), test_result)
+                rej_dict[candidate] = (Tuple(lowest_sig_Zs), test_result)
             end
             if debug > 0
-                println("\trejected: ", test_result)
+                println("\trejected: ", test_result, " through Z ", lowest_sig_Zs, " $(length(pcor_set_dict))")
             end
         end
 
@@ -124,7 +128,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
         PC_nocand = PC[PC .!= candidate]
 
         if debug > 0
-            println("\tTesting candidate $candidate ($cand_index out of $n_candidates) conditioned on $PC_nocand")
+            println("\tTesting candidate $candidate ($cand_index out of $n_candidates) conditioned on $PC_nocand, current set size: $(length(PC_nocand))")
         end
 
         if !isempty(whitelist) && candidate in whitelist
@@ -164,11 +168,11 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
             end
 
             if track_rejections
-                rej_dict[candidate] = (tuple(lowest_sig_Zs...), test_result)
+                rej_dict[candidate] = (Tuple(lowest_sig_Zs), test_result)
             end
 
             if debug > 0
-                println("\trejected: ", test_result)
+                println("\trejected: ", test_result, " through Z ", lowest_sig_Zs)
             end
         else
             PC_dict[candidate] = (test_result.stat, test_result.pval)
@@ -496,7 +500,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     end
     
         
-    if n_obs_min < 0
+    if n_obs_min < 0 && is_zero_adjusted(test_name)
         if test_name == "mi_nz"
             max_levels = maximum(levels) - 1
             n_obs_min = hps * max_levels^(max_k+2) + 1
@@ -667,7 +671,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
     weights_dict = Dict{Int,Dict{Int,Float64}}()
     for target_var in keys(nbr_dict)
-        weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type)
+        weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type, test_name)
     end
 
     graph_dict = make_graph_symmetric(weights_dict, edge_rule)
@@ -777,9 +781,9 @@ function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data
 end
 
 
-function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", alpha::AbstractFloat=0.01, hps::Integer=5, n_obs_min::Integer=0, FDR::Bool=true,
+function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
         levels::AbstractVector{ElType}=ElType[], parallel::String="single", workers_local::Bool=true,
-        cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), chunk_size::Integer=500, correct_reliable_only::Bool=true)
+        cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), chunk_size::Int=500, correct_reliable_only::Bool=true)
 
     if startswith(test_name, "mi") && isempty(levels)
         levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
@@ -1145,7 +1149,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     start_time = time()
     last_update_time = start_time
     check_convergence = false
-    converged = false
+    converged = false, 
 
     while remaining_jobs > 0
         target_var, nbr_result = take!(shared_result_q)

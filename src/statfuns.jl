@@ -23,9 +23,12 @@ end
 function oddsratio{ElType <: Integer}(cont_tab::AbstractArray{ElType}, nz::Bool=false)
     offset = nz ? 1 : 0
     if ndims(cont_tab) == 2
+        ondiag = (cont_tab[1 + offset, 1 + offset] * cont_tab[2 + offset, 2 + offset])
+        offdiag = (cont_tab[1 + offset, 2 + offset] * cont_tab[2 + offset, 1 + offset])
         return (cont_tab[1 + offset, 1 + offset] * cont_tab[2 + offset, 2 + offset]) / (cont_tab[1 + offset, 2 + offset] * cont_tab[2 + offset, 1 + offset])
     else
-        return median([oddsratio(cont_tab[:, :, i], nz) for i in 1:size(cont_tab, 3)])
+        oddsratios_per_Zcombo = filter(!isnan, [oddsratio(cont_tab[:, :, i], false) for i in 1:size(cont_tab, 3)])
+        return isempty(oddsratios_per_Zcombo) ? NaN64 : median(oddsratios_per_Zcombo)
     end
 end
 
