@@ -3,7 +3,6 @@ using DataFrames
 using JLD2
 using Base.Test
 
-#data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 data = Array(readtable(joinpath("data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 
 exp_dict = load(joinpath("data", "learning_expected.jld"))
@@ -57,7 +56,7 @@ end
                 @testset "max_k $max_k" begin
                     for make_sparse in [true, false]
                         @testset "sparse $make_sparse" begin
-                            for parallel in ["single", "multi_il"]
+                            for parallel in ["single"]#["single", "multi_il"]
                                 @testset "parallel $parallel" begin
                                     graph_dict = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=0.0, correct_reliable_only=false, n_obs_min=0)
                                     exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]
@@ -86,12 +85,12 @@ end
         @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=0.0, atol=1e-2)
     end
     
-    @testset "fz_nz_nonsparse_multi_il" begin
-        graph_dict = make_network(data, "fz_nz", false, 32, max_k=3, parallel="multi_il", time_limit=0.0,
-            correct_reliable_only=false)
-        exp_graph_dict = exp_dict["exp_fz_nz_maxk3_paramulti_il"]
-        @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=0.0, atol=1e-2)
-    end
+    #@testset "fz_nz_nonsparse_multi_il" begin
+    #    graph_dict = make_network(data, "fz_nz", false, 32, max_k=3, parallel="multi_il", time_limit=0.0,
+    #        correct_reliable_only=false)
+    #    exp_graph_dict = exp_dict["exp_fz_nz_maxk3_paramulti_il"]
+    #    @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=0.0, atol=1e-2)
+    #end
 end
 
 

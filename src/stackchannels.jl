@@ -16,7 +16,7 @@ type StackChannel{T} <: AbstractChannel where T
     data::Array{T,1}
     sz_max::Int             # maximum size of channel
 
-    function StackChannel(sz)
+    function StackChannel{T}(sz) where T
         sz_max = sz == typemax(Int) ? typemax(Int) - 1 : sz
         new(Condition(), Condition(), :open, Array{T}(0), sz_max)
     end

@@ -11,13 +11,13 @@ export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, ne
 const inf_weight = 708.3964185322641
 
 
-type PairMeanObj
+mutable struct PairMeanObj
     sum_x::Float64
     sum_y::Float64
     n::Int
 end
 
-type PairCorObj
+mutable struct PairCorObj
     cov_xy::Float64
     var_x::Float64
     var_y::Float64
@@ -25,14 +25,14 @@ type PairCorObj
     mean_y::Float64
 end
 
-type TestResult
+struct TestResult
     stat :: Float64
     pval :: Float64
     df :: Int
     suff_power :: Bool
 end
 
-type HitonState{T}
+struct HitonState{T}
     phase :: String
     state_results :: OrderedDict{T,Tuple{Float64,Float64}}
     inter_results :: OrderedDict{T,Tuple{Float64,Float64}}
@@ -40,22 +40,22 @@ type HitonState{T}
     state_rejections :: Dict{T,Tuple{Tuple,TestResult}}
 end
 
-type LGLResult{T}
+struct LGLResult{T}
     graph::Dict{T,Dict{T,Float64}}
     rejections::Dict{T, Dict{T, Tuple{Tuple,TestResult}}}
     unfinished_states::Dict{T, HitonState}
 end
 
-type IndexPair
-    min_ind :: Int
-    sec_ind :: Int
-end
+#type IndexPair
+#    min_ind :: Int
+#    sec_ind :: Int
+#end
 
 
 import Combinatorics:Combinations
 import Base:start,next,done
 
-immutable CombinationsWL{T,S}
+struct CombinationsWL{T,S}
     c::Combinations{T}
     wl::S
 end
@@ -102,21 +102,21 @@ function get_levels{ElType <: Integer}(data::AbstractMatrix{ElType})
 end
 
 
-function min_sec_indices!(ind_pair::IndexPair, index_vec::AbstractVector{Int})
-    min_ind = 0
-    sec_ind = 0
-
-    for ind in index_vec
-        if min_ind == 0 || ind < min_ind
-            sec_ind = min_ind
-            min_ind = ind
-        elseif sec_ind == 0 || ind < sec_ind
-            sec_ind = ind
-        end
-    end
-    ind_pair.min_ind = min_ind
-    ind_pair.sec_ind = sec_ind
-end
+#function min_sec_indices!(ind_pair::IndexPair, index_vec::AbstractVector{Int})
+#    min_ind = 0
+#    sec_ind = 0
+#
+#    for ind in index_vec
+#        if min_ind == 0 || ind < min_ind
+#            sec_ind = min_ind
+#            min_ind = ind
+#        elseif sec_ind == 0 || ind < sec_ind
+#            sec_ind = ind
+#        end
+#    end
+#    ind_pair.min_ind = min_ind
+#    ind_pair.sec_ind = sec_ind
+#end
 
 stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
@@ -322,7 +322,7 @@ function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
 end
 
 
-function map_edge_keys{T}(nbr_dict::Dict{Int,OrderedDict{Int,T}}, key_map_dict::Dict{Int,Int})
+function map_edge_keys(nbr_dict::Dict{Int,T}, key_map_dict::Dict{Int,Int}) where T <: Associative{Int}
     new_nbr_dict = similar(nbr_dict)
 
     for (key, sub_dict) in nbr_dict

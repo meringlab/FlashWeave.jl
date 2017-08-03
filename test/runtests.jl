@@ -2,9 +2,10 @@ start_time = time()
 
 println("Preparing tests")
 
-if nprocs() == 1
-    addprocs(1)
-end
+#if nprocs() == 1
+#    addprocs(1)
+#end
+warn("Multicore currently disabled due to random crashes")
 
 using FlashWeave
 using Base.Test

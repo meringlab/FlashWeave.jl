@@ -6,6 +6,7 @@ export LGL, si_HITON_PC
 using LightGraphs
 using DataStructures
 using StatsBase
+using Clustering
 
 using FlashWeave.Tests
 using FlashWeave.Misc
@@ -205,7 +206,7 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         println("Finding neighbors for $T")
     end
 
-    state = HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict())
+    #state = HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict())
     rej_dict = Dict{Int, Tuple{Tuple,TestResult}}()
 
     if isdiscrete(test_name)
@@ -214,12 +215,13 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
         end
 
         if levels[T] < 2
-            state.phase = "F"
-            state.state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
-            state.unchecked_vars = Int[]
-            state.state_rejections = rej_dict
+            phase = "F"
+            state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
+            inter_results = OrderedDict{Int,Tuple{Float64,Float64}}()
+            unchecked_vars = Int[]
+            state_rejections = rej_dict
 
-            return state
+            return HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
         end
     else
         levels = ElType[]
@@ -318,12 +320,13 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 end
 
                 if isempty(candidates)
-                    state.phase = "F"
-                    state.state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
-                    state.unchecked_vars = Int[]
-                    state.state_rejections = rej_dict
+                    phase = "F"
+                    state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
+                    inter_results = OrderedDict{Int,Tuple{Float64,Float64}}()
+                    unchecked_vars = Int[]
+                    state_rejections = rej_dict
 
-                    return state
+                    return HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
                 end
 
                 # interleaving phase
@@ -344,15 +347,16 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                         println("Time limit exceeded, reporting incomplete results")
                     end
 
-                    state.phase = "I"
-                    state.state_results = TPC_dict
-                    state.unchecked_vars = candidates_unchecked
-                    state.state_rejections = rej_dict
+                    phase = "I"
+                    state_results = TPC_dict
+                    inter_results = OrderedDict{Int,Tuple{Float64,Float64}}()
+                    unchecked_vars = candidates_unchecked
+                    state_rejections = rej_dict
 
-                    return state
+                    return HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
                 end
 
-                state.inter_results = TPC_dict
+                #inter_results = TPC_dict
 
                 if debug > 0
                     println("After interleaving:", length(TPC_dict), " ", collect(keys(TPC_dict)))
@@ -398,12 +402,13 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                     println("Time limit exceeded, reporting incomplete results")
                 end
 
-                state.phase = "E"
-                state.state_results = PC_dict
-                state.unchecked_vars = TPC_unchecked
-                state.state_rejections = rej_dict
+                phase = "E"
+                state_results = PC_dict
+                inter_results = TPC_dict
+                unchecked_vars = TPC_unchecked
+                state_rejections = rej_dict
 
-                return state
+                return HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
             end
         end
         
@@ -427,18 +432,19 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
     # if previous state had converged, keep this information
     if prev_state.phase == "C"
-        state.phase = "C"
-        state.unchecked_vars = prev_state.unchecked_vars
-        state.state_rejections = prev_state.state_rejections
+        phase = "C"
+        unchecked_vars = prev_state.unchecked_vars
+        state_rejections = prev_state.state_rejections
     else
-        state.phase = "F"
-        state.unchecked_vars = Int[]
-        state.state_rejections = rej_dict
+        phase = "F"
+        unchecked_vars = Int[]
+        state_rejections = rej_dict
     end
     
-    state.state_results = PC_dict
+    state_results = PC_dict
+    inter_results = TPC_dict
 
-    state
+    HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
 end
 
 
@@ -450,14 +456,14 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, fully_connect_clusters::Bool=false)
+    track_rejections::Bool=false, fully_connect_clusters::Bool=false, cluster_mode="greedy")
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
     fast_elim: currently always on
     """
     if time_limit == -1.0
-        if parallel == "multi_il" && feed_forward
+        if parallel == "multi_il"# && feed_forward
             time_limit = round(log2(size(data, 2)))
             println("Setting 'time_limit' to $time_limit s.")
         else
@@ -465,10 +471,10 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         end
     end
     
-    if time_limit != 0.0 && !feed_forward
-        warn("Time limit is only useful in combination with feed_forward, setting it to 0.")
-        time_limit = 0.0
-    end
+    #if time_limit != 0.0 && !feed_forward
+    #    warn("Time limit is only useful in combination with feed_forward, setting it to 0.")
+    #    time_limit = 0.0
+    #end
             
     workers_local = workers_all_local()
 
@@ -569,8 +575,8 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         end
 
         univar_matrix = pw_unistat_matrix(data, test_name; pw_stat_dict=all_univar_nbrs)
-        clust_repres, clust_dict = cluster_data(data, test_name; cluster_sim_threshold=precluster_sim,
-                                    sim_mat=univar_matrix)
+        clust_repres, clust_dict = cluster_data(data, test_name, cluster_sim_threshold=precluster_sim,
+                                    sim_mat=univar_matrix, greedy=cluster_mode == "greedy")
 
         if verbose
             println("\tfound $(length(clust_repres)) clusters")
@@ -896,11 +902,12 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
 end
 
 
-function pw_unistat_matrix{ElType <: Real}(data::AbstractMatrix{ElType}, test_name::String; parallel::String="single",
-        pw_stat_dict::Dict{Int,Dict{Int,Tuple{Float64,Float64}}}=Dict{Int,Dict{Int,Tuple{Float64,Float64}}}())
+function pw_unistat_matrix{T,ElType<:Real}(data::AbstractMatrix{ElType}, test_name::String; parallel::String="single",
+        pw_stat_dict::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}=Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}(),
+    pw_uni_args::Dict{Symbol,T}=Dict{Symbol,Any}())
 
     if isempty(pw_stat_dict)
-        pw_stat_dict = pw_univar_neighbors(data, test_name=test_name, parallel=parallel)
+        pw_stat_dict = pw_univar_neighbors(data; test_name=test_name, parallel=parallel, pw_uni_args...)
     end
 
     stat_mat = zeros(Float64, size(data, 2), size(data, 2))
@@ -915,15 +922,17 @@ function pw_unistat_matrix{ElType <: Real}(data::AbstractMatrix{ElType}, test_na
 end
 
 
-function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::String="fz"; cluster_sim_threshold::AbstractFloat=0.8, parallel="single",
-    ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0), verbose::Bool=false, greedy::Bool=true)
+function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::String="fz";
+        cluster_sim_threshold::AbstractFloat=0.8, parallel="single",
+    ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0), verbose::Bool=false, greedy::Bool=true,
+    pw_uni_args::Dict{Symbol,T}=Dict{Symbol,Any}())
 
     if verbose
         println("Computing pairwise similarities")
     end
 
     if isempty(sim_mat)
-        sim_mat = pw_unistat_matrix(data, stat_type, parallel=parallel)
+        sim_mat = pw_unistat_matrix(data, stat_type, parallel=parallel, pw_uni_args=pw_uni_args)
     end
 
     if stat_type == "mi"
@@ -1021,8 +1030,6 @@ function cluster_data{ElType <: Real}(data::AbstractMatrix{ElType}, stat_type::S
     end
 
     if !greedy
-        eval(Expr(:using,:Clustering))
-
         if verbose
             println("\tComputing hierarchical clusters")
         end
