@@ -69,7 +69,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps,
                                    n_obs_min=n_obs_min,
                                    levels=levels, cor_mat=cor_mat,
-                                   pcor_set_dict=pcor_set_dict, debug=debug, zero_mask=zero_mask)
+                                   pcor_set_dict=pcor_set_dict, debug=debug)
 
         if issig(test_result, alpha)
             push!(TPC, candidate)
@@ -164,8 +164,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
         
         (test_result, lowest_sig_Zs) = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps,
                                    n_obs_min=n_obs_min, levels=levels,
-                                   cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, debug=debug, Z_wanted=Z_wanted,
-                                   zero_mask=zero_mask)
+                                   cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, debug=debug, Z_wanted=Z_wanted)
 
         if !issig(test_result, alpha)
             

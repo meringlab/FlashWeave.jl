@@ -1,7 +1,9 @@
 using FlashWeave
 using DataFrames
-using JLD2
+using JLD
 using Base.Test
+using MetaGraphs
+using LightGraphs
 
 data = Array(readtable(joinpath("data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 
@@ -17,8 +19,8 @@ function make_network(data, test_name, make_sparse=false, prec=32; kwargs...)
     graph_res.graph
 end
 
-function compare_graph_dicts(g1, g2; verbose=false, rtol=0.0, atol=0.0)
-    if Set(keys(g1)) != Set(keys(g2))
+function compare_graph_results(g1::Dict, g2::MetaGraph; verbose=false, rtol=0.0, atol=0.0)
+    if Set(keys(g1)) != Set(vertices(g2))
         if verbose
             println("Upper level keys don't match")
         end
@@ -27,9 +29,8 @@ function compare_graph_dicts(g1, g2; verbose=false, rtol=0.0, atol=0.0)
 
     for T in keys(g1)
         nbr_dict1 = g1[T]
-        nbr_dict2 = g2[T]
 
-        if Set(keys(nbr_dict1)) != Set(keys(nbr_dict2))
+        if Set(keys(nbr_dict1)) != Set(neighbors(g2, T))
             if verbose
                 println("Neighbors for node $T dont match")
             end
@@ -37,9 +38,10 @@ function compare_graph_dicts(g1, g2; verbose=false, rtol=0.0, atol=0.0)
         end
 
         for nbr in keys(nbr_dict1)
-            if !isapprox(nbr_dict1[nbr], nbr_dict2[nbr], rtol=rtol, atol=atol)
+            g2_weight = get_prop(g2, T, nbr, :weight)
+            if !isapprox(nbr_dict1[nbr], g2_weight, rtol=rtol, atol=atol)
                 if verbose
-                    println("Weights for node $T and neighbor $nbr dont fit: $(nbr_dict1[nbr]), $(nbr_dict2[nbr])")
+                    println("Weights for node $T and neighbor $nbr dont fit: $(nbr_dict1[nbr]), $(g2_weight)")
                 end
                 return false
             end
@@ -58,14 +60,14 @@ end
                         @testset "sparse $make_sparse" begin
                             for parallel in ["single"]#["single", "multi_il"]
                                 @testset "parallel $parallel" begin
-                                    graph_dict = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=0.0, correct_reliable_only=false, n_obs_min=0)
+                                    graph = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=0.0, correct_reliable_only=false, n_obs_min=0)
                                     exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]
 
                                     atol = 1e-2
                                     rtol = 0.0
 
                                     @testset "edge_identity" begin
-                                        @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=rtol, atol=atol)
+                                        @test compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol)
                                     end
                                 end
                             end
@@ -79,10 +81,10 @@ end
 
 @testset "precision_32" begin
     @testset "mi_sparse_single" begin
-        graph_dict = make_network(data, "mi", true, 32, max_k=3, parallel="single", time_limit=0.0, 
+        graph = make_network(data, "mi", true, 32, max_k=3, parallel="single", time_limit=0.0, 
             correct_reliable_only=false, n_obs_min=0)
         exp_graph_dict = exp_dict["exp_mi_maxk3_parasingle"]
-        @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=0.0, atol=1e-2)
+        @test compare_graph_results(exp_graph_dict, graph, rtol=0.0, atol=1e-2)
     end
     
     #@testset "fz_nz_nonsparse_multi_il" begin
@@ -96,14 +98,14 @@ end
 
 @testset "no_red_tests_OFF" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
-        graph_dict = make_network(data, test_name, false, 64, max_k=3, parallel="single", time_limit=0.0, no_red_tests=false,
+        graph = make_network(data, test_name, false, 64, max_k=3, parallel="single", time_limit=0.0, no_red_tests=false,
                                   correct_reliable_only=false, n_obs_min=0)
         exp_graph_dict = exp_dict["exp_$(test_name)_maxk3_parasingle"]
         atol = 1e-2
         rtol = 0.0
 
         @testset "$test_name" begin
-            @test compare_graph_dicts(graph_dict, exp_graph_dict, rtol=rtol, atol=atol)
+            @test compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol)
         end
     end
 end

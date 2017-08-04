@@ -348,18 +348,18 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
         for node2 in keys(weights_dict[node1])
 
             if !has_edge(G, node1, node2)
-                add_edge!(G, node1, node2)
-                weight = weights_dict[node1][node2]
-
                 # if only one direction is present and "AND" rule is specified, skip this edge
                 if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
                     continue
                 end
 
-                prev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
+                e = Edge(node1, node2)
+                add_edge!(G, e)
                 
-                weight = edge_merge_fun(weight, prev_weight)
-                set_prop!(G, node1, node2, :weight, weight)
+                weight = weights_dict[node1][node2]
+                rev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
+                
+                weight = edge_merge_fun(weight, rev_weight)
                 if edge_rule == "OR"
                     if haskey(weights_dict[node2], node1)
                         edge_dir = '='
@@ -368,7 +368,9 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
                     else
                         edge_dir = '<'
                     end
-                    set_prop!(G, node1, node2, :dir, edge_dir)
+                    set_props!(G, e, Dict(:weight=>weight, :dir=>edge_dir))
+                else
+                    set_prop!(G, e, :weight, weight)
                 end
             end
         end
