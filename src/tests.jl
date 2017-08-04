@@ -101,14 +101,14 @@ end
 ### continuous
 
 function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElType}, test_name::String, n_obs_min::Integer=0,
-    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), nz::Bool=false, Y_adjusted::Bool=false)
+    cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), zero_mask::BitMatrix=trues(0, 0), nz::Bool=false, Y_adjusted::Bool=false)
 
     if isempty(data)
         p_stat = 0.0
         df = 0
         pval = 1.0
         n_obs = 0
-    elseif test_name == "fz" || test_name == "fz_nz"
+    elseif startswith(test_name, "fz")
         if isempty(cor_mat)
             if issparse(data)
                 p_stat, n_obs = cor(X, Y, data, nz)
@@ -119,6 +119,8 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, data::AbstractMatrix{ElTy
             else
                 if nz && !Y_adjusted
                     sub_data = @view data[data[:, Y] .!= 0, :]
+                elseif test_name == "fz_ndz"
+                    sub_data = @view data[zero_mask[:, X] .| zero_mask[:, Y], :]
                 else
                     sub_data = data
                 end
@@ -155,7 +157,7 @@ end
 
 
 function test{ElType <: AbstractFloat}(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{ElType},
-        test_name::String, n_obs_min::Integer=0, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0))
+        test_name::String, n_obs_min::Integer=0, cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), zero_mask::BitMatrix=trues(0, 0))
     """CRITICAL: expects zeros to be trimmed from X if nz_test
     is provided!
     
@@ -163,7 +165,7 @@ function test{ElType <: AbstractFloat}(X::Int, Ys::AbstractVector{Int}, data::Ab
     
     nz = is_zero_adjusted(test_name)
     
-    map(Y -> test(X, Y, data, test_name, n_obs_min, cor_mat, nz, false), Ys)
+    map(Y -> test(X, Y, data, test_name, n_obs_min, cor_mat, zero_mask, nz, false), Ys)
 end
 
 
@@ -183,7 +185,7 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, 
     #    sub_data = data
     #end
 
-    if test_name == "fz" || test_name == "fz_nz"
+    if startswith(test_name, "fz")
         n_obs = size(data, 1)
         
         if n_obs >= n_obs_min
@@ -201,7 +203,7 @@ end
 
 
 function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String; recursive::Bool=true, n_obs_min::Integer=0)
-    cor_mat = recursive ? cor(data) : zeros(ElType, 0, 0)
+    cor_mat = recursive && test_name != "fz_ndz" ? cor(data) : zeros(ElType, 0, 0)
     pcor_set_dict = Dict{String,Dict{String,ElType}}()
     test(X, Y, Zs, data, test_name, n_obs_min, is_zero_adjusted(test_name), cor_mat, pcor_set_dict)
 end
@@ -300,7 +302,7 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
         nk = zeros(ElType, max_levels_z)
         cum_levels = zeros(ElType, max_k + 1)
         z_map_arr = zeros(ElType, max_levels_z)
-    elseif nz
+    elseif nz || test_name == "fz_ndz"
         if n_obs_min > size(data, 1)
             return TestResult(0.0, 1.0, 0.0, false), Int[]
         end      
@@ -326,7 +328,8 @@ function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{In
                 test_result = test(X, Y, Zs, data, test_name, hps, levels_x, levels_y, cont_tab, z,
                                    ni, nj, nk, cum_levels, z_map_arr, nz, levels)
             else
-                test_result = test(X, Y, Zs, data, test_name, n_obs_min, nz, cor_mat, pcor_set_dict, subset_size < max_k)
+                test_result = test(X, Y, Zs, data, test_name, n_obs_min, nz, cor_mat, pcor_set_dict,
+                                   subset_size < max_k)
             end
             num_tests += 1
 

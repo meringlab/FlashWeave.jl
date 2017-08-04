@@ -294,9 +294,9 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
 
     if filter_data
         unfilt_dims = size(data)
-        col_mask = var(data, 1)[:] .> 0.0
+        col_mask = (var(data, 1)[:] .> 0.0)[:]
         data = data[:, col_mask]
-        row_mask = sum(data, 2)[:] .> 0
+        row_mask = (sum(data, 2)[:] .> 0)[:]
         data = data[row_mask, :]
         if !isempty(env_cols)
             env_data = env_data[row_mask, :]

@@ -5,8 +5,9 @@ using StatsBase
 using Combinatorics
 using DataStructures
 using JLD2
+using MetaGraphs
 
-export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, combinations_with_whitelist, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_graph_symmetric, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!, make_chunks, work_chunker
+export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, combinations_with_whitelist, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_symmetric_graph, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!, make_chunks, work_chunker
 
 const inf_weight = 708.3964185322641
 
@@ -41,7 +42,7 @@ struct HitonState{T}
 end
 
 struct LGLResult{T}
-    graph::Dict{T,Dict{T,Float64}}
+    graph::MetaGraph{T,Float64}
     rejections::Dict{T, Dict{T, Tuple{Tuple,TestResult}}}
     unfinished_states::Dict{T, HitonState}
 end
@@ -121,7 +122,7 @@ end
 stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
 isdiscrete(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
-iscontinuous(test_name::String) = test_name in ["fz", "fz_nz"]
+iscontinuous(test_name::String) = test_name in ["fz", "fz_nz", "fz_ndz"]
 is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
 is_mi_test(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
 
@@ -226,15 +227,34 @@ function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMa
     levels_z
 end
 
-function dict_to_graph(graph_dict)
+function dict_to_graph{T}(graph_dict::Dict{T,Dict{T,Float64}})
     G = Graph(maximum(keys(graph_dict)))
-    for var_A in keys(graph_dict)
-        for var_B in keys(graph_dict[var_A])
+    for key in keys(graph_dict)
+        @assert key <= nv(G) "nodes are missing from graph_dict"
+        for nbr in keys(graph_dict[key])
+            @assert nbr <= nv(G) "nodes are missing from graph_dict"
             add_edge!(G, var_A, var_B)
         end
     end
     G           
 end
+
+
+function dict_to_metagraph{T}(graph_dict::Dict{T,Dict{T,Float64}})
+    Gm = MetaGraph(length(graph_dict))
+    for (i, (key, nbr_dict)) in enumerate(graph_dict)
+        @assert key <= nv(G) "nodes are missing from graph_dict"
+        for (nbr, weight) in nbr_dict
+            if !has_edge(G, key, nbr)
+                @assert nbr <= nv(G) "nodes are missing from graph_dict"
+                add_edge!(G, key, nbr)
+                set_prop!(G, key, nbr, :weight, nbr_dict[nbr])
+            end
+        end
+    end
+    G
+end
+
 
 function neighbor_distances(G1, G2, G2_sps=zeros(Float64, 0, 0))
     """Shortest path distances in G2, for each edge present in G1"""
@@ -303,12 +323,12 @@ function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
                 add_edge!(checked_G, node1, node2)
                 weight = weights_dict[node1][node2]
 
-                prev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
-
                 # if only one direction is present and "AND" rule is specified, skip this edge
-                if edge_rule == "AND" && isnan(prev_weight)
+                if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
                     continue
                 end
+
+                prev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
 
                 weight = edge_merge_fun(weight, prev_weight)
 
@@ -319,6 +339,42 @@ function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     end
 
     graph_dict
+end
+
+function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String, edge_merge_fun=maxweight)
+    G = MetaGraph(maximum(keys(weights_dict)))
+
+    for node1 in keys(weights_dict)
+        for node2 in keys(weights_dict[node1])
+
+            if !has_edge(G, node1, node2)
+                add_edge!(G, node1, node2)
+                weight = weights_dict[node1][node2]
+
+                # if only one direction is present and "AND" rule is specified, skip this edge
+                if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
+                    continue
+                end
+
+                prev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
+                
+                weight = edge_merge_fun(weight, prev_weight)
+                set_prop!(G, node1, node2, :weight, weight)
+                if edge_rule == "OR"
+                    if haskey(weights_dict[node2], node1)
+                        edge_dir = '='
+                    elseif node1 < node2
+                        edge_dir = '>'
+                    else
+                        edge_dir = '<'
+                    end
+                    set_prop!(G, node1, node2, :dir, edge_dir)
+                end
+            end
+        end
+    end
+
+    G
 end
 
 
