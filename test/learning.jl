@@ -11,11 +11,8 @@ exp_dict = load(joinpath("data", "learning_expected.jld"))
 
 function make_network(data, test_name, make_sparse=false, prec=32; kwargs...)
     data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
-    #println(typeof(data_norm))
     kwargs_dict = Dict(kwargs)
-    #println(test_name, " ", typeof(data_norm), " ", kwargs)
     graph_res = LGL(data_norm; test_name=test_name, verbose=false, kwargs...)
-    #graph_dict = haskey(kwargs_dict, :track_rejections) && kwargs_dict[:track_rejections] ? graph_res[1] : graph_res
     graph_res.graph
 end
 

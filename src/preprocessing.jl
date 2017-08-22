@@ -237,6 +237,9 @@ function discretize_env{ElType <: Real}(env_data::SparseMatrixCSC{ElType}, norm,
     sparse(env_data_dense)
 end
 
+function balance_transform_single_coord(x_i::Int, arr::AbstractVector)
+    
+end
 
 function clrnorm_data(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
     if norm == "clr"
@@ -272,6 +275,10 @@ function rownorm_data(data::AbstractMatrix)
     end
     broadcast!(/, dest, data, row_sums)
     dest
+end
+
+function balnorm_data(data::AbstractMatrix)
+    
 end
 
 function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",

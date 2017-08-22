@@ -9,22 +9,22 @@ using StatsBase
 using Clustering
 
 using FlashWeave.Tests
+using FlashWeave.Types
 using FlashWeave.Misc
 using FlashWeave.Statfuns
 using FlashWeave.StackChannels
 
 
-
 function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
-    test_name::String, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0,
-        levels::AbstractVector{ElType}=ElType[],
-    prev_TPC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0,
-    whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false, zero_mask::BitMatrix=trues(0,0))
+    test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0,
+    prev_TPC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0,
+        debug::Integer=0, whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
+    rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false,
+        z::Vector{ElType}=ElType[])
 
 
-    nz = is_zero_adjusted(test_name)
-    is_discrete = isdiscrete(test_name)
+    nz = is_zero_adjusted(test_obj)
+    is_discrete = isdiscrete(test_obj)
     is_dense = !issparse(data)
 
     if isempty(prev_TPC_dict)
@@ -58,32 +58,28 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
             continue
         end
 
-        if needs_nz_view(candidate, data, test_name, levels, false)
+        if needs_nz_view(candidate, data, test_obj)
             sub_data = @view data[data[:, candidate] .!= 0, :]
-        elseif test_name == "fz_ndz"
-            sub_data = @view data[(data[:, T] .!= 0) .| (data[:, candidate] .!= 0), :]
         else
             sub_data = data
         end
 
-        (test_result, lowest_sig_Zs) = test_subsets(T, candidate, TPC, sub_data, test_name, max_k, alpha, hps=hps,
-                                   n_obs_min=n_obs_min,
-                                   levels=levels, cor_mat=cor_mat,
-                                   pcor_set_dict=pcor_set_dict, debug=debug)
+        (test_result, lowest_sig_Zs) = test_subsets(T, candidate, TPC, sub_data, test_obj, max_k, alpha, hps=hps,
+                                   n_obs_min=n_obs_min, debug=debug, z=z)
 
         if issig(test_result, alpha)
             push!(TPC, candidate)
             TPC_dict[candidate] = (test_result.stat, test_result.pval)
 
             if debug > 0
-                println("\taccepted: ", test_result, " $(length(pcor_set_dict))")
+                println("\taccepted: ", test_result)
             end
         else
             if track_rejections
                 rej_dict[candidate] = (Tuple(lowest_sig_Zs), test_result)
             end
             if debug > 0
-                println("\trejected: ", test_result, " through Z ", lowest_sig_Zs, " $(length(pcor_set_dict))")
+                println("\trejected: ", test_result, " through Z ", lowest_sig_Zs)
             end
         end
 
@@ -97,16 +93,16 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
 end
 
 
-function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String,
-    max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, fast_elim::Bool=true,
-        no_red_tests::Bool=false, levels::AbstractVector{ElType}=ElType[],
-    prev_PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(), PC_unchecked::AbstractVector{Int}=[],
-    time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0, debug::Integer=0, whitelist::Set{Int}=Set{Int}(),
-    blacklist::Set{Int}=Set{Int}(), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,Float64}}(), rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false, zero_mask::BitMatrix=trues(0,0))
+function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, data::AbstractMatrix{ElType},
+        test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0,
+        fast_elim::Bool=true, no_red_tests::Bool=false, prev_PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(),
+        PC_unchecked::AbstractVector{Int}=[], time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0,
+        debug::Integer=0, whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
+        rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false,
+        z::Vector{ElType}=ElType[]) 
 
-    nz = is_zero_adjusted(test_name)
-    is_discrete = isdiscrete(test_name)
+    nz = is_zero_adjusted(test_obj)
+    is_discrete = isdiscrete(test_obj)
     is_dense = !issparse(data)
 
     if !isempty(prev_PC_dict)
@@ -143,10 +139,8 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
             continue
         end
 
-        if needs_nz_view(candidate, data, test_name, levels, false)
+        if needs_nz_view(candidate, data, test_obj)
             sub_data = @view data[data[:, candidate] .!= 0, :]
-        elseif test_name == "fz_ndz"
-            sub_data = @view data[(data[:, T] .!= 0) .| (data[:, candidate] .!= 0), :]
         else
             sub_data = data
         end
@@ -162,9 +156,8 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
             Z_wanted = Int[]
         end
         
-        (test_result, lowest_sig_Zs) = test_subsets(T, candidate, PC_nocand, sub_data, test_name, max_k, alpha, hps=hps,
-                                   n_obs_min=n_obs_min, levels=levels,
-                                   cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, debug=debug, Z_wanted=Z_wanted)
+        (test_result, lowest_sig_Zs) = test_subsets(T, candidate, PC_nocand, sub_data, test_obj, max_k, alpha, hps=hps,
+                                   n_obs_min=n_obs_min, debug=debug, Z_wanted=Z_wanted, z=z)
 
         if !issig(test_result, alpha)
             
@@ -198,21 +191,19 @@ end
 
 
 
-function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
+function si_HITON_PC{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
     fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
         blacklist::Set{Int}=Set{Int}(),
-        univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{ElType}=ElType[],
-    univar_step::Bool=isempty(univar_nbrs), cor_mat::Matrix{ElType}=zeros(ElType, 0, 0),
-    pcor_set_dict::Dict{String,Dict{String,ElType}}=Dict{String,Dict{String,ElType}}(),
-    prev_state::HitonState{Int}=HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false, zero_mask::BitMatrix=trues(0,0))
+        univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{DiscType}=DiscType[],
+    univar_step::Bool=isempty(univar_nbrs), cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
+    prev_state::HitonState{Int}=HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
 
     if debug > 0
         println("Finding neighbors for $T")
     end
 
-    #state = HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict())
     rej_dict = Dict{Int, Tuple{Tuple,TestResult}}()
-
+    
     if isdiscrete(test_name)
         if isempty(levels)
             levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
@@ -227,13 +218,16 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
 
             return HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
         end
+        
+        z = issparse(data) ? ElType[] : fill(-one(ElType), size(data, 1))
     else
-        levels = ElType[]
+        z = ElType[]
     end
 
+    test_obj = make_test_object(test_name, true, max_k=max_k, levels=levels, cor_mat=cor_mat)
 
-    if is_zero_adjusted(test_name)
-        if needs_nz_view(T, data, test_name, levels, true)
+    if is_zero_adjusted(test_obj)
+        if needs_nz_view(T, data, test_obj)
             data = @view data[data[:, T] .!= 0, :]
         end
     end
@@ -246,28 +240,21 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
     if debug > 0
         println("UNIVARIATE")
     end
-    
 
     if univar_step
         if isdiscrete(test_name)
-            univar_test_results = test(T, test_variables, data, test_name, hps, levels)
+            univar_test_results = test(T, test_variables, data, test_obj, hps, n_obs_min)
         else
-            uni_cor_mat = is_zero_adjusted(test_name) ? zeros(ElType, 0, 0) : cor_mat
-            univar_test_results = test(T, test_variables, data, test_name, n_obs_min, uni_cor_mat)
+            univar_test_results = test(T, test_variables, data, test_obj, n_obs_min)
         end
-    end    
 
-
-    # if local FDR was specified, apply it here
-    if univar_step
         pvals = map(x -> x.pval, univar_test_results)
 
+        # if local FDR was specified, apply it here
         if FDR
-            #pvals = adjust(pvals, BenjaminiHochberg())
             pvals = benjamini_hochberg(pvals)
         end
 
-        #univar_nbrs = Dict{Int,Tuple{Float64,Float64}}()
         empty!(univar_nbrs)
         for (nbr, stat, pval) in zip(test_variables, map(x -> x.stat, univar_test_results), pvals)
             if pval < alpha
@@ -296,12 +283,12 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
             # needed for sparse matrices (should stay sparse for univariate computations and then
             # be converted to a view for conditioning)
             if issparse(data) && is_zero_adjusted(test_name)
-                if needs_nz_view(T, data, test_name, levels, false)
+                if needs_nz_view(T, data, test_obj)
                     data = @view data[data[:, T] .!= 0, :]
                 end
             end    
 
-            if prev_state.phase == "I" || prev_state.phase == "S"#prev_state.phase != "E" && prev_state.phase != "C"
+            if prev_state.phase == "I" || prev_state.phase == "S"
 
                 if prev_state.phase == "I"
                     prev_TPC_dict = prev_state.state_results
@@ -334,11 +321,10 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 end
 
                 # interleaving phase
-                TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_name, max_k,
-                                                                    alpha, hps, n_obs_min, levels, prev_TPC_dict, time_limit,
-                                                                    start_time, debug, whitelist, blacklist, cor_mat,
-                                                                    pcor_set_dict, rej_dict,
-                                                                    track_rejections, zero_mask)
+                TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_obj, max_k,
+                                                                    alpha, hps, n_obs_min, prev_TPC_dict, time_limit,
+                                                                    start_time, debug, whitelist, blacklist,
+                                                                    rej_dict, track_rejections, z)
 
                 # set test stats of the initial candidate to its univariate association results
                 if prev_state.phase == "S"
@@ -394,11 +380,10 @@ function si_HITON_PC{ElType}(T::Int, data::AbstractMatrix{ElType}; test_name::St
                 PC_candidates = convert(Vector{Int}, collect(keys(TPC_dict)))
             end
 
-            PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_name, max_k, alpha,
-                                                       hps, n_obs_min, fast_elim, no_red_tests, levels,
+            PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_obj, max_k, alpha,
+                                                       hps, n_obs_min, fast_elim, no_red_tests,
                                                        prev_PC_dict, PC_unchecked, time_limit, start_time,
-                                                       debug, whitelist, blacklist, cor_mat, pcor_set_dict, rej_dict,
-                                                       track_rejections, zero_mask)
+                                                       debug, whitelist, blacklist, rej_dict, track_rejections, z)
 
             if !isempty(TPC_unchecked)
 
@@ -456,29 +441,16 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
                         hps::Integer=5, n_obs_min::Integer=-1, 
     convergence_threshold::AbstractFloat=0.01, FDR::Bool=true, global_univar::Bool=true, parallel::String="single",
         fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
-        weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=true, 
+        weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=false, 
         verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, fully_connect_clusters::Bool=false, cluster_mode="greedy",
-        zero_mask::BitMatrix=trues(0, 0))
+    track_rejections::Bool=false, fully_connect_clusters::Bool=false, cluster_mode="greedy")
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
     fast_elim: currently always on
-    """
-    if test_name == "fz_ndz"
-        if isempty(zero_mask)
-            error("zero-mask must be provided for test 'fz_ndz'")
-        end
-        
-        if issparse(data)
-            warn("sparse data currently not supported for test 'fz_ndz', converting to dense")
-            data = full(data)
-            zero_mask = full(zero_mask)
-        end
-    end
-            
+    """           
     
     if time_limit == -1.0
         if parallel == "multi_il"# && feed_forward
@@ -506,26 +478,29 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         warn("Setting fast_elim to true because time_limit has been specified")
         fast_elim = true
     end
-
     
     if recursive_pcor && iscontinuous(test_name)
         warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated
               variables, caution advised")
     end    
                     
+    data_prec = string(eltype(data))[end-1:end]
+    disc_type = eval(Symbol("Int$(data_prec)"))
+    cont_type = eval(Symbol("Float$(data_prec)"))
+    
     if isdiscrete(test_name)
         if verbose
             println("Computing levels..")
         end
         levels = get_levels(data)
-        cor_mat = zeros(ElType, 0, 0)
+        cor_mat = zeros(cont_type, 0, 0)
     else
-        levels = ElType[]
+        levels = disc_type[]
 
-        if recursive_pcor && !is_zero_adjusted(test_name) && test_name != "fz_ndz"
-            cor_mat = convert(Matrix{eltype(data)}, cor(data))
+        if recursive_pcor && !is_zero_adjusted(test_name)
+            cor_mat = convert(Matrix{cont_type}, cor(data))
         else
-            cor_mat = zeros(ElType, 0, 0)
+            cor_mat = zeros(cont_type, 0, 0)
         end            
     end
     
@@ -549,12 +524,9 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
                   :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
                   :time_limit => time_limit, :track_rejections => track_rejections)
 
-    pcor_set_dict = Dict{String,Dict{String,ElType}}()
 
-    #if track_rejections
     rej_dict = Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
     unfinished_state_dict = Dict{Int, HitonState{Int}}()
-    #end
 
     if global_univar
         # precompute univariate associations and sort variables (fewest neighbors first)
@@ -565,7 +537,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
 
         all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                               levels=levels, parallel=parallel, workers_local=workers_local,
-                                              cor_mat=cor_mat, correct_reliable_only=correct_reliable_only, zero_mask=zero_mask)
+                                              cor_mat=cor_mat, correct_reliable_only=correct_reliable_only)
         var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
         target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
 
@@ -623,7 +595,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         nbr_dict = all_univar_nbrs
     else
         if recursive_pcor && is_zero_adjusted(test_name)
-            cor_mat = zeros(ElType, size(data, 2), size(data, 2))
+            cor_mat = zeros(cont_type, size(data, 2), size(data, 2))
         end
                         
         if verbose
@@ -637,23 +609,19 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
                         
         if parallel == "single" || nprocs() == 1                            
             nbr_results = [si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels, cor_mat=cor_mat,
-                           pcor_set_dict=pcor_set_dict, zero_mask=zero_mask, kwargs...) for x in target_vars]
+                           kwargs...) for x in target_vars]
         else
             # embarassingly parallel
             if parallel == "multi_ep"
-                #@sync nbr_results_refs = [@spawn si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels,
-                #                          cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, kwargs...) for x in target_vars]
-
-                #nbr_results = map(fetch, nbr_results_refs)
                 nbr_results = @parallel (vcat) for x in target_vars
                     si_HITON_PC(x, data; univar_nbrs=all_univar_nbrs[x], levels=levels,
-                                cor_mat=cor_mat, pcor_set_dict=pcor_set_dict, zero_mask=zero_mask, kwargs...)
+                                cor_mat=cor_mat, kwargs...)
                 end
 
             # interleaved parallelism
             elseif endswith(parallel, "il")
                 il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, update_interval, kwargs,
-                                              convergence_threshold, cor_mat, zero_mask, parallel=parallel, edge_rule=edge_rule,
+                                              convergence_threshold, cor_mat, parallel=parallel, edge_rule=edge_rule,
                                               nonsparse_cond=nonsparse_cond, verbose=verbose, workers_local=workers_local,
                                               feed_forward=feed_forward)
                 nbr_results = [il_dict[target_var] for target_var in target_vars]
@@ -771,11 +739,10 @@ end
 
 function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
                             stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
-                            test_name::String, hps::Integer, n_obs_min::Integer, levels::AbstractVector{ElType},
-                            nz::Bool, cor_mat::Matrix{ElType}, zero_mask::BitMatrix, correct_reliable_only::Bool=false)
+                            test_obj::AbstractTest, hps::Integer, n_obs_min::Integer, correct_reliable_only::Bool=false)
     n_vars = size(data, 2)
 
-    if needs_nz_view(X, data, test_name, levels, true)
+    if needs_nz_view(X, data, test_obj)
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
@@ -783,10 +750,10 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
 
     Ys = collect(Ys_slice)
 
-    if isdiscrete(test_name)
-        test_results = test(X, Ys, sub_data, test_name, hps, levels, n_obs_min)
+    if isdiscrete(test_obj)
+        test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
     else
-        test_results = test(X, Ys, sub_data, test_name, n_obs_min, cor_mat, zero_mask)
+        test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
     end
 
     for (Y, test_res) in zip(Ys, test_results)
@@ -806,11 +773,10 @@ end
 
 
 function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
-                            test_name::String, hps::Integer, n_obs_min::Integer, levels::AbstractVector{ElType},
-                            nz::Bool, cor_mat::Matrix{ElType}, zero_mask::BitMatrix)
+                            test_obj::String, hps::Integer, n_obs_min::Integer)
     n_vars = size(data, 2)
 
-    if needs_nz_view(X, data, test_name, levels, true)
+    if needs_nz_view(X, data, test_obj)
         sub_data = @view data[data[:, X] .!= 0, :]
     else
         sub_data = data
@@ -818,27 +784,30 @@ function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data
 
     Ys = collect(Ys_slice)
 
-    if isdiscrete(test_name)
-        test_results = test(X, Ys, sub_data, test_name, hps, levels, n_obs_min)
+    if isdiscrete(test_obj)
+        test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
     else
-        test_results = test(X, Ys, sub_data, test_name, n_obs_min, cor_mat)
+        test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
     end
 end
 
 
-function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
-        levels::AbstractVector{ElType}=ElType[], parallel::String="single", workers_local::Bool=true,
-        cor_mat::Matrix{ElType}=zeros(ElType, 0, 0), zero_mask::BitMatrix=trues(0, 0),
+function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(data::AbstractMatrix{ElType};
+        test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
+        levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
+        cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
         chunk_size::Int=500, correct_reliable_only::Bool=true)
 
     if startswith(test_name, "mi") && isempty(levels)
         levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
     end
+    
+    test_obj = make_test_object(test_name, false, levels=levels, cor_mat=cor_mat)
 
     n_vars = size(data, 2)
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
 
-    nz = is_zero_adjusted(test_name)
+    nz = is_zero_adjusted(test_obj)
 
 
     work_items = collect(work_chunker(n_vars, min(chunk_size, div(n_vars, 3))))
@@ -848,8 +817,7 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
         stats = zeros(Float64, n_pairs)
 
         for (X, Ys_slice) in work_items
-            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_name, hps, n_obs_min, levels, nz, cor_mat, zero_mask,
-                correct_reliable_only)
+            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_obj, hps, n_obs_min, correct_reliable_only)
         end
 
     else
@@ -860,22 +828,16 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
                 shared_pvals = SharedArray{Float64}(n_pairs)
                 shared_stats = SharedArray{Float64}(n_pairs)
                 @sync @parallel for work_item in work_items
-                    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_name, hps, n_obs_min,
-                                                                    levels, nz, cor_mat, zero_mask, correct_reliable_only)
+                    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_obj, hps,
+                                      n_obs_min, correct_reliable_only)
                 end
                 stats = shared_stats.s
                 pvals = shared_pvals.s
 
             # otherwise make workers store test results remotely and gather them in the end via network
             else
-                #error("Remote parallelism not needs fixing.")
-                #@sync all_test_result_refs = [@spawn pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, levels,
-                #                              nz, cor_mat)
-                #                              for work_item in work_items]
-                #all_test_results = map(fetch, all_test_result_refs)
                 all_test_results = @parallel (vcat) for work_item in work_items
-                    pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, n_obs_min, levels,
-                                              nz, cor_mat, zero_mask)
+                    pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, n_obs_min)
                 end
                 
                 pvals = ones(Float64, n_pairs)
@@ -905,8 +867,8 @@ function pw_univar_neighbors{ElType <: Real}(data::AbstractMatrix{ElType}; test_
             pvals = ones(Float64, n_pairs)
             stats = zeros(Float64, n_pairs)
             Threads.@threads for work_item in work_items
-                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_name, hps, n_obs_min, levels, nz,
-                    cor_mat, zero_mask, correct_reliable_only)
+                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_obj, hps, n_obs_min,
+                                  correct_reliable_only)
             end
         end
     end
@@ -937,14 +899,18 @@ end
 
 function pw_unistat_matrix{T,ElType<:Real}(data::AbstractMatrix{ElType}, test_name::String; parallel::String="single",
         pw_stat_dict::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}=Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}(),
-    pw_uni_args::Dict{Symbol,T}=Dict{Symbol,Any}())
+    pw_uni_args::Dict{Symbol,T}=Dict{Symbol,Any}(), unsig_is_na::Bool=true)
 
     if isempty(pw_stat_dict)
         pw_stat_dict = pw_univar_neighbors(data; test_name=test_name, parallel=parallel, pw_uni_args...)
     end
 
-    stat_mat = zeros(Float64, size(data, 2), size(data, 2))
-
+    if unsig_is_na
+        stat_mat = repmat([NaN64], size(data, 2), size(data, 2))
+    else
+        stat_mat = zeros(Float64, size(data, 2), size(data, 2))
+    end
+        
     for var_A in keys(pw_stat_dict)
         for var_B in keys(pw_stat_dict[var_A])
             (stat, pval) = pw_stat_dict[var_A][var_B]
@@ -958,14 +924,19 @@ end
 function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::String="fz";
         cluster_sim_threshold::AbstractFloat=0.8, parallel="single",
     ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0), verbose::Bool=false, greedy::Bool=true,
-    pw_uni_args::Dict{Symbol,T}=Dict{Symbol,Any}())
-
+    pw_uni_args::Dict{Symbol,T}=Dict{Symbol,Any}(), unsig_is_na::Bool=true)
+    
     if verbose
         println("Computing pairwise similarities")
     end
 
+    if !greedy && unsig_is_na
+        warn("Hierarchical clustering currently doesn't support NA values, assuming them to be max distance.")
+        unsig_is_na = false
+    end
+    
     if isempty(sim_mat)
-        sim_mat = pw_unistat_matrix(data, stat_type, parallel=parallel, pw_uni_args=pw_uni_args)
+        sim_mat = pw_unistat_matrix(data, stat_type, parallel=parallel, pw_uni_args=pw_uni_args, unsig_is_na=unsig_is_na)
     end
 
     if stat_type == "mi"
@@ -1018,7 +989,7 @@ function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::S
             for var_B in unclustered_vars
                 sim = sim_mat[var_A, var_B]
 
-                if greedy && (sim == 0.0)
+                if greedy && ((sim == 0.0) || isnan(sim))
                     continue
                 end
 
@@ -1088,8 +1059,10 @@ function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::S
 end
 
 
-function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels::AbstractVector{ElType}, cor_mat::Matrix{ElType}, zero_mask::BitMatrix, edge_rule::String, nonsparse_cond::Bool, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel,
-                            GLL_fun, GLL_args::Dict{Symbol,Any})
+function interleaved_worker{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(data::AbstractMatrix{ElType},
+        levels::AbstractVector{DiscType}, cor_mat::Matrix{ContType}, edge_rule::String, nonsparse_cond::Bool,
+        shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any})
+    
     if nonsparse_cond
         data = full(data)
     end
@@ -1108,17 +1081,16 @@ function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels
             if prev_state.phase == "C"
                 converged = true
             elseif converged
-                prev_state.phase = "C"
+                prev_state = HitonState("C", prev_state.state_results, prev_state.inter_results, prev_state.unchecked_vars,
+                                        prev_state.state_rejections)
             end
                                                         
             if edge_rule == "AND"
                 nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels,
-                                        prev_state=prev_state, blacklist=skip_nbrs, cor_mat=cor_mat, zero_mask=zero_mask,
-                                        GLL_args...)
+                                        prev_state=prev_state, blacklist=skip_nbrs, cor_mat=cor_mat, GLL_args...)
             else
                 nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs, levels=levels,
-                                        prev_state=prev_state, whitelist=skip_nbrs, cor_mat=cor_mat, zero_mask=zero_mask,
-                                        GLL_args...)
+                                        prev_state=prev_state, whitelist=skip_nbrs, cor_mat=cor_mat, GLL_args...)
             end
             put!(shared_result_q, (target_var, nbr_state))
         catch exc
@@ -1132,10 +1104,13 @@ function interleaved_worker{ElType <: Real}(data::AbstractMatrix{ElType}, levels
 end
 
 
-function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType}, all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}},
-     levels::AbstractVector{ElType}, update_interval::Real, GLL_args::Dict{Symbol,Any},
-        convergence_threshold::AbstractFloat, cor_mat::Matrix{ElType}, zero_mask::BitMatrix; conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi", edge_rule::String="OR", nonsparse_cond::Bool=false,
-        verbose::Bool=true, workers_local::Bool=true, feed_forward::Bool=true)
+function interleaved_backend{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType},
+        all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, levels::AbstractVector{DiscType},
+        update_interval::Real, GLL_args::Dict{Symbol,Any}, convergence_threshold::AbstractFloat, cor_mat::Matrix{ContType};
+        conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi",
+        edge_rule::String="OR", nonsparse_cond::Bool=false, verbose::Bool=true, workers_local::Bool=true,
+        feed_forward::Bool=true)
+    
     jobs_total = length(target_vars)
 
     if startswith(parallel, "multi") || startswith(parallel, "threads")
@@ -1145,7 +1120,6 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     elseif startswith(parallel, "single")
         n_workers = 1
         job_q_buff_size = 1
-        #@assert nprocs() > 1 "Need to have one additional worker for interleaved mode."
     else
         error("$parallel not a valid execution mode.")
     end
@@ -1158,7 +1132,8 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
     queued_jobs = 0
     waiting_vars = Stack(Int)
     for (i, target_var) in enumerate(reverse(target_vars))
-        job = (target_var, all_univar_nbrs[target_var], HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), Set{Int}())
+        job = (target_var, all_univar_nbrs[target_var], HitonState{Int}("S", OrderedDict(), OrderedDict(),
+                                                                        [], Dict()), Set{Int}())
 
         if i < jobs_total - n_workers
             push!(waiting_vars, target_var)
@@ -1173,7 +1148,8 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
         println("Starting workers and sending data..")
         tic()
     end
-    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, zero_mask, edge_rule, nonsparse_cond, shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
+    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, nonsparse_cond,
+                                                shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
     
     if verbose
         println("Done. Starting inference..")
@@ -1207,7 +1183,7 @@ function interleaved_backend{ElType <: Real}(target_vars::AbstractVector{Int}, d
             # node has not yet finished computing
             if curr_state.phase != "F" && curr_state.phase != "C"
                 if converged
-                    curr_state.phase = "C"
+                    curr_state = HitonState("C", curr_state.state_results, curr_state.inter_results, curr_state.unchecked_vars, curr_state.state_rejections)
                 end
                 
                 if feed_forward

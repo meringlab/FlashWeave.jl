@@ -7,84 +7,29 @@ using DataStructures
 using JLD2
 using MetaGraphs
 
-export PairMeanObj, PairCorObj, HitonState, TestResult, LGLResult, IndexPair, needs_nz_view, combinations_with_whitelist, get_levels, min_sec_indices!, stop_reached, isdiscrete, iscontinuous, is_zero_adjusted, is_mi_test, signed_weight, workers_all_local, make_cum_levels!, level_map!, print_network_stats, maxweight, make_symmetric_graph, map_edge_keys, pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!, make_chunks, work_chunker
+using FlashWeave.Types
+
+export make_test_object, needs_nz_view, get_levels, stop_reached, signed_weight,
+       workers_all_local, make_cum_levels!, make_cum_levels, level_map!,
+       print_network_stats, maxweight, make_symmetric_graph, map_edge_keys,
+       pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!,
+       make_chunks, work_chunker
 
 const inf_weight = 708.3964185322641
 
 
-mutable struct PairMeanObj
-    sum_x::Float64
-    sum_y::Float64
-    n::Int
-end
-
-mutable struct PairCorObj
-    cov_xy::Float64
-    var_x::Float64
-    var_y::Float64
-    mean_x::Float64
-    mean_y::Float64
-end
-
-struct TestResult
-    stat :: Float64
-    pval :: Float64
-    df :: Int
-    suff_power :: Bool
-end
-
-struct HitonState{T}
-    phase :: String
-    state_results :: OrderedDict{T,Tuple{Float64,Float64}}
-    inter_results :: OrderedDict{T,Tuple{Float64,Float64}}
-    unchecked_vars :: Vector{T}
-    state_rejections :: Dict{T,Tuple{Tuple,TestResult}}
-end
-
-struct LGLResult{T}
-    graph::MetaGraph{T,Float64}
-    rejections::Dict{T, Dict{T, Tuple{Tuple,TestResult}}}
-    unfinished_states::Dict{T, HitonState}
-end
-
-#type IndexPair
-#    min_ind :: Int
-#    sec_ind :: Int
-#end
-
-
-import Combinatorics:Combinations
-import Base:start,next,done
-
-struct CombinationsWL{T,S}
-    c::Combinations{T}
-    wl::S
-end
-
-start(c::CombinationsWL) = start(c.c)
-next(c::CombinationsWL, s) = next(c.c, s)
-
-function done(c::CombinationsWL, s)
-    if done(c.c, s)
-        return true
-    else
-        (comb, next_s) = next(c.c, s)
-        return !(comb[1] in c.wl)
-    end
-end
-
-function combinations_with_whitelist(a::AbstractVector{T}, wl::AbstractVector{T}, t::Integer) where T <: Integer
-    wl_set = Set(wl)
+function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool; max_k::Integer=0,
+        levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0))
+    discrete_test = isdiscrete(test_name)
+    nz = is_zero_adjusted(test_name) ? Nz() : NoNz()
     
-    a_wl = copy(wl)
-    for e in a
-        if !(e in wl_set)
-            push!(a_wl, e)
-        end
+    if cond
+        test_obj = discrete_test ? MiTestCond(levels, nz, max_k) : FzTestCond(cor_mat, Dict{String,Dict{String,ContType}}(), nz)
+    else
+        test_obj = discrete_test ? MiTest(levels, nz) : FzTest(cor_mat, nz)
     end
-    CombinationsWL(combinations(a_wl, t), wl_set)    
+    test_obj
 end
-
 
 function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,Int})::ElType
     levels = length(unique(nonzeros(col_vec)))
@@ -97,39 +42,18 @@ function get_levels{ElType <: Integer}(col_vec::AbstractVector{ElType})::ElType
     length(unique(col_vec))
 end
 
-
 function get_levels{ElType <: Integer}(data::AbstractMatrix{ElType})
     map(x -> get_levels(data[:, x]), 1:size(data, 2))
 end
 
 
-#function min_sec_indices!(ind_pair::IndexPair, index_vec::AbstractVector{Int})
-#    min_ind = 0
-#    sec_ind = 0
-#
-#    for ind in index_vec
-#        if min_ind == 0 || ind < min_ind
-#            sec_ind = min_ind
-#            min_ind = ind
-#        elseif sec_ind == 0 || ind < sec_ind
-#            sec_ind = ind
-#        end
-#    end
-#    ind_pair.min_ind = min_ind
-#    ind_pair.sec_ind = sec_ind
-#end
-
 stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
-isdiscrete(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
-iscontinuous(test_name::String) = test_name in ["fz", "fz_nz", "fz_ndz"]
-is_zero_adjusted(test_name::String) = endswith(test_name, "nz")
-is_mi_test(test_name::String) = test_name in ["mi", "mi_nz", "mi_expdz"]
-
-function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_name::String, levels::Vector{ElType}, univar::Bool)
-    nz = is_zero_adjusted(test_name)
-    disc = isdiscrete(test_name)
-    is_nz_var = !disc || (levels[X] > 2)
+function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest)
+    univar = isa(test_obj, MiTest) || isa(test_obj, FzTest)
+    nz = is_zero_adjusted(test_obj)
+    disc = isdiscrete(test_obj)
+    is_nz_var = !disc || (test_obj.levels[X] > 2)
     nz && is_nz_var && (!issparse(data) || !univar)
 end
 
@@ -202,8 +126,15 @@ function make_cum_levels!{ElType <: Integer}(cum_levels::AbstractVector{ElType},
     end
 end
 
+function make_cum_levels{ElType <: Integer}(Zs::AbstractVector{Int}, levels::AbstractVector{ElType})
+    cum_levels = zeros(Int, length(Zs))
+    make_cum_levels!(cum_levels, Zs, levels)
+    cum_levels
+end
 
-function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, z::AbstractVector{ElType}, cum_levels::AbstractVector{ElType},
+
+function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, z::AbstractVector{ElType},
+        cum_levels::AbstractVector{ElType},
     z_map_arr::AbstractVector{ElType})
     fill!(z_map_arr, -1)
     levels_z = zero(ElType)
@@ -588,6 +519,9 @@ function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMat
         end
     end
 end
+
+
+
 
 make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))
 work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))

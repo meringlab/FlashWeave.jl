@@ -5,7 +5,7 @@ println("Preparing tests")
 #if nprocs() == 1
 #    addprocs(1)
 #end
-warn("Multicore currently disabled due to instability (occasional segfaults)")
+warn("Multicore testing currently disabled due to instability")
 
 using FlashWeave
 using Base.Test

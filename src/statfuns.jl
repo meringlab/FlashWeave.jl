@@ -1,11 +1,15 @@
 module Statfuns
 
-export cor_nz, pcor, pcor_rec, cor_subset!, fz_pval, mutual_information, mi_pval, adjust_df, oddsratio, nz_adjust_cont_tab, benjamini_hochberg
+export cor_nz, pcor, pcor_rec, cor_subset!,
+       fz_pval, mutual_information, mi_pval,
+       adjust_df, oddsratio, nz_adjust_cont_tab,
+       benjamini_hochberg
 
 import Base:cor
 
 using Distributions
 
+using FlashWeave.Types
 using FlashWeave.Misc
 
 
@@ -20,14 +24,14 @@ function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
 end
 
 
-function oddsratio{ElType <: Integer}(cont_tab::AbstractArray{ElType}, nz::Bool=false)
+function oddsratio{ElType <: Integer}(ctab::AbstractArray{ElType}, nz::Bool=false)
     offset = nz ? 1 : 0
-    if ndims(cont_tab) == 2
-        ondiag = (cont_tab[1 + offset, 1 + offset] * cont_tab[2 + offset, 2 + offset])
-        offdiag = (cont_tab[1 + offset, 2 + offset] * cont_tab[2 + offset, 1 + offset])
-        return (cont_tab[1 + offset, 1 + offset] * cont_tab[2 + offset, 2 + offset]) / (cont_tab[1 + offset, 2 + offset] * cont_tab[2 + offset, 1 + offset])
+    if ndims(ctab) == 2
+        ondiag = (ctab[1 + offset, 1 + offset] * ctab[2 + offset, 2 + offset])
+        offdiag = (ctab[1 + offset, 2 + offset] * ctab[2 + offset, 1 + offset])
+        return (ctab[1 + offset, 1 + offset] * ctab[2 + offset, 2 + offset]) / (ctab[1 + offset, 2 + offset] * ctab[2 + offset, 1 + offset])
     else
-        oddsratios_per_Zcombo = filter(!isnan, [oddsratio(cont_tab[:, :, i], false) for i in 1:size(cont_tab, 3)])
+        oddsratios_per_Zcombo = filter(!isnan, [oddsratio(ctab[:, :, i], false) for i in 1:size(ctab, 3)])
         return isempty(oddsratios_per_Zcombo) ? NaN64 : median(oddsratios_per_Zcombo)
     end
 end
@@ -220,13 +224,13 @@ function mi_pval(mi::AbstractFloat, df::Integer, n_obs::Integer)
 end
 
 
-function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType})
-    num_dims = ndims(cont_tab)
-    levels_x = size(cont_tab, 1)
-    levels_y = size(cont_tab, 2)
+function mutual_information{ElType <: Integer}(ctab::AbstractArray{ElType})
+    num_dims = ndims(ctab)
+    levels_x = size(ctab, 1)
+    levels_y = size(ctab, 2)
 
     if num_dims == 3
-        levels_z = size(cont_tab, 3)
+        levels_z = size(ctab, 3)
     end
 
     if num_dims == 3
@@ -234,81 +238,44 @@ function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType})
         nj = zeros(ElType, levels_y, levels_z)
         nk = zeros(ElType, levels_z)
 
-        return mutual_information(cont_tab, levels_x, levels_y, levels_z, ni, nj, nk)
+        return mutual_information(ctab, levels_x, levels_y, levels_z, ni, nj, nk)
     else
         ni = zeros(ElType, levels_x)
         nj = zeros(ElType, levels_y)
 
-        return mutual_information(cont_tab, levels_x, levels_y, ni, nj)
+        return mutual_information(ctab, levels_x, levels_y, ni, nj)
     end
 
 end
 
 
-function estimate_expected_dz!{ElType <: AbstractFloat}(cont_tab::AbstractArray{ElType, 3}, levels_z::Integer=0)
-
-    if ndims(cont_tab) == 3
-        for i in 1:levels_z
-            estimate_expected_dz!(cont_tab[:, :, i])
-        end
-    else
-        num_dz = cont_tab[1, 1]
-
-        while true
-            n_obs = sum(cont_tab)
-            #cont_tab_rel = cont_tab ./ n_obs
-            prev_exp = cont_tab[1, 1]
-            new_exp = Int(round((sum(cont_tab[1, :]) / n_obs) * (sum(cont_tab[:, 1]) / n_obs) * n_obs))
-            cont_tab[1, 1] = new_exp
-
-            if new_exp == prev_exp
-                break
-            else
-                prev_exp = new_exp
-            end
-        end
-    end
-end
-
-
-function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType, 3}, levels_x::Integer, levels_y::Integer, levels_z::Integer,
-        ni::AbstractMatrix{ElType}, nj::AbstractMatrix{ElType}, nk::AbstractVector{ElType}, exp_dz::Bool=false)
+function mutual_information{ElType <: Integer}(ctab::AbstractArray{ElType, 3}, levels_x::Integer, levels_y::Integer,
+        levels_z::Integer, marg_i::AbstractMatrix{ElType}, marg_j::AbstractMatrix{ElType}, marg_k::AbstractVector{ElType})
     """Note: returns mutual information * number of observations!"""
     #if reset_marginals
-    fill!(ni, 0)
-    fill!(nj, 0)
-    fill!(nk, 0)
-
-    if exp_dz
-        estimate_expected_dz!(cont_tab, levels_z)
-    end
-    #println("cont tab:", cont_tab)
+    fill!(marg_i, 0)
+    fill!(marg_j, 0)
+    fill!(marg_k, 0)
 
     # compute marginals
     for i in 1:levels_x, j in 1:levels_y, k in 1:levels_z
-        #println("i, j, k: $i $j $k")
-        ni[i, k] += cont_tab[i, j, k]
-        nj[j, k] += cont_tab[i, j, k]
-        nk[k] += cont_tab[i, j, k]
+        marg_i[i, k] += ctab[i, j, k]
+        marg_j[j, k] += ctab[i, j, k]
+        marg_k[k] += ctab[i, j, k]
     end
 
     mi_stat = 0.0
-    n_obs = sum(cont_tab)
+    n_obs = sum(ctab)
 
 
     # compute mutual information
-    for i in 1:size(cont_tab, 1), j in 1:size(cont_tab, 2), k in 1:size(cont_tab, 3)
+    for i in 1:size(ctab, 1), j in 1:size(ctab, 2), k in 1:size(ctab, 3)
+        cell_value = ctab[i, j, k]
+        marg_ik = marg_i[i, k]
+        marg_jk = marg_j[j, k]
 
-        #if exp_dz && i == 1 && j == 1
-        #    continue
-        #end
-
-        cell_value = cont_tab[i, j, k]
-        nik = ni[i, k]
-        njk = nj[j, k]
-
-        if cell_value != 0 && nik != 0 && njk != 0
-            inner_term = log((nk[k] * cell_value) / (nik * njk))
+        if cell_value != 0 && marg_ik != 0 && marg_jk != 0
+            inner_term = log((marg_k[k] * cell_value) / (marg_ik * marg_jk))
             mi_stat += cell_value * inner_term
         end
     end
@@ -317,38 +284,29 @@ function mutual_information{ElType <: Integer}(cont_tab::AbstractArray{ElType, 3
 end
 
 
-function mutual_information{ElType <: Integer}(cont_tab::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, ni::AbstractVector{ElType},
-        nj::AbstractVector{ElType}, exp_dz::Bool=false)
+function mutual_information{ElType <: Integer}(ctab::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer,
+        marg_i::AbstractVector{ElType}, marg_j::AbstractVector{ElType})
     """Note: returns mutual information * number of observations!"""
-    fill!(ni, 0)
-    fill!(nj, 0)
-
-    if exp_dz
-        estimate_expected_dz!(cont_tab)
-    end
+    fill!(marg_i, 0)
+    fill!(marg_j, 0)
 
     # compute marginals
     for i in 1:levels_x, j in 1:levels_y
-        ni[i] += cont_tab[i, j]
-        nj[j] += cont_tab[i, j]
+        marg_i[i] += ctab[i, j]
+        marg_j[j] += ctab[i, j]
     end
 
     mi_stat = 0.0
-    n_obs = sum(cont_tab)
+    n_obs = sum(ctab)
 
     # compute mutual information
     for i in 1:levels_x
-        nii = ni[i]
+        marg_ii = marg_i[i]
         for j in 1:levels_y
-            #if exp_dz && i == 1 && j == 1
-            #    continue
-            #end
-
-            cell_value = cont_tab[i, j]
-            njj = nj[j]
-            if cell_value != 0 && nii != 0 && njj != 0
-                cell_mi = cell_value * log((n_obs * cell_value) / (nii * njj))
-                #cell_mi = cell_value * ((log(n_obs) + log(cell_value)) - (log(nii) + log(njj)))
+            cell_value = ctab[i, j]
+            marg_jj = marg_j[j]
+            if cell_value != 0 && marg_ii != 0 && marg_jj != 0
+                cell_mi = cell_value * log((n_obs * cell_value) / (marg_ii * marg_jj))
                 mi_stat += cell_mi
             end
         end
@@ -358,14 +316,14 @@ function mutual_information{ElType <: Integer}(cont_tab::AbstractMatrix{ElType},
 end
 
 
-function adjust_df{ElType <: Integer}(ni::AbstractVector{ElType}, nj::AbstractVector{ElType}, levels_x::Integer, levels_y::Integer)
+function adjust_df{ElType <: Integer}(marg_i::AbstractVector{ElType}, marg_j::AbstractVector{ElType}, levels_x::Integer, levels_y::Integer)
     alx = 0
     aly = 0
     for i in 1:levels_x
-        alx += sign(ni[i])
+        alx += sign(marg_i[i])
     end
     for j in 1:levels_y
-        aly += sign(nj[j])
+        aly += sign(marg_j[j])
     end
 
     alx = max(1, alx)
@@ -377,25 +335,25 @@ function adjust_df{ElType <: Integer}(ni::AbstractVector{ElType}, nj::AbstractVe
 end
 
 
-function adjust_df{ElType <: Integer}(ni::AbstractMatrix{ElType}, nj::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
+function adjust_df{ElType <: Integer}(marg_i::AbstractMatrix{ElType}, marg_j::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
     df = 0
     for k in 1:levels_z
-        df += adjust_df(ni[:, k], nj[:, k], levels_x, levels_y)
+        df += adjust_df(marg_i[:, k], marg_j[:, k], levels_x, levels_y)
     end
     df
 end
 
 
-function nz_adjust_cont_tab{ElType <: Integer}(levels_x::Integer, levels_y::Integer, cont_tab::AbstractArray{ElType})
+function nz_adjust_cont_tab{ElType <: Integer}(levels_x::Integer, levels_y::Integer, ctab::AbstractArray{ElType})
     offset_x = levels_x > 2 ? 2 : 1
     offset_y = levels_y > 2 ? 2 : 1
 
-    if ndims(cont_tab) == 2
-        return @view cont_tab[offset_x:end, offset_y:end]
-    elseif ndims(cont_tab) == 3
-        return @view cont_tab[offset_x:end, offset_y:end, :]
+    if ndims(ctab) == 2
+        return @view ctab[offset_x:end, offset_y:end]
+    elseif ndims(ctab) == 3
+        return @view ctab[offset_x:end, offset_y:end, :]
     else
-        error("cont_tab must have 2 or 3 dimensions (found $(ndims(cont_tab)) )")
+        error("ctab must have 2 or 3 dimensions (found $(ndims(ctab)) )")
     end
 end
 
