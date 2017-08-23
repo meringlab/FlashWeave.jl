@@ -50,11 +50,9 @@ end
 stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
 function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest)
-    univar = isa(test_obj, MiTest) || isa(test_obj, FzTest)
     nz = is_zero_adjusted(test_obj)
-    disc = isdiscrete(test_obj)
-    is_nz_var = !disc || (test_obj.levels[X] > 2)
-    nz && is_nz_var && (!issparse(data) || !univar)
+    is_nz_var = iscontinuous(test_obj) || test_obj.levels[X] > 2
+    nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))    
 end
 
 signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)

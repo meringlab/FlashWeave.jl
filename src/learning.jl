@@ -2,7 +2,6 @@ module Learning
 
 export LGL, si_HITON_PC
 
-#using MultipleTesting
 using LightGraphs
 using DataStructures
 using StatsBase
