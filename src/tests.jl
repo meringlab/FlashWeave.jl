@@ -167,7 +167,7 @@ end
 ### CONDITIONAL ###
 ###################
 
-function test{ElType <: Integer}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_obj::MiTestCond, hps::Integer, z::AbstractVector{ElType}=ElType[])
+function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Integer}, test_obj::MiTestCond, hps::Integer, z::AbstractVector{<:Integer}=Int[])
     """Test association between X and Y"""
     levels_x = test_obj.levels[X]
     levels_y = test_obj.levels[Y]
@@ -211,11 +211,11 @@ function test{ElType <: Integer}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::
 end
 
 
-function test{ElType <: Integer}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String, hps::Integer=5)
+function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5)
     levels = get_levels(data)
     test_obj = MiTestCond(levels, is_zero_adjusted(test_name) ? Nz() : NoNz(), length(Zs))
 
-    z = issparse(data) ? ElType[] : zeros(ElType, size(data, 1))
+    z = issparse(data) ? eltype(levels)[] : zeros(eltype(levels), size(data, 1))
     test(X, Y, Zs, data, test_obj, hps, z)
 end
 
@@ -223,7 +223,7 @@ end
 
 ## CONTINUOUS ##
 
-function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType},
+function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFloat},
     test_obj::FzTestCond, n_obs_min::Integer, cache_result::Bool=true)
     """Critical: expects zeros to be trimmed from both X and Y if nz is true"""
 
@@ -243,18 +243,18 @@ function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, 
 end
 
 
-function test{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, test_name::String; recursive::Bool=true, n_obs_min::Integer=0)
-    cor_mat = recursive ? cor(data) : zeros(ElType, 0, 0)
-    test_obj = FzTestCond(cor_mat, Dict{String,Dict{String,ElType}}(), is_zero_adjusted(test_name) ? Nz() : NoNz())
+function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Real}, test_name::String; recursive::Bool=true, n_obs_min::Integer=0)
+    cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)
+    test_obj = FzTestCond(cor_mat, Dict{String,Dict{String,eltype(cor_mat)}}(), is_zero_adjusted(test_name) ? Nz() : NoNz())
     test(X, Y, Zs, data, test_obj, n_obs_min, true)
 end
 
 
 ## MAIN SUBSET TEST FUNCTION ##
 
-function test_subsets{ElType <: Real}(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{ElType},
+function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{<:Real},
     test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, n_obs_min::Integer=0,
-    debug::Int=0, Z_wanted::AbstractVector{Int}=Int[], z::Vector{ElType}=ElType[])
+    debug::Int=0, Z_wanted::AbstractVector{Int}=Int[], z::Vector{<:Integer}=Int[])
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
     lowest_sig_Zs = Int[]

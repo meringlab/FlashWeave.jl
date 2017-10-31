@@ -31,14 +31,14 @@ function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool
     test_obj
 end
 
-function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,Int})::ElType
+function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,Int})
     levels = length(unique(nonzeros(col_vec)))
     add_zero = col_vec.n > length(col_vec.nzind) ? one(ElType) : zero(ElType)
     levels + add_zero
 end
 
 
-function get_levels{ElType <: Integer}(col_vec::AbstractVector{ElType})::ElType
+function get_levels{ElType <: Integer}(col_vec::AbstractVector{ElType})
     length(unique(col_vec))
 end
 
@@ -52,7 +52,7 @@ stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit 
 function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest)
     nz = is_zero_adjusted(test_obj)
     is_nz_var = iscontinuous(test_obj) || test_obj.levels[X] > 2
-    nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))    
+    nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))# || isa(test_obj, MiTestCond))    
 end
 
 signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)
@@ -131,9 +131,9 @@ function make_cum_levels{ElType <: Integer}(Zs::AbstractVector{Int}, levels::Abs
 end
 
 
-function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, z::AbstractVector{ElType},
-        cum_levels::AbstractVector{ElType},
-    z_map_arr::AbstractVector{ElType})
+function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, z::AbstractVector{<:Integer},
+        cum_levels::AbstractVector{<:Integer},
+    z_map_arr::AbstractVector{<:Integer})
     fill!(z_map_arr, -1)
     levels_z = zero(ElType)
 

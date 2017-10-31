@@ -19,7 +19,7 @@ function interleaving_phase{ElType <: Real}(T::Int, candidates::AbstractVector{I
     prev_TPC_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(), time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0,
         debug::Integer=0, whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
     rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false,
-        z::Vector{ElType}=ElType[])
+        z::Vector{<:Integer}=Int[])
 
 
     nz = is_zero_adjusted(test_obj)
@@ -98,7 +98,7 @@ function elimination_phase{ElType <: Real}(T::Int, TPC::AbstractVector{Int}, dat
         PC_unchecked::AbstractVector{Int}=[], time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0,
         debug::Integer=0, whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
         rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false,
-        z::Vector{ElType}=ElType[]) 
+        z::Vector{<:Integer}=Int[]) 
 
     nz = is_zero_adjusted(test_obj)
     is_discrete = isdiscrete(test_obj)
@@ -218,9 +218,9 @@ function si_HITON_PC{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(T
             return HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
         end
         
-        z = issparse(data) ? ElType[] : fill(-one(ElType), size(data, 1))
+        z = !issparse(data) ? fill(-one(DiscType), size(data, 1)) : DiscType[]
     else
-        z = ElType[]
+        z = DiscType[]
     end
 
     test_obj = make_test_object(test_name, true, max_k=max_k, levels=levels, cor_mat=cor_mat)
@@ -241,10 +241,12 @@ function si_HITON_PC{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(T
     end
 
     if univar_step
+        uni_test_obj = make_test_object(test_name, false, max_k=0, levels=levels, cor_mat=cor_mat)
+        
         if isdiscrete(test_name)
-            univar_test_results = test(T, test_variables, data, test_obj, hps, n_obs_min)
+            univar_test_results = test(T, test_variables, data, uni_test_obj, hps, n_obs_min)
         else
-            univar_test_results = test(T, test_variables, data, test_obj, n_obs_min)
+            univar_test_results = test(T, test_variables, data, uni_test_obj, n_obs_min)
         end
 
         pvals = map(x -> x.pval, univar_test_results)
@@ -483,9 +485,9 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
               variables, caution advised")
     end    
                     
-    data_prec = string(eltype(data))[end-1:end]
-    disc_type = eval(Symbol("Int$(data_prec)"))
-    cont_type = eval(Symbol("Float$(data_prec)"))
+    #data_prec = string(eltype(data))[end-1:end]
+    disc_type = Int32#eval(Symbol("Int$(data_prec)"))
+    cont_type = Float32#eval(Symbol("Float$(data_prec)"))
     
     if isdiscrete(test_name)
         if verbose

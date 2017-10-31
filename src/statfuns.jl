@@ -24,7 +24,7 @@ function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
 end
 
 
-function oddsratio{ElType <: Integer}(ctab::AbstractArray{ElType}, nz::Bool=false)
+function oddsratio(ctab::AbstractArray{<:Integer}, nz::Bool=false)
     offset = nz ? 1 : 0
     if ndims(ctab) == 2
         ondiag = (ctab[1 + offset, 1 + offset] * ctab[2 + offset, 2 + offset])
@@ -44,7 +44,7 @@ function fz_pval(stat::AbstractFloat, n::Int, len_z::Int)
 end
 
 
-function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{ElType})
+function pcor(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Real})
     sub_data = @view data[:, [X, Y, Zs...]]
 
     if size(sub_data, 1) < 1
@@ -78,7 +78,7 @@ function pcor{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, 
 end
 
 
-function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, cor_mat::AbstractMatrix{ElType}, pcor_set_dict::Dict{String,Dict{String,ElType}}, cache_result::Bool=true)
+function pcor_rec{ContType<:AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, cor_mat::AbstractMatrix{ContType}, pcor_set_dict::Dict{String,Dict{String,ContType}}, cache_result::Bool=true)
     XY_key = join((X, Y), "_")
     Zs_key = join(Zs, "_")
 
@@ -91,7 +91,7 @@ function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{In
             pXY = cor_mat[X, Y]
             pXZ = cor_mat[X, Z]
             pYZ = cor_mat[Y, Z]
-            denom_term = (sqrt(one(ElType) - pXZ^2) * sqrt(one(ElType) - pYZ^2))
+            denom_term = (sqrt(one(ContType) - pXZ^2) * sqrt(one(ContType) - pYZ^2))
             p = denom_term == 0.0 ? 0.0 : (pXY - pXZ * pYZ) / denom_term
 
         else
@@ -102,7 +102,7 @@ function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{In
             pXZ0_nZ0 = pcor_rec(X, Z0, Zs_nZ0, cor_mat, pcor_set_dict)
             pYZ0_nZ0 = pcor_rec(Y, Z0, Zs_nZ0, cor_mat, pcor_set_dict)
 
-            denom_term = sqrt(one(ElType) - pXZ0_nZ0^2) * sqrt(one(ElType) - pYZ0_nZ0^2.0)
+            denom_term = sqrt(one(ContType) - pXZ0_nZ0^2) * sqrt(one(ContType) - pYZ0_nZ0^2.0)
             p = denom_term == 0.0 ? 0.0 : (pXY_nZ0 - pXZ0_nZ0 * pYZ0_nZ0) / denom_term
         end
 
@@ -117,7 +117,7 @@ function pcor_rec{ElType <: AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{In
 
         if cache_result
             if !haskey(pcor_set_dict, XY_key)
-                pcor_set_dict[XY_key] = Dict{String, ElType}()
+                pcor_set_dict[XY_key] = Dict{String, ContType}()
             end
 
             pcor_set_dict[XY_key][Zs_key] = p
@@ -141,7 +141,7 @@ function update!(obj::PairCorObj, x_entry, y_entry)
     obj.var_y += y_entry_norm * y_entry_norm
 end
 
-function cor{ElType <: AbstractFloat}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
+function cor(X::Int, Y::Int, data::SparseMatrixCSC{<:Real},
     nz::Bool=false)
     p_mean_obj = PairMeanObj(0.0, 0.0, 0)
     iter_apply_sparse_rows!(X, Y, data, update!, p_mean_obj, nz, nz)
@@ -176,7 +176,7 @@ function cor{ElType <: AbstractFloat}(X::Int, Y::Int, data::SparseMatrixCSC{ElTy
 end
 
 
-function cor{ElType <: AbstractFloat}(data::SparseMatrixCSC{ElType}, nz::Bool)
+function cor(data::SparseMatrixCSC{<:Real}, nz::Bool)
     n_vars = size(data, 2)
     cor_mat = zeros(Float64, n_vars, n_vars)
     Threads.@threads for X in 1:n_vars-1
@@ -190,7 +190,7 @@ function cor{ElType <: AbstractFloat}(data::SparseMatrixCSC{ElType}, nz::Bool)
 end
 
 
-function cor_subset!{ElType <: AbstractFloat}(data::AbstractMatrix{ElType}, cor_mat::AbstractMatrix{ElType}, vars::AbstractVector{Int})
+function cor_subset!(data::AbstractMatrix{<:Real}, cor_mat::AbstractMatrix{<:AbstractFloat}, vars::AbstractVector{Int})
     n_vars = length(vars)
     """CRITICAL: expects zeros to be trimmed from X and Y in zero-ignoring mode!
     """
@@ -224,7 +224,7 @@ function mi_pval(mi::AbstractFloat, df::Integer, n_obs::Integer)
 end
 
 
-function mutual_information{ElType <: Integer}(ctab::AbstractArray{ElType})
+function mutual_information{T<:Integer}(ctab::AbstractArray{T})
     num_dims = ndims(ctab)
     levels_x = size(ctab, 1)
     levels_y = size(ctab, 2)
@@ -234,14 +234,14 @@ function mutual_information{ElType <: Integer}(ctab::AbstractArray{ElType})
     end
 
     if num_dims == 3
-        ni = zeros(ElType, levels_x, levels_z)
-        nj = zeros(ElType, levels_y, levels_z)
-        nk = zeros(ElType, levels_z)
+        ni = zeros(T, levels_x, levels_z)
+        nj = zeros(T, levels_y, levels_z)
+        nk = zeros(T, levels_z)
 
         return mutual_information(ctab, levels_x, levels_y, levels_z, ni, nj, nk)
     else
-        ni = zeros(ElType, levels_x)
-        nj = zeros(ElType, levels_y)
+        ni = zeros(T, levels_x)
+        nj = zeros(T, levels_y)
 
         return mutual_information(ctab, levels_x, levels_y, ni, nj)
     end
@@ -249,8 +249,8 @@ function mutual_information{ElType <: Integer}(ctab::AbstractArray{ElType})
 end
 
 
-function mutual_information{ElType <: Integer}(ctab::AbstractArray{ElType, 3}, levels_x::Integer, levels_y::Integer,
-        levels_z::Integer, marg_i::AbstractMatrix{ElType}, marg_j::AbstractMatrix{ElType}, marg_k::AbstractVector{ElType})
+function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer, levels_y::Integer,
+        levels_z::Integer, marg_i::AbstractMatrix{<:Integer}, marg_j::AbstractMatrix{<:Integer}, marg_k::AbstractVector{<:Integer})
     """Note: returns mutual information * number of observations!"""
     #if reset_marginals
     fill!(marg_i, 0)
@@ -284,8 +284,8 @@ function mutual_information{ElType <: Integer}(ctab::AbstractArray{ElType, 3}, l
 end
 
 
-function mutual_information{ElType <: Integer}(ctab::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer,
-        marg_i::AbstractVector{ElType}, marg_j::AbstractVector{ElType})
+function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, levels_y::Integer,
+        marg_i::AbstractVector{<:Integer}, marg_j::AbstractVector{<:Integer})
     """Note: returns mutual information * number of observations!"""
     fill!(marg_i, 0)
     fill!(marg_j, 0)
@@ -316,7 +316,7 @@ function mutual_information{ElType <: Integer}(ctab::AbstractMatrix{ElType}, lev
 end
 
 
-function adjust_df{ElType <: Integer}(marg_i::AbstractVector{ElType}, marg_j::AbstractVector{ElType}, levels_x::Integer, levels_y::Integer)
+function adjust_df{T<:Integer}(marg_i::AbstractVector{T}, marg_j::AbstractVector{T}, levels_x::Integer, levels_y::Integer)
     alx = 0
     aly = 0
     for i in 1:levels_x
@@ -329,13 +329,13 @@ function adjust_df{ElType <: Integer}(marg_i::AbstractVector{ElType}, marg_j::Ab
     alx = max(1, alx)
     aly = max(1, aly)
 
-    df = (alx - one(ElType)) * (aly - one(ElType))
+    df = (alx - one(T)) * (aly - one(T))
 
     df
 end
 
 
-function adjust_df{ElType <: Integer}(marg_i::AbstractMatrix{ElType}, marg_j::AbstractMatrix{ElType}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
+function adjust_df{T<:Integer}(marg_i::AbstractMatrix{T}, marg_j::AbstractMatrix{T}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
     df = 0
     for k in 1:levels_z
         df += adjust_df(marg_i[:, k], marg_j[:, k], levels_x, levels_y)
@@ -344,7 +344,7 @@ function adjust_df{ElType <: Integer}(marg_i::AbstractMatrix{ElType}, marg_j::Ab
 end
 
 
-function nz_adjust_cont_tab{ElType <: Integer}(levels_x::Integer, levels_y::Integer, ctab::AbstractArray{ElType})
+function nz_adjust_cont_tab(levels_x::Integer, levels_y::Integer, ctab::AbstractArray{<:Integer})
     offset_x = levels_x > 2 ? 2 : 1
     offset_y = levels_y > 2 ? 2 : 1
 
@@ -358,11 +358,11 @@ function nz_adjust_cont_tab{ElType <: Integer}(levels_x::Integer, levels_y::Inte
 end
 
 
-function benjamini_hochberg{ElType <: AbstractFloat}(pvals::AbstractVector{ElType})
+function benjamini_hochberg{T <: AbstractFloat}(pvals::AbstractVector{T})
     """Accelerated version of that found in MultipleTesting.jl"""
     m = length(pvals)
 
-    sorted_pval_tuples::Vector{Tuple{Int,ElType}} = collect(zip(1:length(pvals), pvals))
+    sorted_pval_tuples::Vector{Tuple{Int,T}} = collect(zip(1:length(pvals), pvals))
     sort!(sorted_pval_tuples, by=x->x[2])
 
     for i in reverse(1:m-1)
