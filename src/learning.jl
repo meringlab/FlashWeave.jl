@@ -190,12 +190,15 @@ end
 
 
 
-function si_HITON_PC{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(T::Int, data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
-    fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval", whitelist::Set{Int}=Set{Int}(),
-        blacklist::Set{Int}=Set{Int}(),
-        univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(), levels::AbstractVector{DiscType}=DiscType[],
-    univar_step::Bool=isempty(univar_nbrs), cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
-    prev_state::HitonState{Int}=HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()), debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false)
+function si_HITON_PC{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(T::Int, data::AbstractMatrix{ElType};
+        test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
+        fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval",
+        whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(), 
+        univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(),
+        levels::AbstractVector{DiscType}=DiscType[], univar_step::Bool=isempty(univar_nbrs),
+        cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), 
+        prev_state::HitonState{Int}=HitonState{Int}("S", OrderedDict(), OrderedDict(), [], Dict()),
+        debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false, cache_pcor::Bool=true)
 
     if debug > 0
         println("Finding neighbors for $T")
@@ -223,7 +226,7 @@ function si_HITON_PC{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(T
         z = DiscType[]
     end
 
-    test_obj = make_test_object(test_name, true, max_k=max_k, levels=levels, cor_mat=cor_mat)
+    test_obj = make_test_object(test_name, true, max_k=max_k, levels=levels, cor_mat=cor_mat, cache_pcor=cache_pcor)
 
     if is_zero_adjusted(test_obj)
         if needs_nz_view(T, data, test_obj)
@@ -445,7 +448,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
         weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=false, 
         verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
-    recursive_pcor::Bool=true, correct_reliable_only::Bool=true, feed_forward::Bool=true,
+    recursive_pcor::Bool=true, cache_pcor::Bool=true, correct_reliable_only::Bool=true, feed_forward::Bool=true,
     track_rejections::Bool=false, fully_connect_clusters::Bool=false, cluster_mode="greedy")
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
@@ -454,18 +457,13 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     """           
     
     if time_limit == -1.0
-        if parallel == "multi_il"# && feed_forward
+        if parallel == "multi_il"
             time_limit = round(log2(size(data, 2)))
             println("Setting 'time_limit' to $time_limit s.")
         else
             time_limit = 0.0
         end
     end
-    
-    #if time_limit != 0.0 && !feed_forward
-    #    warn("Time limit is only useful in combination with feed_forward, setting it to 0.")
-    #    time_limit = 0.0
-    #end
             
     workers_local = workers_all_local()
 
@@ -485,9 +483,8 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
               variables, caution advised")
     end    
                     
-    #data_prec = string(eltype(data))[end-1:end]
-    disc_type = Int32#eval(Symbol("Int$(data_prec)"))
-    cont_type = Float32#eval(Symbol("Float$(data_prec)"))
+    disc_type = Int32
+    cont_type = Float32
     
     if isdiscrete(test_name)
         if verbose
@@ -523,7 +520,7 @@ function LGL{ElType <: Real}(data::AbstractMatrix{ElType}; test_name::String="mi
     kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min,
                   :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
                   :weight_type => weight_type, :univar_step => !global_univar, :debug => debug,
-                  :time_limit => time_limit, :track_rejections => track_rejections)
+                  :time_limit => time_limit, :track_rejections => track_rejections, :cache_pcor => cache_pcor)
 
 
     rej_dict = Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
@@ -1313,7 +1310,7 @@ function interleaved_backend{ElType<:Real, DiscType<:Integer, ContType<:Abstract
 end
 
 
-function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String="cont"; niche_adjust::Bool=false,
+function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String="cont"; zero_adjust::Bool=false,
                                        make_sparse::Bool=false, maxk::Integer=3, alpha::AbstractFloat=0.01,
                                        normalize::Bool=true, parallel::Union{Bool,Void}=nothing,
                                        preclust_sim::AbstractFloat=0.0, feed_forward::Bool=true,
@@ -1328,8 +1325,8 @@ function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String
         error("$mode is not a valid testing mode")
     end
 
-    if niche_adjust
-        test_name = join([test_name, "_nz"])
+    if zero_adjust
+        test_name = test_name * "_nz"
     end
 
     if feed_forward
@@ -1352,7 +1349,7 @@ function learn_network{ElType <: Real}(data::AbstractArray{ElType}, mode::String
         println("Inferring network\n")
         println("\tSettings:")
         println("\t\tmode - $mode")
-        println("\t\tniche_adjust - $niche_adjust")
+        println("\t\tzero_adjust - $zero_adjust")
         println("\t\tmax_k - $max_k")
         println("\t\tsparse - $make_sparse")
         println("\t\tfeed_forward - $feed_forward")

@@ -79,10 +79,10 @@ end
 
 
 function pcor_rec{ContType<:AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, cor_mat::AbstractMatrix{ContType}, pcor_set_dict::Dict{String,Dict{String,ContType}}, cache_result::Bool=true)
-    XY_key = join((X, Y), "_")
+    XY_key = string(X) * "_" * string(Y)
     Zs_key = join(Zs, "_")
 
-    if haskey(pcor_set_dict, XY_key) && haskey(pcor_set_dict[XY_key], Zs_key)
+    if cache_result && haskey(pcor_set_dict, XY_key) && haskey(pcor_set_dict[XY_key], Zs_key)
         p = pcor_set_dict[XY_key][Zs_key]
     else
         if length(Zs) == 1
@@ -98,9 +98,9 @@ function pcor_rec{ContType<:AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{In
             Zs_nZ0 = Zs[1:end-1]
             Z0 = Zs[end]
 
-            pXY_nZ0 = pcor_rec(X, Y, Zs_nZ0, cor_mat, pcor_set_dict)
-            pXZ0_nZ0 = pcor_rec(X, Z0, Zs_nZ0, cor_mat, pcor_set_dict)
-            pYZ0_nZ0 = pcor_rec(Y, Z0, Zs_nZ0, cor_mat, pcor_set_dict)
+            pXY_nZ0 = pcor_rec(X, Y, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
+            pXZ0_nZ0 = pcor_rec(X, Z0, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
+            pYZ0_nZ0 = pcor_rec(Y, Z0, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
 
             denom_term = sqrt(one(ContType) - pXZ0_nZ0^2) * sqrt(one(ContType) - pYZ0_nZ0^2.0)
             p = denom_term == 0.0 ? 0.0 : (pXY_nZ0 - pXZ0_nZ0 * pYZ0_nZ0) / denom_term

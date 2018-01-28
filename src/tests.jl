@@ -224,13 +224,14 @@ end
 ## CONTINUOUS ##
 
 function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFloat},
-    test_obj::FzTestCond, n_obs_min::Integer, cache_result::Bool=true)
+    test_obj::FzTestCond, n_obs_min::Integer)
     """Critical: expects zeros to be trimmed from both X and Y if nz is true"""
 
     n_obs = size(data, 1)
 
     if n_obs >= n_obs_min
-        p_stat = isempty(test_obj.cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, test_obj.cor_mat, test_obj.pcor_set_dict, cache_result)
+        p_stat = isempty(test_obj.cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, test_obj.cor_mat, test_obj.pcor_set_dict,
+            test_obj.cache_pcor)
         pval = fz_pval(p_stat, n_obs, 0)
     else
         p_stat = 0.0
@@ -266,8 +267,10 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
         if n_obs_min > size(data, 1)
             return TestResult(0.0, 1.0, 0.0, false), Int[]
         end      
-            
-        empty!(test_obj.pcor_set_dict)
+        
+        if test_obj.cache_pcor
+            empty!(test_obj.pcor_set_dict)
+        end
 
         # compute correlations on the current subset of variables
         if !isempty(test_obj.cor_mat)
@@ -286,7 +289,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
             if discrete_test
                 test_result = test(X, Y, Zs, data, test_obj, hps, z)
             else
-                test_result = test(X, Y, Zs, data, test_obj, n_obs_min, subset_size < max_k)
+                test_result = test(X, Y, Zs, data, test_obj, n_obs_min)
             end
             num_tests += 1
 

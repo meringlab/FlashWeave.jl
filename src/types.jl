@@ -141,6 +141,7 @@ struct FzTestCond{S<:AbstractFloat, T<:AbstractNz} <: AbstractCorTest{S, T}
     cor_mat::Matrix{S}
     pcor_set_dict::Dict{String,Dict{String,S}}
     nz::T
+    cache_pcor::Bool
 end
 
 ## STATISTICS REPORT ##

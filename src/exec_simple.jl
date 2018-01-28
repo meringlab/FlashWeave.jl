@@ -22,6 +22,7 @@ function main(input_args::Vector{String})
     make_sparse = input_args[9]
     normalize = input_args[10]
     write_table = input_args[11]
+    max_k = input_args[12]
 
     #println("Starting processes and importing modules")
     #tic()
@@ -78,7 +79,13 @@ function main(input_args::Vector{String})
     #repres, clust_dict = Cauocc.cluster_data(data_norm, test_name, parallel=split(parallel_mode, "_")[1])
     #data_norm = data_norm[:, repres]
     #println("Finished after $(toc())s\n")
-    lgl_args = Dict{Symbol,Any}(:test_name => test_name, :parallel => parallel_mode, :verbose => false, :recursive_pcor => rec_mode == "true", :max_k => univar_mode == "true" ? 0 : 3, :FDR => FDR == "true")
+    if univar_mode == "true"
+        max_k = 0
+    else
+        max_k = parse(Int, max_k)
+    end
+    
+    lgl_args = Dict{Symbol,Any}(:test_name => test_name, :parallel => parallel_mode, :verbose => false, :recursive_pcor => rec_mode == "true", :max_k => max_k, :FDR => FDR == "true")
 
     if speed_mode == "fast"
         lgl_args[:convergence_threshold] = 0.05
@@ -92,7 +99,7 @@ function main(input_args::Vector{String})
 
     println("Learning network")
     tic()
-    graph_dict = LGL(data_norm; lgl_args...).graph
+    graph = LGL(data_norm; lgl_args...).graph
     #println("Finished after $(toc())s\n")
     toc()
     #println("Adding cluster edges")
@@ -100,7 +107,8 @@ function main(input_args::Vector{String})
     if write_table == "true"
         println("Converting output and writing to file")
         tic()
-        adj_matrix = FlashWeave.Misc.dict_to_adjmat(graph_dict, header)
+        #adj_matrix = FlashWeave.Misc.dict_to_adjmat(graph, header)
+        adj_matrix = FlashWeave.Misc.metagraph_to_adjmat(graph, header)
         writedlm(output_path, adj_matrix, '\t')
         #println("Finished after $(toc())s\n")
         toc()

@@ -19,12 +19,12 @@ const inf_weight = 708.3964185322641
 
 
 function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool; max_k::Integer=0,
-        levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0))
+        levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), cache_pcor::Bool=true)
     discrete_test = isdiscrete(test_name)
     nz = is_zero_adjusted(test_name) ? Nz() : NoNz()
     
     if cond
-        test_obj = discrete_test ? MiTestCond(levels, nz, max_k) : FzTestCond(cor_mat, Dict{String,Dict{String,ContType}}(), nz)
+        test_obj = discrete_test ? MiTestCond(levels, nz, max_k) : FzTestCond(cor_mat, Dict{String,Dict{String,ContType}}(), nz, cache_pcor)
     else
         test_obj = discrete_test ? MiTest(levels, nz) : FzTest(cor_mat, nz)
     end
@@ -332,6 +332,23 @@ function map_edge_keys(nbr_dict::Dict{Int,T}, key_map_dict::Dict{Int,Int}) where
     new_nbr_dict
 end
 
+function metagraph_to_adjmat(G::MetaGraph, header::AbstractVector{String})
+    n_vars = length(header)
+    adj_mat = zeros(Float64, (n_vars, n_vars))
+    checked_nodes = Set{Int}()
+    for node_index in 1:n_vars
+        for nbr in neighbors(G, node_index)
+            if !(nbr in checked_nodes)
+                weight = get_prop(G, node_index, nbr, :weight)
+                adj_mat[node_index, nbr] = weight
+                adj_mat[nbr, node_index] = weight
+            end
+        end
+    end
+    adj_mat_final = vcat(reshape(header, 1, size(adj_mat, 2)), adj_mat)
+    adj_mat_final = hcat(reshape(["", header...], size(adj_mat_final, 2) + 1, 1), adj_mat_final)
+    adj_mat_final
+end
 
 function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::AbstractVector{String})
     #n_nodes = length(graph_dict)
