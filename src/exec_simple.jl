@@ -23,6 +23,7 @@ function main(input_args::Vector{String})
     normalize = input_args[10]
     write_table = input_args[11]
     max_k = input_args[12]
+    weight_type = input_args[13]
 
     #println("Starting processes and importing modules")
     #tic()
@@ -85,7 +86,7 @@ function main(input_args::Vector{String})
         max_k = parse(Int, max_k)
     end
     
-    lgl_args = Dict{Symbol,Any}(:test_name => test_name, :parallel => parallel_mode, :verbose => false, :recursive_pcor => rec_mode == "true", :max_k => max_k, :FDR => FDR == "true")
+    lgl_args = Dict{Symbol,Any}(:test_name => test_name, :parallel => parallel_mode, :verbose => false, :recursive_pcor => rec_mode == "true", :max_k => max_k, :FDR => FDR == "true", :weight_type => weight_type)
 
     if speed_mode == "fast"
         lgl_args[:convergence_threshold] = 0.05

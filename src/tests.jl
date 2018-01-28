@@ -246,8 +246,9 @@ end
 
 function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Real}, test_name::String; recursive::Bool=true, n_obs_min::Integer=0)
     cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)
-    test_obj = FzTestCond(cor_mat, Dict{String,Dict{String,eltype(cor_mat)}}(), is_zero_adjusted(test_name) ? Nz() : NoNz())
-    test(X, Y, Zs, data, test_obj, n_obs_min, true)
+    test_obj = FzTestCond(cor_mat, Dict{String,Dict{String,eltype(cor_mat)}}(), is_zero_adjusted(test_name) ? Nz() : NoNz(),
+        true)
+    test(X, Y, Zs, data, test_obj, n_obs_min)
 end
 
 
