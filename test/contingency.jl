@@ -28,7 +28,7 @@ function compare_cond_ctabs(ctab1, ctab2)
     comp_dim = min(size(ctab1, 3), size(ctab2, 3))
     ctab1 = ctab1[1:2, 1:2, 1:comp_dim]
     ctab2 = ctab2[1:2, 1:2, 1:comp_dim]
-    
+
     used_js = Set{Int}()
     for i in 1:comp_dim
         slice1 = ctab1[:, :, i]
@@ -43,10 +43,10 @@ function compare_cond_ctabs(ctab1, ctab2)
                 end
             end
         end
-        
+
         if !found_hit
             return false
-        end 
+        end
     end
     true
 end

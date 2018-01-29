@@ -1,8 +1,9 @@
 module Tests
 
-export test, test_subsets, issig
+export test, test_subsets, issig, pw_univar_neighbors
 
 using Combinatorics
+using DataStructures
 
 using FlashWeave.Types
 using FlashWeave.Misc
@@ -28,7 +29,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
         n_obs_min::Int=0)
     levels_x = test_obj.levels[X]
     levels_y = test_obj.levels[Y]
-    
+
     if !issparse(data)
         contingency_table!(X, Y, data, test_obj.ctab)
     else
@@ -76,7 +77,7 @@ function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Integer},
     if test_obj.levels[X] < 2
         return [TestResult(0.0, 1.0, 0, false) for Y in Ys]
     else
-        return map(Y -> test(X, Y, data, test_obj, hps, n_obs_min), Ys)     
+        return map(Y -> test(X, Y, data, test_obj, hps, n_obs_min), Ys)
     end
 end
 
@@ -101,11 +102,11 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Real}, test_obj::FzTest,
         n_obs = 0
     else
         nz = is_zero_adjusted(test_obj)
-        
+
         if isempty(test_obj.cor_mat)
             if issparse(data)
                 p_stat, n_obs = cor(X, Y, data, nz)
-                
+
                 if n_obs < n_obs_min
                     p_stat = 0.0
                 end
@@ -121,7 +122,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Real}, test_obj::FzTest,
                     n_obs = 0
                 else
                     n_obs = size(sub_data, 1)
-                    
+
                     if n_obs >= n_obs_min
                         sub_x_vec = @view sub_data[:, X]
                         sub_y_vec = @view sub_data[:, Y]
@@ -135,13 +136,13 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Real}, test_obj::FzTest,
         else
             n_obs = size(data, 1)
             p_stat = n_obs >= n_obs_min ? test_obj.cor_mat[X, Y] : 0.0
-            
+
         end
 
         df = 0
         pval = fz_pval(p_stat, n_obs, 0)
     end
-    
+
     TestResult(p_stat, pval, df, n_obs >= n_obs_min)
 end
 
@@ -150,9 +151,9 @@ function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Real},
         test_obj::AbstractCorTest, n_obs_min::Integer=0)
     """CRITICAL: expects zeros to be trimmed from X if nz_test
     is provided!
-    
+
     Test all variables Ys for univariate association with X"""
-    
+
     map(Y -> test(X, Y, data, test_obj, n_obs_min, false), Ys)
 end
 
@@ -171,7 +172,7 @@ function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:In
     """Test association between X and Y"""
     levels_x = test_obj.levels[X]
     levels_y = test_obj.levels[Y]
-    
+
     if !issparse(data)
         levels_z = contingency_table!(X, Y, Zs, data, test_obj.ctab, z, test_obj.zmap.cum_levels, test_obj.zmap.z_map_arr)
     else
@@ -239,7 +240,7 @@ function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Ab
     end
 
     df = 0
-    
+
     Misc.TestResult(p_stat, pval, df, n_obs >= n_obs_min)
 end
 
@@ -267,8 +268,8 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
     if !discrete_test && nz
         if n_obs_min > size(data, 1)
             return TestResult(0.0, 1.0, 0.0, false), Int[]
-        end      
-        
+        end
+
         if test_obj.cache_pcor
             empty!(test_obj.pcor_set_dict)
         end
@@ -276,16 +277,16 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
         # compute correlations on the current subset of variables
         if !isempty(test_obj.cor_mat)
             cor_subset!(data, test_obj.cor_mat, [X, Y, Z_total...])
-            
+
             if debug > 2
                 println(test_obj.cor_mat[[X, Y, Z_total...], [X, Y, Z_total...]])
             end
         end
     end
-    
+
     for subset_size in max_k:-1:1
         Z_combos = isempty(Z_wanted) ? combinations(Z_total, subset_size) : combinations_with_whitelist(Z_total, Z_wanted, subset_size)
-        
+
         for Zs in Z_combos
             if discrete_test
                 test_result = test(X, Y, Zs, data, test_obj, hps, z)
@@ -297,7 +298,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
             if debug > 2
                 println("\t subset ", Zs, " : ", test_result)
             end
-            
+
             if !issig(test_result, alpha)
                 return test_result, Zs
             elseif test_result.pval >= lowest_sig_result.pval
@@ -308,6 +309,185 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
     end
 
     lowest_sig_result, lowest_sig_Zs
+end
+
+
+# backend functions for pairwise univariate tests
+
+function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}, stats::AbstractVector{Float64}, alpha::AbstractFloat)
+    nbr_dict = Dict([(X, OrderedDict{Int,Tuple{Float64,Float64}}()) for X in 1:n_vars])
+
+    for X in 1:n_vars-1, Y in X+1:n_vars
+        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+        pval = pvals[pair_index]
+
+        if pval < alpha
+            stat = stats[pair_index]
+            nbr_dict[X][Y] = (stat, pval)
+            nbr_dict[Y][X] = (stat, pval)
+        end
+    end
+    nbr_dict
+end
+
+
+function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
+                            stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
+                            test_obj::AbstractTest, hps::Integer, n_obs_min::Integer, correct_reliable_only::Bool=false)
+    n_vars = size(data, 2)
+
+    if needs_nz_view(X, data, test_obj)
+        sub_data = @view data[data[:, X] .!= 0, :]
+    else
+        sub_data = data
+    end
+
+    Ys = collect(Ys_slice)
+
+    if isdiscrete(test_obj)
+        test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
+    else
+        test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
+    end
+
+    for (Y, test_res) in zip(Ys, test_results)
+        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+
+        if correct_reliable_only && !test_res.suff_power
+            curr_stat = curr_pval = NaN64
+        else
+            curr_stat = test_res.stat
+            curr_pval = test_res.pval
+        end
+
+        stats[pair_index] = curr_stat
+        pvals[pair_index] = curr_pval
+    end
+end
+
+
+function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
+                            test_obj::String, hps::Integer, n_obs_min::Integer)
+    n_vars = size(data, 2)
+
+    if needs_nz_view(X, data, test_obj)
+        sub_data = @view data[data[:, X] .!= 0, :]
+    else
+        sub_data = data
+    end
+
+    Ys = collect(Ys_slice)
+
+    if isdiscrete(test_obj)
+        test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
+    else
+        test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
+    end
+end
+
+
+function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(data::AbstractMatrix{ElType};
+        test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
+        levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
+        cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
+        chunk_size::Int=500, correct_reliable_only::Bool=true)
+
+    if startswith(test_name, "mi") && isempty(levels)
+        levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+    end
+
+    test_obj = make_test_object(test_name, false, levels=levels, cor_mat=cor_mat)
+
+    n_vars = size(data, 2)
+    n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
+
+    nz = is_zero_adjusted(test_obj)
+
+
+    work_items = collect(work_chunker(n_vars, min(chunk_size, div(n_vars, 3))))
+
+    if startswith(parallel, "single")
+        pvals = ones(Float64, n_pairs)
+        stats = zeros(Float64, n_pairs)
+
+        for (X, Ys_slice) in work_items
+            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_obj, hps, n_obs_min, correct_reliable_only)
+        end
+
+    else
+        shuffle!(work_items)
+        if startswith(parallel, "multi")
+            # if worker processes are on the same machine, use local memory sharing via shared arrays
+            if workers_local
+                shared_pvals = SharedArray{Float64}(n_pairs)
+                shared_stats = SharedArray{Float64}(n_pairs)
+                @sync @parallel for work_item in work_items
+                    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_obj, hps,
+                                      n_obs_min, correct_reliable_only)
+                end
+                stats = shared_stats.s
+                pvals = shared_pvals.s
+
+            # otherwise make workers store test results remotely and gather them in the end via network
+            else
+                all_test_results = @parallel (vcat) for work_item in work_items
+                    pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, n_obs_min)
+                end
+
+                pvals = ones(Float64, n_pairs)
+                stats = zeros(Float64, n_pairs)
+
+                i = 0
+                for (X, Ys_slice) in work_items
+                    for Y in Ys_slice
+                        i += 1
+                        test_res = all_test_results[i]
+                        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+
+                        if correct_reliable_only && !test_res.suff_power
+                            curr_stat = curr_pval = NaN64
+                        else
+                            curr_stat = test_res.stat
+                            curr_pval = test_res.pval
+                        end
+
+                        stats[pair_index] = curr_stat
+                        pvals[pair_index] = curr_pval
+                    end
+                end
+            end
+
+        elseif startswith(parallel, "threads")
+            pvals = ones(Float64, n_pairs)
+            stats = zeros(Float64, n_pairs)
+            Threads.@threads for work_item in work_items
+                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_obj, hps, n_obs_min,
+                                  correct_reliable_only)
+            end
+        end
+    end
+
+    if FDR
+        if correct_reliable_only && any(isnan(x) for x in pvals)
+            reliable_mask = .!isnan.(pvals)
+            reliable_pvals = pvals[reliable_mask]
+            reliable_pvals = benjamini_hochberg(reliable_pvals)
+
+            rel_pval_i = 1
+            for (i, is_reliable_elem) in enumerate(reliable_mask)
+                if is_reliable_elem
+                    pvals[i] = reliable_pvals[rel_pval_i]
+                    rel_pval_i += 1
+                else
+                    pvals[i] = NaN64
+                end
+            end
+        else
+            pvals = benjamini_hochberg(pvals)
+        end
+    end
+
+    condensed_stats_to_dict(n_vars, pvals, stats, alpha)
 end
 
 

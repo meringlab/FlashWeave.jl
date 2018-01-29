@@ -22,7 +22,7 @@ function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool
         levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), cache_pcor::Bool=true)
     discrete_test = isdiscrete(test_name)
     nz = is_zero_adjusted(test_name) ? Nz() : NoNz()
-    
+
     if cond
         test_obj = discrete_test ? MiTestCond(levels, nz, max_k) : FzTestCond(cor_mat, Dict{String,Dict{String,ContType}}(), nz, cache_pcor)
     else
@@ -52,7 +52,7 @@ stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit 
 function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest)
     nz = is_zero_adjusted(test_obj)
     is_nz_var = iscontinuous(test_obj) || test_obj.levels[X] > 2
-    nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))# || isa(test_obj, MiTestCond))    
+    nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))# || isa(test_obj, MiTestCond))
 end
 
 signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)
@@ -105,7 +105,7 @@ function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_n
                 edge_sign = sign(univar_nbrs[nbr][1])
                 nbr_dict[nbr] = edge_sign * abs(signed_weight(PC_dict[nbr]..., weight_kind))
             end
-        else     
+        else
             nbr_dict = Dict([(nbr, signed_weight(PC_dict[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
         end
     end
@@ -165,7 +165,7 @@ function dict_to_graph{T}(graph_dict::Dict{T,Dict{T,Float64}})
             add_edge!(G, var_A, var_B)
         end
     end
-    G           
+    G
 end
 
 
@@ -193,7 +193,7 @@ function neighbor_distances(G1, G2, G2_sps=zeros(Float64, 0, 0))
     G2_sps[G2_sps .> nv(G2)] = NaN64
     nbr_dists = [G2_sps[e.src, e.dst] for e in edges(G1)]
     nbr_dists
-end 
+end
 
 function jaccard_similarity(graph_dict1::Dict, graph_dict2::Dict)
     G1 = dict_to_graph(graph_dict1)
@@ -204,7 +204,7 @@ end
 function jaccard_similarity(G1::LightGraphs.Graph, G2::LightGraphs.Graph)
     edge_set1 = Set(map(Tuple, edges(G1)))
     edge_set2 = Set(map(Tuple, edges(G2)))
-    length(intersect(edge_set1, edge_set2)) / length(union(edge_set1, edge_set2))        
+    length(intersect(edge_set1, edge_set2)) / length(union(edge_set1, edge_set2))
 end
 
 
@@ -284,10 +284,10 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
 
                 e = Edge(node1, node2)
                 add_edge!(G, e)
-                
+
                 weight = weights_dict[node1][node2]
                 rev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
-                
+
                 weight = edge_merge_fun(weight, rev_weight)
                 if edge_rule == "OR"
                     if haskey(weights_dict[node2], node1)
@@ -313,10 +313,6 @@ function map_edge_keys(nbr_dict::Dict{Int,T}, key_map_dict::Dict{Int,Int}) where
     new_nbr_dict = similar(nbr_dict)
 
     for (key, sub_dict) in nbr_dict
-        if !haskey(key_map_dict, key)
-            continue
-        end
-
         var_key = key_map_dict[key]
         new_sub_dict = similar(sub_dict)
 
@@ -378,7 +374,7 @@ end
 
 function translate_hiton_state(state::HitonState{T1}, trans_dict::Dict{T1,T2}) where {T1,T2}
     trans_state_results = OrderedDict{T2,Tuple{Float64,Float64}}([(trans_dict[key], val) for (key, val) in state.state_results])
-    trans_inter_results = OrderedDict{T2,Tuple{Float64,Float64}}([(trans_dict[key], val) for (key, val) in state.inter_results]) 
+    trans_inter_results = OrderedDict{T2,Tuple{Float64,Float64}}([(trans_dict[key], val) for (key, val) in state.inter_results])
     trans_unchecked_vars = T2[trans_dict[x] for x in state.unchecked_vars]
     trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(trans_dict[key], (Tuple(map(x -> trans_dict[x], Zs)), test_res)) for (key, (Zs, test_res)) in state.state_rejections])
     HitonState{T2}(state.phase, trans_state_results, trans_inter_results, trans_unchecked_vars, trans_state_rejections)
@@ -400,7 +396,7 @@ function translate_results(results::LGLResult{T1}, trans_dict::Dict{T1,T2}) wher
             trans_rejections[key][nbr] = (Tuple(map(x -> trans_dict[x], Zs)), test_res)
         end
     end
-    
+
     trans_unfinished_states = Dict{T2,HitonState{T2}}([(trans_dict[key], translate_hiton_state(val, trans_dict)) for (key, val) in results.unfinished_states])
     LGLResult{T2}(trans_graph, trans_rejections, trans_unfinished_states)
 end
@@ -415,13 +411,13 @@ function save_network(results::LGLResult, out_path::String; meta_dict::Dict=Dict
     if fmt == "auto"
         fmt = split(out_path, ".")[end]
     end
-    
+
     if fmt == "jld"
         save(out_path, "results", results, "meta_data", meta_dict)
     else
         base_path = splitext(out_path)[1]
         meta_path = join([base_path, "_meta_data.txt"])
-        
+
         if !isempty(meta_dict)
             open(meta_path, "w") do meta_f
                 for key in keys(meta_dict)
@@ -429,7 +425,7 @@ function save_network(results::LGLResult, out_path::String; meta_dict::Dict=Dict
                 end
             end
         end
-        
+
         if fmt == "adj"
             if isempty(header)
                 error("fmt \"adj\" can only be used if header is provided")

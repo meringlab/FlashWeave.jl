@@ -1,18 +1,18 @@
 using FlashWeave
-using DataFrames
 using JLD
 using Base.Test
 using MetaGraphs
 using LightGraphs
 
-data = Array(readtable(joinpath("data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+#data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 
 exp_dict = load(joinpath("data", "learning_expected.jld"))
 
 function make_network(data, test_name, make_sparse=false, prec=32; kwargs...)
     data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
     kwargs_dict = Dict(kwargs)
-    graph_res = LGL(data_norm; test_name=test_name, verbose=false, kwargs...)
+    graph_res = LGL(data_norm; test_name=test_name, verbose=true, kwargs...)
     graph_res.graph
 end
 
@@ -47,6 +47,19 @@ function compare_graph_results(g1::Dict, g2::MetaGraph; verbose=false, rtol=0.0,
     true
 end
 
+# For sanity checking
+max_k = 3
+make_sparse = false
+parallel = "single_il"
+test_name = "mi"
+graph = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, verbose=true)
+
+#exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]
+#atol = 1e-2
+#rtol = 0.0
+
+#println(compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol, verbose=true))
+#println(keys(exp_dict))
 
 @testset "major_test_modes" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]#(test_name, sub_dict) in exp_num_nbr_dict
@@ -55,16 +68,27 @@ end
                 @testset "max_k $max_k" begin
                     for make_sparse in [true, false]
                         @testset "sparse $make_sparse" begin
-                            for parallel in ["single"]#["single", "multi_il"]
+                            for parallel in ["single", "single_il"]#["single", "multi_il"]
                                 @testset "parallel $parallel" begin
+
                                     graph = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=0.0, correct_reliable_only=false, n_obs_min=0)
-                                    exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]
 
-                                    atol = 1e-2
-                                    rtol = 0.0
+                                    if parallel != "single_il"
+                                        exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]
 
-                                    @testset "edge_identity" begin
-                                        @test compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol)
+                                        atol = 1e-2
+                                        rtol = 0.0
+
+                                        compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol)
+
+
+                                        @testset "edge_identity" begin
+                                            @test compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol)
+                                        end
+                                    else
+                                        @testset "has_edges" begin
+                                            @test ne(graph) > 0
+                                        end
                                     end
                                 end
                             end
@@ -78,12 +102,12 @@ end
 
 @testset "precision_32" begin
     @testset "mi_sparse_single" begin
-        graph = make_network(data, "mi", true, 32, max_k=3, parallel="single", time_limit=0.0, 
+        graph = make_network(data, "mi", true, 32, max_k=3, parallel="single", time_limit=0.0,
             correct_reliable_only=false, n_obs_min=0)
         exp_graph_dict = exp_dict["exp_mi_maxk3_parasingle"]
         @test compare_graph_results(exp_graph_dict, graph, rtol=0.0, atol=1e-2)
     end
-    
+
     #@testset "fz_nz_nonsparse_multi_il" begin
     #    graph_dict = make_network(data, "fz_nz", false, 32, max_k=3, parallel="multi_il", time_limit=0.0,
     #        correct_reliable_only=false)
@@ -120,7 +144,7 @@ end
 #    end
 #end
 
-    
+
 #@testset "track_rejections" begin
 #    exp_num_nbr = exp_num_nbr_dict["fz"][3]
 #    @test all(get_num_nbr(data, "fz", false, max_k=3, parallel="single", track_rejections=true) .== exp_num_nbr)
@@ -128,13 +152,13 @@ end
 #    @test all(get_num_nbr(data, "mi", false, max_k=0, parallel="single", track_rejections=true) .== exp_num_nbr)
 #end
 
-#@testset "speed" begin 
+#@testset "speed" begin
 #    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
 #        println(test_name)
-#        
+#
 #        for max_k in [0, 3]
 #            println("\t$max_k")
-#            
+#
 #            @testset "$test_name $max_k" begin
 #                test_times = []
 #                for make_sparse in [true, false]
@@ -146,9 +170,9 @@ end
 #                        time_taken = time() - start_time
 #                        push!(test_times, time_taken)
 #                    end
-#                end                
+#                end
 #            end
-#        end         
+#        end
 #    end
 #end
 

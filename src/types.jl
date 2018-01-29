@@ -47,7 +47,7 @@ function ZMapper{T<:Integer}(max_k::Integer, max_level::T)
     for j in 2:max_k
         cum_levels[j] = cum_levels[j - 1] * max_level
     end
-    
+
     max_mapped_level = max_level
     for j in 1:max_k
         max_mapped_level += max_level * cum_levels[j]
@@ -159,7 +159,7 @@ end
 ##################
 
 struct HitonState{T}
-    phase::String
+    phase::Char
     state_results::OrderedDict{T,Tuple{Float64,Float64}}
     inter_results::OrderedDict{T,Tuple{Float64,Float64}}
     unchecked_vars::Vector{T}
@@ -199,14 +199,14 @@ end
 
 function combinations_with_whitelist(a::AbstractVector{T}, wl::AbstractVector{T}, t::Integer) where T <: Integer
     wl_set = Set(wl)
-    
+
     a_wl = copy(wl)
     for e in a
         if !(e in wl_set)
             push!(a_wl, e)
         end
     end
-    CombinationsWL(combinations(a_wl, t), wl_set)    
+    CombinationsWL(combinations(a_wl, t), wl_set)
 end
 
 end

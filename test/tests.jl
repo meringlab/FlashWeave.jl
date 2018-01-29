@@ -1,9 +1,8 @@
 using FlashWeave
 using JLD
-using DataFrames
 using Base.Test
 
-data = Array(readtable(joinpath("data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
+data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_clr = FlashWeave.Preprocessing.preprocess_data_default(data, "fz", verbose=false, prec=64)
 data_clr_nz = FlashWeave.Preprocessing.preprocess_data_default(data, "fz_nz", verbose=false, prec=64)
 data_bin = FlashWeave.Preprocessing.preprocess_data_default(data, "mi", verbose=false, prec=64)
@@ -32,7 +31,7 @@ for (test_name, data_norm) in [("mi", data_bin), ("mi_nz", data_mi_nz),
                 else
                     sub_data = data_norm
                 end
-                
+
                 if cond_mode == "uni"
                     @test all([compare_test_results(r1, r2) for (r1, r2) in zip(FlashWeave.Tests.test(1, collect(2:50), sub_data, test_name), exp_res)])
                 elseif cond_mode == "condZ1"

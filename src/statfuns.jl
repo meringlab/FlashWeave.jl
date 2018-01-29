@@ -15,7 +15,7 @@ using FlashWeave.Misc
 
 function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
     sample_factor = n - len_z - 3
-    
+
     if sample_factor > 0
         return (sqrt(sample_factor) / 2.0) * log((1.0 + p) / (1.0 - p))
     else
@@ -163,7 +163,7 @@ function cor(X::Int, Y::Int, data::SparseMatrixCSC{<:Real},
         p_cor_obj.var_x += (-mean_x * -mean_x) * z_elems
         p_cor_obj.var_y += (-mean_y * -mean_y) * z_elems
     end
-    
+
     p = p_cor_obj.cov_xy / sqrt(p_cor_obj.var_x * p_cor_obj.var_y)
 
     if p > 1.0
@@ -171,7 +171,7 @@ function cor(X::Int, Y::Int, data::SparseMatrixCSC{<:Real},
     elseif p < -1.0
         p = -1.0
     end
-    
+
     p, n_obs
 end
 
@@ -375,6 +375,5 @@ function benjamini_hochberg{T <: AbstractFloat}(pvals::AbstractVector{T})
     sort!(sorted_pval_tuples, by=x->x[1])
     return [x[2] for x in sorted_pval_tuples]
 end
-
 
 end
