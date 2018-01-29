@@ -36,12 +36,15 @@ function interleaved_worker(data::AbstractMatrix{ElType}, edge_rule::String, non
             end
 
             if edge_rule == "AND"
-                nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs,
-                                        prev_state=prev_state, blacklist=skip_nbrs, GLL_args...)
+                blacklist = skip_nbrs
+                whitelist = Int[]
             else
-                nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs,
-                                        prev_state=prev_state, whitelist=skip_nbrs, GLL_args...)
+                blacklist = Int[]
+                whitelist = skip_nbrs
             end
+
+            nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs,
+                                    prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
             put!(shared_result_q, (target_var, nbr_state))
         catch exc
             println("Exception occurred! ", exc)

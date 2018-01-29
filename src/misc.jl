@@ -531,12 +531,7 @@ function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMat
     end
 end
 
-
-
-
 make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))
 work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))
-
-
 
 end

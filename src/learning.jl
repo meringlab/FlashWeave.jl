@@ -14,7 +14,7 @@ using FlashWeave.Interleaved
 using FlashWeave.Preclustering
 
 
-function prepare_lgl(data, test_name, time_limit, parallel, feed_forward, n_obs_min, hps, fast_elim, recursive_pcor, verbose)
+function prepare_lgl(data, test_name, time_limit, parallel, feed_forward, max_k, n_obs_min, hps, fast_elim, recursive_pcor, verbose)
     if time_limit == -1.0
         if parallel == "multi_il"
             time_limit = round(log2(size(data, 2)))
@@ -256,7 +256,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     fast_elim: currently always on
     """
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type = prepare_lgl(data, test_name, time_limit, parallel,
-                                                                                          feed_forward, n_obs_min, hps, fast_elim,
+                                                                                          feed_forward, max_k, n_obs_min, hps, fast_elim,
                                                                                           recursive_pcor, verbose)
 
     hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min,
