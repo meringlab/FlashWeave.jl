@@ -9,10 +9,10 @@ data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[
 
 exp_dict = load(joinpath("data", "learning_expected.jld"))
 
-function make_network(data, test_name, make_sparse=false, prec=32; kwargs...)
+function make_network(data, test_name, make_sparse=false, prec=32, verbose=false; kwargs...)
     data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
     kwargs_dict = Dict(kwargs)
-    graph_res = LGL(data_norm; test_name=test_name, verbose=true, kwargs...)
+    graph_res = LGL(data_norm; test_name=test_name, verbose=verbose, kwargs...)
     graph_res.graph
 end
 
@@ -48,13 +48,17 @@ function compare_graph_results(g1::Dict, g2::MetaGraph; verbose=false, rtol=0.0,
 end
 
 # For sanity checking
-max_k = 3
-make_sparse = false
-parallel = "single_il"
-test_name = "mi"
-graph = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, verbose=true)
+#max_k = 3
+#make_sparse = false
+#parallel = "single"
+#test_name = "mi"
+#graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true)
 
-#exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]
+#@code_warntype make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, verbose=true)
+
+
+
+#exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_paramulti_il"]
 #atol = 1e-2
 #rtol = 0.0
 
@@ -68,10 +72,11 @@ graph = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=par
                 @testset "max_k $max_k" begin
                     for make_sparse in [true, false]
                         @testset "sparse $make_sparse" begin
-                            for parallel in ["single", "single_il"]#["single", "multi_il"]
+                            for parallel in ["single", "multi_il"]#["single", "multi_il"]
                                 @testset "parallel $parallel" begin
-
-                                    graph = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=0.0, correct_reliable_only=false, n_obs_min=0)
+                                    time_limit = endswith(parallel, "il") ? 30.0 : 0.0
+                                    graph = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel,
+                                                         time_limit=time_limit, correct_reliable_only=false, n_obs_min=0)
 
                                     if parallel != "single_il"
                                         exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_para$(parallel)"]

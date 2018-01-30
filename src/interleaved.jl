@@ -10,8 +10,8 @@ using FlashWeave.StackChannels
 
 export interleaved_backend
 
-function interleaved_worker(data::AbstractMatrix{ElType}, edge_rule::String, nonsparse_cond::Bool,
-     shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_fun, GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
+function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_rule::String, nonsparse_cond::Bool,
+     shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
 
     if nonsparse_cond
         data = full(data)
@@ -37,14 +37,25 @@ function interleaved_worker(data::AbstractMatrix{ElType}, edge_rule::String, non
 
             if edge_rule == "AND"
                 blacklist = skip_nbrs
-                whitelist = Int[]
+                whitelist = Set{Int}()
             else
-                blacklist = Int[]
+                blacklist = Set{Int}()
                 whitelist = skip_nbrs
             end
-
-            nbr_state = si_HITON_PC(target_var, data; univar_nbrs=univar_nbrs,
+            #println("computing neighbors")
+            #@code_warntype si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs, prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
+            #println(length(univar_nbrs), " ", size(data), " ", length(levels))
+            #println(typeof(levels), " ", typeof(cor_mat))
+            #println("worker: whiteblack: ", length(whitelist), " ", length(blacklist))
+            #println("worker: whitelist pre: ", whitelist)
+            #println("worker: target_var: ", target_var)
+            nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs,
                                     prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
+
+            #nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs,
+            #                        prev_state=prev_state, GLL_args...)
+            #nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs, GLL_args...)
+            #println("delivering neighbors")
             put!(shared_result_q, (target_var, nbr_state))
         catch exc
             println("Exception occurred! ", exc)
@@ -58,11 +69,11 @@ end
 
 
 function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType},
-        all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, GLL_args::Dict{Symbol,Any};
+        all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, levels::Vector{DiscType}, cor_mat::Matrix{ContType}, GLL_args::Dict{Symbol,Any};
         update_interval::Real=30.0, convergence_threshold::AbstractFloat=0.01,
-        conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi",
+        conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi_il",
         edge_rule::String="OR", nonsparse_cond::Bool=false, verbose::Bool=true, workers_local::Bool=true,
-        feed_forward::Bool=true) where {ElType<:Real}
+        feed_forward::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     jobs_total = length(target_vars)
 
@@ -100,8 +111,8 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         println("Starting workers and sending data..")
         tic()
     end
-    worker_returns = [@spawn interleaved_worker(data, edge_rule, nonsparse_cond,
-                                                shared_job_q, shared_result_q, si_HITON_PC, GLL_args) for x in 1:n_workers]
+    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, nonsparse_cond,
+                                                shared_job_q, shared_result_q, GLL_args) for x in 1:n_workers]
 
     if verbose
         println("Done. Starting inference..")
@@ -150,6 +161,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
             # node is complete
             else
+                #println("MASTER: node complete, updating graph")
                 graph_dict[target_var] = curr_state
 
                 for nbr in keys(curr_state.state_results)

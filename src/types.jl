@@ -4,17 +4,18 @@ using DataStructures
 using MetaGraphs
 using Combinatorics
 
-export PairMeanObj, PairCorObj,
+export NbrStatDict, PairMeanObj, PairCorObj,
        AbstractTest, AbstractContTest, AbstractCorTest, ContTest2D, ContTest3D, AbstractNz, Nz, NoNz,
        MiTest, MiTestCond, FzTest, FzTestCond, TestResult,
        reset!, is_zero_adjusted, isdiscrete, iscontinuous,
-       HitonState, LGLResult,
-       combinations_with_whitelist
+       HitonState, LGLResult, combinations_with_whitelist
 
 
 #####################
 ## AUXILLARY TYPES ##
 #####################
+
+const NbrStatDict = OrderedDict{Int,Tuple{Float64,Float64}}
 
 mutable struct PairMeanObj
     sum_x::Float64

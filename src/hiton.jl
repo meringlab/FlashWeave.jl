@@ -11,19 +11,24 @@ using FlashWeave.Statfuns
 
 # Backend functions for Hiton-PC
 
-function init_candidates(prev_accepted_dict, candidates, candidates_unchecked)
+function init_candidates(prev_accepted_dict::NbrStatDict, candidates::Vector{Int},
+    candidates_unchecked::Vector{Int})
+
     if !isempty(prev_accepted_dict)
         accepted_dict = prev_accepted_dict
         candidates = candidates_unchecked
     else
-        accepted_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
+        accepted_dict = NbrStatDict()
         candidates = candidates
     end
 
     candidates, accepted_dict
 end
 
-function candidate_in_blackwhite_lists!(candidate, accepted, accepted_dict, whitelist, blacklist, debug)
+
+function candidate_in_blackwhite_lists!(candidate::Int, accepted::Vector{Int}, accepted_dict::NbrStatDict,
+     whitelist::Set{Int}, blacklist::Set{Int}, debug::Integer)
+
     candidate_in_list = false
     if !isempty(whitelist) && candidate in whitelist
         push!(accepted, candidate)
@@ -45,7 +50,9 @@ function candidate_in_blackwhite_lists!(candidate, accepted, accepted_dict, whit
     candidate_in_list
 end
 
-function prepare_nzdata(T, data, test_obj)
+
+function prepare_nzdata(T::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest) where {ElType<:Real}
+
     if needs_nz_view(T, data, test_obj)
         sub_data = @view data[data[:, T] .!= 0, :]
     else
@@ -56,8 +63,9 @@ function prepare_nzdata(T, data, test_obj)
 end
 
 
-function update_sig_result!(test_result, lowest_sig_Zs, candidate, accepted, accepted_dict, alpha, debug, rej_dict,
-     track_rejections)
+function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Vector{Int}, candidate::Int, accepted::Vector{Int},
+     accepted_dict::NbrStatDict, alpha::AbstractFloat, debug::Integer, rej_dict::Dict{Int,Tuple{Tuple,TestResult}}, track_rejections::Bool,
+     phase::Char, fast_elim::Bool)
 
      if issig(test_result, alpha)
          push!(accepted, candidate)
@@ -67,6 +75,10 @@ function update_sig_result!(test_result, lowest_sig_Zs, candidate, accepted, acc
              println("\taccepted: ", test_result)
          end
      else
+         if phase == 'E' && !fast_elim
+            push!(accepted, candidate)
+         end
+
          if track_rejections
              rej_dict[candidate] = (Tuple(lowest_sig_Zs), test_result)
          end
@@ -76,24 +88,26 @@ function update_sig_result!(test_result, lowest_sig_Zs, candidate, accepted, acc
      end
  end
 
-function check_candidate!(candidate, T, data, accepted, accepted_dict, test_obj, max_k, alpha, hps, n_obs_min, debug,
-     rej_dict, track_rejections, z)
-    sub_data = prepare_nzdata(candidate, data, test_obj)
+function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, accepted::Vector{Int}, accepted_dict::NbrStatDict,
+    test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer, n_obs_min::Integer, debug::Integer, rej_dict::Dict{Int,Tuple{Tuple,TestResult}},
+    track_rejections::Bool, z::Vector{DiscType}, phase::Char, fast_elim::Bool)  where {ElType<:Real, DiscType<:Integer}
 
-    test_result, lowest_sig_Zs = test_subsets(T, candidate, accepted, sub_data, test_obj, max_k, alpha, hps=hps,
+    data_prep = prepare_nzdata(candidate, data, test_obj)
+
+    test_result, lowest_sig_Zs = test_subsets(T, candidate, accepted, data_prep, test_obj, max_k, alpha, hps=hps,
                                n_obs_min=n_obs_min, debug=debug, z=z)
 
     update_sig_result!(test_result, lowest_sig_Zs, candidate, accepted, accepted_dict, alpha, debug, rej_dict,
-                             track_rejections)
+                             track_rejections, phase, fast_elim)
 end
 
-function hiton_backend{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
+function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
         test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0,
-        prev_accepted_dict::OrderedDict{Int,Tuple{Float64,Float64}}=Dict(),
-        candidates_unchecked::AbstractVector{Int}=[], time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0,
+        prev_accepted_dict::NbrStatDict=Dict(),
+        candidates_unchecked::Vector{Int}=Int[], time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0,
         debug::Integer=0, whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
         rej_dict::Dict{Int, Tuple{Tuple,TestResult}}=Dict{Int, Tuple{Tuple,TestResult}}(), track_rejections::Bool=false,
-        z::Vector{<:Integer}=Int[], phase::Char='I'; fast_elim::Bool=true, no_red_tests::Bool=false)# where {ElType <: Real}
+        z::Vector{DiscType}=Int[], phase::Char='I'; fast_elim::Bool=true, no_red_tests::Bool=false) where {ElType<:Real, DiscType<:Integer}
     phase != 'I' && phase != 'E' && error("'phase' must be 'I' or 'E'")
 
     nz = is_zero_adjusted(test_obj)
@@ -108,7 +122,7 @@ function hiton_backend{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, 
             println("\tTesting candidate $candidate ($cand_index out of $(length(candidates))) conditioned on $accepted, current set size: $(length(accepted))")
         end
 
-        candidate_in_list = candidate_in_blackwhite_lists!(candidate, candidates, accepted_dict, whitelist, blacklist, debug)
+        candidate_in_list = candidate_in_blackwhite_lists!(candidate, accepted, accepted_dict, whitelist, blacklist, debug)
 
         if !candidate_in_list
             if phase == 'E'
@@ -116,7 +130,7 @@ function hiton_backend{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, 
             end
 
             check_candidate!(candidate, T, data, accepted, accepted_dict, test_obj, max_k, alpha, hps, n_obs_min, debug,
-                 rej_dict, track_rejections, z)
+                 rej_dict, track_rejections, z, phase, fast_elim)
         end
 
         if stop_reached(start_time, time_limit) && cand_index < length(candidates)
@@ -127,34 +141,40 @@ function hiton_backend{ElType <: Real}(T::Int, candidates::AbstractVector{Int}, 
     accepted_dict, Int[]
 end
 
-function interleaving_phase(args...; add_initial_candidate=true, univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}())
+
+function interleaving_phase(args...; add_initial_candidate::Bool=true,
+    univar_nbrs::NbrStatDict=NbrStatDict())::Tuple{NbrStatDict,Vector{Int}}
+
     TPC_dict, candidates_unchecked = hiton_backend(args..., 'I')
     # set test stats of the initial candidate to its univariate association results
     if add_initial_candidate
         candidates = args[2]
         TPC_dict[candidates[1]] = univar_nbrs[candidates[1]]
     end
+
     TPC_dict, candidates_unchecked
 end
 
-elimination_phase(args...; kwargs...) = hiton_backend(args..., 'E'; kwargs...)
+elimination_phase(args...; kwargs...)::Tuple{NbrStatDict,Vector{Int}} = hiton_backend(args..., 'E'; kwargs...)
 
 function make_stopped_HitonState()
     phase = 'F'
-    state_results = OrderedDict{Int,Tuple{Float64,Float64}}()
-    inter_results = OrderedDict{Int,Tuple{Float64,Float64}}()
+    state_results = NbrStatDict()
+    inter_results = NbrStatDict()
     unchecked_vars = Int[]
     state_rejections = Dict{Int, Tuple{Tuple,TestResult}}()
 
     HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
 end
 
-function init_hiton_pc(T, data, test_name, levels::AbstractVector{DiscType}, max_k, cor_mat, cache_pcor) where {DiscType<:Integer}
+function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, levels::Vector{DiscType}, max_k::Integer,
+     cor_mat::AbstractMatrix{ContType}, cache_pcor::Bool) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+
     stop_hiton = false
 
     if isdiscrete(test_name)
         if isempty(levels)
-            levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+            levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))::Vector{DiscType}
         end
 
         if levels[T] < 2
@@ -168,13 +188,14 @@ function init_hiton_pc(T, data, test_name, levels::AbstractVector{DiscType}, max
     end
 
     test_obj = make_test_object(test_name, true, max_k=max_k, levels=levels, cor_mat=cor_mat, cache_pcor=cache_pcor)
-    data = prepare_nzdata(T, data, test_obj)
+    data_prep = prepare_nzdata(T, data, test_obj)
     test_variables = filter(x -> x != T, 1:size(data, 2))
 
-    data, levels, z, test_obj, test_variables, stop_hiton
+    data_prep, levels, z, test_obj, test_variables, stop_hiton
 end
 
-function prepare_interleaving_phase(prev_state, rej_dict, univar_nbrs, track_rejections)
+function prepare_interleaving_phase(prev_state::HitonState{Int}, rej_dict::Dict{Int,Tuple{Tuple,TestResult}},
+     univar_nbrs::NbrStatDict, track_rejections::Bool)
 
     if prev_state.phase == 'I'
         prev_TPC_dict = prev_state.state_results
@@ -186,19 +207,19 @@ function prepare_interleaving_phase(prev_state, rej_dict, univar_nbrs, track_rej
         end
     else
         # sort candidates
-        candidate_pval_pairs = [(candidate, univar_nbrs[candidate][2]) for candidate in keys(univar_nbrs)]
+        candidate_pval_pairs = Tuple{Int,Float64}[(candidate, univar_nbrs[candidate][2]) for candidate in keys(univar_nbrs)]
         sort!(candidate_pval_pairs, by=x -> x[2])
         candidates = map(x -> x[1], candidate_pval_pairs)
         candidates_unchecked = Int[]
-        prev_TPC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
+        prev_TPC_dict = NbrStatDict()
     end
     candidates, candidates_unchecked, prev_TPC_dict, rej_dict
 end
 
 
-#PC_candidates, PC_unchecked, prev_PC_dict, TPC_dict, rej_dict = prepare_elimination_phase(prev_state, track_rejections, no_red_tests, fast_elim)
+function prepare_elimination_phase(prev_state::HitonState{Int}, TPC_dict::NbrStatDict,
+    rej_dict::Dict{Int,Tuple{Tuple,TestResult}}, track_rejections::Bool, no_red_tests::Bool, fast_elim::Bool)
 
-function prepare_elimination_phase(prev_state, TPC_dict, rej_dict, track_rejections, no_red_tests, fast_elim)
     if prev_state.phase == 'E'
         prev_PC_dict = prev_state.state_results
 
@@ -213,7 +234,7 @@ function prepare_elimination_phase(prev_state, TPC_dict, rej_dict, track_rejecti
             rej_dict = prev_state.state_rejections
         end
     else
-        prev_PC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
+        prev_PC_dict = NbrStatDict()
         PC_unchecked = Int[]
         PC_candidates = convert(Vector{Int}, collect(keys(TPC_dict)))
     end
@@ -221,7 +242,9 @@ function prepare_elimination_phase(prev_state, TPC_dict, rej_dict, track_rejecti
     PC_candidates, PC_unchecked, prev_PC_dict, TPC_dict, rej_dict
 end
 
-function update_PC_dict!(PC_dict, TPC_dict)
+
+function update_PC_dict!(PC_dict::NbrStatDict, TPC_dict::NbrStatDict)
+
     for nbr in keys(PC_dict)
         if haskey(TPC_dict, nbr) && (TPC_dict[nbr][2] > PC_dict[nbr][2] || isnan(PC_dict[nbr][2]))
             PC_dict[nbr] = TPC_dict[nbr]
@@ -229,7 +252,10 @@ function update_PC_dict!(PC_dict, TPC_dict)
     end
 end
 
-function make_final_HitonState(prev_state, PC_dict, TPC_dict, rej_dict)
+
+function make_final_HitonState(prev_state::HitonState{Int}, PC_dict::NbrStatDict,
+     TPC_dict::NbrStatDict, rej_dict::Dict{Int,Tuple{Tuple,TestResult}})
+
     # if previous state had converged, keep this information
     if prev_state.phase == 'C'
         phase = 'C'
@@ -249,22 +275,22 @@ end
 
 # Main function for Hiton-PC
 
-function si_HITON_PC(T::Int, data::AbstractMatrix{ElType};
-        test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Integer=0,
+function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscType}=DiscType[], cor_mat::Matrix{ContType}=zeros(ContType);
+        test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0,
         fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval",
         whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
-        univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}=OrderedDict{Int,Tuple{Float64,Float64}}(),
-        levels::AbstractVector{DiscType}=DiscType[],
-        cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
+        univar_nbrs::NbrStatDict=NbrStatDict(),
         prev_state::HitonState{Int}=HitonState{Int}('S', OrderedDict(), OrderedDict(), [], Dict()),
-        debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false, cache_pcor::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+        debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false,
+         cache_pcor::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     if debug > 0
         println("Finding neighbors for $T")
     end
 
     rej_dict = Dict{Int, Tuple{Tuple,TestResult}}()
-    data, levels, z, test_obj, test_variables, stop_hiton = init_hiton_pc(T, data, test_name, levels, max_k, cor_mat, cache_pcor)
+
+    data_prep, levels, z, test_obj, test_variables, stop_hiton = init_hiton_pc(T, data, test_name, levels, max_k, cor_mat, cache_pcor)
 
     if stop_hiton
         return make_stopped_HitonState()
@@ -285,8 +311,8 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType};
                 PC_dict = prev_state.state_results
                 TPC_dict = prev_state.inter_results
             else
-                PC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
-                TPC_dict = OrderedDict{Int,Tuple{Float64,Float64}}()
+                PC_dict = NbrStatDict()
+                TPC_dict = NbrStatDict()
             end
         else
             if prev_state.phase == 'I' || prev_state.phase == 'S'
@@ -302,8 +328,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType};
                     return make_stopped_HitonState()
                 end
 
-                # interleaving phase
-                TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data, test_obj, max_k,
+                TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data_prep, test_obj, max_k,
                                                                     alpha, hps, n_obs_min, prev_TPC_dict, candidates_unchecked,
                                                                      time_limit, start_time, debug, whitelist, blacklist,
                                                                     rej_dict, track_rejections, z, add_initial_candidate=prev_state.phase=='S',
@@ -315,7 +340,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType};
                         println("Time limit exceeded, reporting incomplete results")
                     end
 
-                    return HitonState('I', TPC_dict, OrderedDict{Int,Tuple{Float64,Float64}}(), candidates_unchecked, rej_dict)
+                    return HitonState('I', TPC_dict, NbrStatDict(), candidates_unchecked, rej_dict)
                 end
 
                 if debug > 0
@@ -335,7 +360,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType};
                                                                                                       no_red_tests, fast_elim)
 
 
-            PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data, test_obj, max_k, alpha,
+            PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data_prep, test_obj, max_k, alpha,
                                                        hps, n_obs_min, prev_PC_dict, PC_unchecked, time_limit,
                                                         start_time, debug, whitelist, blacklist, rej_dict,
                                                         track_rejections, z, fast_elim=fast_elim,
