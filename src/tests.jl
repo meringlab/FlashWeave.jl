@@ -27,8 +27,8 @@ sufficient_power(levels_x::Integer, levels_y::Integer, levels_z::Integer, n_obs:
 
 function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::AbstractContTest, hps::Integer,
         n_obs_min::Int=0)
-    levels_x = test_obj.levels[X]
-    levels_y = test_obj.levels[Y]
+    @inbounds levels_x = test_obj.levels[X]
+    @inbounds levels_y = test_obj.levels[Y]
 
     if !issparse(data)
         contingency_table!(X, Y, data, test_obj.ctab)
@@ -73,8 +73,8 @@ function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Integer},
     is provided!
 
     Test all variables Ys for univariate association with X"""
-
-    if test_obj.levels[X] < 2
+    @inbounds levels_x = test_obj.levels[X]
+    if levels_x < 2
         return [TestResult(0.0, 1.0, 0, false) for Y in Ys]
     else
         return map(Y -> test(X, Y, data, test_obj, hps, n_obs_min), Ys)
@@ -103,7 +103,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Real}, test_obj::FzTest,
     else
         nz = is_zero_adjusted(test_obj)
 
-        if isempty(test_obj.cor_mat)
+        @inbounds if isempty(test_obj.cor_mat)
             if issparse(data)
                 p_stat, n_obs = cor(X, Y, data, nz)
 
@@ -213,6 +213,7 @@ end
 
 
 function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5)
+    """Convenience function for module tests"""
     levels = get_levels(data)
     test_obj = MiTestCond(levels, is_zero_adjusted(test_name) ? Nz() : NoNz(), length(Zs))
 
@@ -244,8 +245,10 @@ function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Ab
     Misc.TestResult(p_stat, pval, df, n_obs >= n_obs_min)
 end
 
+# convenience function for module tests
 
 function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Real}, test_name::String; recursive::Bool=true, n_obs_min::Integer=0)
+    """Convenience function for module tests"""
     cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)
     test_obj = FzTestCond(cor_mat, Dict{String,Dict{String,eltype(cor_mat)}}(), is_zero_adjusted(test_name) ? Nz() : NoNz(),
         true)

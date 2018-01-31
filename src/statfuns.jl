@@ -29,9 +29,9 @@ function oddsratio(ctab::AbstractArray{<:Integer}, nz::Bool=false)
     if ndims(ctab) == 2
         ondiag = (ctab[1 + offset, 1 + offset] * ctab[2 + offset, 2 + offset])
         offdiag = (ctab[1 + offset, 2 + offset] * ctab[2 + offset, 1 + offset])
-        return (ctab[1 + offset, 1 + offset] * ctab[2 + offset, 2 + offset]) / (ctab[1 + offset, 2 + offset] * ctab[2 + offset, 1 + offset])
+        @inbounds return (ctab[1 + offset, 1 + offset] * ctab[2 + offset, 2 + offset]) / (ctab[1 + offset, 2 + offset] * ctab[2 + offset, 1 + offset])
     else
-        oddsratios_per_Zcombo = filter(!isnan, [oddsratio(ctab[:, :, i], false) for i in 1:size(ctab, 3)])
+        @inbounds oddsratios_per_Zcombo = filter(!isnan, [oddsratio(ctab[:, :, i], false) for i in 1:size(ctab, 3)])
         return isempty(oddsratios_per_Zcombo) ? NaN64 : median(oddsratios_per_Zcombo)
     end
 end
@@ -51,7 +51,7 @@ function pcor(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Re
         return 0.0
     end
 
-    p = try
+    @inbounds p = try
         cov_mat = cov(sub_data)
         #println("$X, $Y, $Zs, $cov_mat")
         inv_mat = pinv(cov_mat)
@@ -85,7 +85,7 @@ function pcor_rec{ContType<:AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{In
     if cache_result && haskey(pcor_set_dict, XY_key) && haskey(pcor_set_dict[XY_key], Zs_key)
         p = pcor_set_dict[XY_key][Zs_key]
     else
-        if length(Zs) == 1
+        @inbounds if length(Zs) == 1
             Z = Zs[1]
 
             pXY = cor_mat[X, Y]
@@ -144,7 +144,7 @@ end
 function cor(X::Int, Y::Int, data::SparseMatrixCSC{<:Real},
     nz::Bool=false)
     p_mean_obj = PairMeanObj(0.0, 0.0, 0)
-    iter_apply_sparse_rows!(X, Y, data, update!, p_mean_obj, nz, nz)
+    @inbounds iter_apply_sparse_rows!(X, Y, data, update!, p_mean_obj, nz, nz)
 
     n_obs = nz ? p_mean_obj.n : size(data, 1)
 
@@ -155,7 +155,7 @@ function cor(X::Int, Y::Int, data::SparseMatrixCSC{<:Real},
     mean_x = p_mean_obj.sum_x / n_obs
     mean_y = p_mean_obj.sum_y / n_obs
     p_cor_obj = PairCorObj(0.0, 0.0, 0.0, mean_x, mean_y)
-    iter_apply_sparse_rows!(X, Y, data, update!, p_cor_obj, nz, nz)
+    @inbounds iter_apply_sparse_rows!(X, Y, data, update!, p_cor_obj, nz, nz)
 
     if !nz
         z_elems = size(data, 1) - p_mean_obj.n
@@ -179,7 +179,7 @@ end
 function cor(data::SparseMatrixCSC{<:Real}, nz::Bool)
     n_vars = size(data, 2)
     cor_mat = zeros(Float64, n_vars, n_vars)
-    Threads.@threads for X in 1:n_vars-1
+    @inbounds Threads.@threads for X in 1:n_vars-1
         for Y in X+1:n_vars
             cor_xy = cor(X, Y, data, nz)
             cor_mat[X, Y] = cor_xy
@@ -203,7 +203,7 @@ function cor_subset!(data::AbstractMatrix{<:Real}, cor_mat::AbstractMatrix{<:Abs
     sub_data = @view data[:, vars]
     sub_cors = cor(sub_data)
 
-    for i in 1:n_vars-1
+    @inbounds for i in 1:n_vars-1
         X = vars[i]
         for j in i+1:n_vars
             Y = vars[j]
@@ -258,7 +258,7 @@ function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer
     fill!(marg_k, 0)
 
     # compute marginals
-    for i in 1:levels_x, j in 1:levels_y, k in 1:levels_z
+    @inbounds for i in 1:levels_x, j in 1:levels_y, k in 1:levels_z
         marg_i[i, k] += ctab[i, j, k]
         marg_j[j, k] += ctab[i, j, k]
         marg_k[k] += ctab[i, j, k]
@@ -269,7 +269,7 @@ function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer
 
 
     # compute mutual information
-    for i in 1:size(ctab, 1), j in 1:size(ctab, 2), k in 1:size(ctab, 3)
+    @inbounds for i in 1:size(ctab, 1), j in 1:size(ctab, 2), k in 1:size(ctab, 3)
         cell_value = ctab[i, j, k]
         marg_ik = marg_i[i, k]
         marg_jk = marg_j[j, k]
@@ -291,7 +291,7 @@ function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, 
     fill!(marg_j, 0)
 
     # compute marginals
-    for i in 1:levels_x, j in 1:levels_y
+    @inbounds for i in 1:levels_x, j in 1:levels_y
         marg_i[i] += ctab[i, j]
         marg_j[j] += ctab[i, j]
     end
@@ -300,7 +300,7 @@ function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, 
     n_obs = sum(ctab)
 
     # compute mutual information
-    for i in 1:levels_x
+    @inbounds for i in 1:levels_x
         marg_ii = marg_i[i]
         for j in 1:levels_y
             cell_value = ctab[i, j]
@@ -319,10 +319,10 @@ end
 function adjust_df{T<:Integer}(marg_i::AbstractVector{T}, marg_j::AbstractVector{T}, levels_x::Integer, levels_y::Integer)
     alx = 0
     aly = 0
-    for i in 1:levels_x
+    @inbounds for i in 1:levels_x
         alx += sign(marg_i[i])
     end
-    for j in 1:levels_y
+    @inbounds for j in 1:levels_y
         aly += sign(marg_j[j])
     end
 
@@ -337,7 +337,7 @@ end
 
 function adjust_df{T<:Integer}(marg_i::AbstractMatrix{T}, marg_j::AbstractMatrix{T}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
     df = 0
-    for k in 1:levels_z
+    @inbounds for k in 1:levels_z
         df += adjust_df(marg_i[:, k], marg_j[:, k], levels_x, levels_y)
     end
     df
@@ -365,7 +365,7 @@ function benjamini_hochberg{T <: AbstractFloat}(pvals::AbstractVector{T})
     sorted_pval_tuples::Vector{Tuple{Int,T}} = collect(zip(1:length(pvals), pvals))
     sort!(sorted_pval_tuples, by=x->x[2])
 
-    for i in reverse(1:m-1)
+    @inbounds for i in reverse(1:m-1)
         next_adj = sorted_pval_tuples[i+1][2]
         new_adj = sorted_pval_tuples[i][2] * m / i
         min_adj = min(next_adj, new_adj)
@@ -373,7 +373,7 @@ function benjamini_hochberg{T <: AbstractFloat}(pvals::AbstractVector{T})
     end
 
     sort!(sorted_pval_tuples, by=x->x[1])
-    return [x[2] for x in sorted_pval_tuples]
+    @inbounds return [x[2] for x in sorted_pval_tuples]
 end
 
 end

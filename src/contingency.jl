@@ -10,7 +10,7 @@ function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::AbstractMat
     """2x2"""
     fill!(cont_tab, 0)
 
-    for i = 1:size(data, 1)
+    @inbounds for i = 1:size(data, 1)
         x_val = data[i, X] + one(ElType)
         y_val = data[i, Y] + one(ElType)
 
@@ -35,7 +35,7 @@ function contingency_table!{ElType<:Integer}(X::Int, Y::Int, Zs::Vector{Int}, da
     fill!(cont_tab, 0)
     levels_z = level_map!(Zs, data, z, cum_levels, z_map_arr)
 
-    for i in 1:size(data, 1)
+    @inbounds for i in 1:size(data, 1)
         x_val = data[i, X] + one(ElType)
         y_val = data[i, Y] + one(ElType)
         z_val = z[i] + one(ElType)
@@ -77,25 +77,25 @@ end
 
 function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer,Int},
         test_obj::ContTest2D)
-    if is_zero_adjusted(test_obj)
+    @inbounds if is_zero_adjusted(test_obj)
         X_nz = test_obj.levels[X] > 2
         Y_nz = test_obj.levels[Y] > 2
     else
         X_nz = Y_nz = false
     end
-    
+
     sparse_ctab_backend!((X, Y), data, test_obj, X_nz, Y_nz)
 end
 
 function contingency_table!(X::Int, Y::Int, Zs::Vector{Int}, data::SparseMatrixCSC{<:Integer,Int},
         test_obj::ContTest3D)
-    if is_zero_adjusted(test_obj)
+    @inbounds if is_zero_adjusted(test_obj)
         X_nz = test_obj.levels[X] > 2
         Y_nz = test_obj.levels[Y] > 2
     else
         X_nz = Y_nz = false
     end
-    
+
     sparse_ctab_backend!((X, Y, Zs...), data, test_obj, X_nz, Y_nz)
 end
 
@@ -113,7 +113,7 @@ function make_zmap_expression(col_type::Type{NTuple{N,Int}}) where N
         end
         append!(map_expr.args, i_Zs_expr.args)
     end
-    
+
     quote
         $(map_expr)
         z_val = test_obj.zmap.z_map_arr[gfp_map]
@@ -127,7 +127,7 @@ end
 
 @generated function sparse_ctab_backend!(cols::NTuple{N,Int}, data::SparseMatrixCSC{ElType,Int},
         test_obj::TestType, X_nz::Bool, Y_nz::Bool) where {N, ElType<:Integer, S<:Integer, T<:AbstractNz, TestType<:AbstractContTest{S,T}}
-    
+
     # general init
     # <<----------------
     expr = quote
@@ -139,26 +139,26 @@ end
         break_loop = false
     end
     # ---------------->>
-    
+
     if TestType <: AbstractContTest
-        push!(expr.args, :(reset!(test_obj)))        
+        push!(expr.args, :(reset!(test_obj)))
     end
-    
-    
+
+
     varsymb_dict = Dict()
-    
+
     # initialize variables for each column
     for i in 1:N
         varsymb_dict[i] = (Symbol("col$i"), Symbol("i$i"), Symbol("rowind$i"), Symbol("val$i"), Symbol("bound$i"))
         col_var, i_var, rowind_var, val_var, bound_var = varsymb_dict[i]
-        
+
         # <<----------------
         init_expr = quote
             $(col_var) = cols[$(i)]
             $(i_var) = data.colptr[$(col_var)]
             $(bound_var) = $(col_var) == n_cols ? nnz(data) + 1 : data.colptr[$(col_var) + 1]
 
-            if $(i_var) < $(bound_var)
+            @inbounds if $(i_var) < $(bound_var)
                 $(rowind_var) = rvals[$(i_var)]
 
                 if $(rowind_var) < min_ind
@@ -170,16 +170,16 @@ end
             end
         end
         # -------------->>
-        
+
         append!(expr.args, init_expr.args)
     end
-    
+
     # main loop
     sparse_expr = quote end
-    
+
     for i in 1:N
         col_var, i_var, rowind_var, val_var, bound_var = varsymb_dict[i]
-        
+
         if T <: Nz && i < 3
             adj_name = i == 1 ? Symbol("X_nz") : Symbol("Y_nz")
             skip_expr = quote
@@ -190,7 +190,7 @@ end
         else
             skip_expr = quote end
         end
-        
+
         if T <: Nz && i < 3
             adj_name = i == 1 ? Symbol("X_nz") : Symbol("Y_nz")
             break_expr = quote
@@ -201,10 +201,10 @@ end
         else
             break_expr = quote end
         end
-        
-        # <<----------------        
+
+        # <<----------------
         i_sparse_expr = quote
-            if $(rowind_var) == min_ind
+            @inbounds if $(rowind_var) == min_ind
                 $(val_var) = nzvals[$(i_var)]
                 $(i_var) += 1
 
@@ -235,7 +235,7 @@ end
                             n_out_of_bounds += 1
                             $(rowind_var) = n_rows + 1
                         else
-                            $(rowind_var) = rvals[$(i_var)]
+                            @inbounds $(rowind_var) = rvals[$(i_var)]
                         end
                     end
                 else
@@ -243,38 +243,38 @@ end
                 end
             end
         end
-        
+
         append!(sparse_expr.args, i_sparse_expr.args)
     end
-    
+
     if TestType <: ContTest2D
         val_process_expr = quote
-            test_obj.ctab[val1+one(ElType), val2+one(ElType)] += 1
+            @inbounds test_obj.ctab[val1+one(ElType), val2+one(ElType)] += 1
         end
     elseif TestType <: ContTest3D
         zmap_expr = make_zmap_expression(cols)
-        
+
         val_process_expr = quote
             $(zmap_expr)
-            test_obj.ctab[val1+one(ElType), val2+one(ElType), z_val+one(ElType)] += 1            
+            @inbounds test_obj.ctab[val1+one(ElType), val2+one(ElType), z_val+one(ElType)] += 1
         end
     end
-    
+
     # <<----------------
-    
+
     loop_expr = T <: Nz ? quote skip_row = false end : quote end
     if T <: Nz
         val_process_expr = quote
             if !skip_row
                 $(val_process_expr)
             end
-            
+
             if break_loop
                 break
             end
         end
     end
-    
+
     loop_expr = quote
         while true
             $(loop_expr)
@@ -290,15 +290,15 @@ end
         end
     end
     # ---------------->>
-    
+
     append!(expr.args, loop_expr.args)
     if TestType <: ContTest2D
-        push!(expr.args, :(test_obj.ctab[1, 1] += n_rows - sum(test_obj.ctab)))        
+        push!(expr.args, :(@inbounds test_obj.ctab[1, 1] += n_rows - sum(test_obj.ctab)))
     elseif TestType <: ContTest3D
         fill_allzero_expr = quote
             all_zero_obs = n_rows - sum(test_obj.ctab)
-            if all_zero_obs > 0
-                if test_obj.zmap.z_map_arr[1] != -1 
+            @inbounds if all_zero_obs > 0
+                if test_obj.zmap.z_map_arr[1] != -1
                     all_zero_z_index = test_obj.zmap.z_map_arr[1] + 1
                 else
                     test_obj.zmap.levels_total += one(ElType)
