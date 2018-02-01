@@ -258,7 +258,7 @@ end
 function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
     hps::Integer=5, n_obs_min::Integer=-1, convergence_threshold::AbstractFloat=0.01, FDR::Bool=true,
     parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
-    weight_type::String="cond_logpval", edge_rule::String="OR", nonsparse_cond::Bool=false,
+    weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
     verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true, cache_pcor::Bool=true, correct_reliable_only::Bool=true, feed_forward::Bool=true,
