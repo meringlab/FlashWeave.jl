@@ -308,13 +308,16 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
         # if the global network has converged
         if prev_state.phase == 'C'
             if !isempty(prev_state.inter_results)
-                PC_dict = prev_state.state_results
                 TPC_dict = prev_state.inter_results
+                PC_dict = prev_state.state_results
             else
-                PC_dict = NbrStatDict()
                 TPC_dict = NbrStatDict()
+                PC_dict = NbrStatDict()
             end
         else
+            TPC_dict = NbrStatDict()
+            PC_dict = NbrStatDict()
+
             if prev_state.phase == 'I' || prev_state.phase == 'S'
 
                 candidates, candidates_unchecked, prev_TPC_dict, rej_dict = prepare_interleaving_phase(prev_state, rej_dict, univar_nbrs, track_rejections)
