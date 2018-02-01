@@ -5,7 +5,7 @@ tic()
 #end
 
 using FlashWeave
-using JLD2
+using JLD
 toc()
 
 function main(input_args::Vector{String})
@@ -55,7 +55,7 @@ function main(input_args::Vector{String})
         #println("Finished after $(toc())s\n")
     end
     toc()
-    
+
     if normalize == "true"
         println("Normalizing data")
         tic()
@@ -85,7 +85,7 @@ function main(input_args::Vector{String})
     else
         max_k = parse(Int, max_k)
     end
-    
+
     lgl_args = Dict{Symbol,Any}(:test_name => test_name, :parallel => parallel_mode, :verbose => false, :recursive_pcor => rec_mode == "true", :max_k => max_k, :FDR => FDR == "true", :weight_type => weight_type)
 
     if speed_mode == "fast"

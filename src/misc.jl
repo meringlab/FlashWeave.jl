@@ -4,7 +4,7 @@ using LightGraphs
 using StatsBase
 using Combinatorics
 using DataStructures
-using JLD2
+using JLD
 using MetaGraphs
 
 using FlashWeave.Types

@@ -1,5 +1,5 @@
 using FlashWeave
-using DataFrames
+#using DataFrames
 using Base.Test
 
 ctab12 = [4 2; 2 4]

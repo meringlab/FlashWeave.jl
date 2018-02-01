@@ -4,6 +4,7 @@ using Base.Test
 using MetaGraphs
 using LightGraphs
 
+#cd("/Users/janko/.julia/v0.6/FlashWeave/test")
 #data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 
@@ -12,7 +13,7 @@ exp_dict = load(joinpath("data", "learning_expected.jld"))
 function make_network(data, test_name, make_sparse=false, prec=32, verbose=false; kwargs...)
     data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
     kwargs_dict = Dict(kwargs)
-    graph_res = LGL(data_norm; test_name=test_name, verbose=verbose, kwargs...)
+    graph_res = LGL(data_norm; test_name=test_name, verbose=verbose, weight_type="cond_logpval",  kwargs...)
     graph_res.graph
 end
 
@@ -56,12 +57,9 @@ end
 
 #@code_warntype make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, verbose=true)
 
-
-
 #exp_graph_dict = exp_dict["exp_$(test_name)_maxk$(max_k)_paramulti_il"]
 #atol = 1e-2
 #rtol = 0.0
-
 #println(compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol, verbose=true))
 #println(keys(exp_dict))
 

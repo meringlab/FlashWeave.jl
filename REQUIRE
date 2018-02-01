@@ -1,1 +1,8 @@
-julia 0.5
+julia 0.6
+Combinatorics 0.5.0
+Distributions 0.15.0
+StatsBase 0.19.5
+Clustering 0.9.1
+MetaGraphs 0.3.0
+DataStructures 0.7.4
+JLD 0.8.3
