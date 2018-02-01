@@ -63,7 +63,7 @@ function prepare_nzdata(T::Int, data::AbstractMatrix{ElType}, test_obj::Abstract
 end
 
 
-function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Vector{Int}, candidate::Int, accepted::Vector{Int},
+function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg{Int64,N} where N<:Int}, candidate::Int, accepted::Vector{Int},
      accepted_dict::NbrStatDict, alpha::AbstractFloat, debug::Integer, rej_dict::Dict{Int,Tuple{Tuple,TestResult}}, track_rejections::Bool,
      phase::Char, fast_elim::Bool)
 

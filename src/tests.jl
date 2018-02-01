@@ -168,10 +168,10 @@ end
 ### CONDITIONAL ###
 ###################
 
-function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Integer}, test_obj::MiTestCond, hps::Integer, z::AbstractVector{<:Integer}=Int[])
+function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer}, test_obj::MiTestCond, hps::Integer, z::AbstractVector{<:Integer}=Int[])
     """Test association between X and Y"""
-    levels_x = test_obj.levels[X]
-    levels_y = test_obj.levels[Y]
+    @inbounds levels_x = test_obj.levels[X]
+    @inbounds levels_y = test_obj.levels[Y]
 
     if !issparse(data)
         levels_z = contingency_table!(X, Y, Zs, data, test_obj.ctab, z, test_obj.zmap.cum_levels, test_obj.zmap.z_map_arr)
@@ -212,7 +212,7 @@ function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:In
 end
 
 
-function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5)
+function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5)
     """Convenience function for module tests"""
     levels = get_levels(data)
     test_obj = MiTestCond(levels, is_zero_adjusted(test_name) ? Nz() : NoNz(), length(Zs))
@@ -225,7 +225,7 @@ end
 
 ## CONTINUOUS ##
 
-function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFloat},
+function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:AbstractFloat},
     test_obj::FzTestCond, n_obs_min::Integer)
     """Critical: expects zeros to be trimmed from both X and Y if nz is true"""
 
@@ -247,7 +247,8 @@ end
 
 # convenience function for module tests
 
-function test(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Real}, test_name::String; recursive::Bool=true, n_obs_min::Integer=0)
+function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Real}, test_name::String;
+     recursive::Bool=true, n_obs_min::Integer=0)
     """Convenience function for module tests"""
     cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)
     test_obj = FzTestCond(cor_mat, Dict{String,Dict{String,eltype(cor_mat)}}(), is_zero_adjusted(test_name) ? Nz() : NoNz(),
@@ -263,7 +264,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
     debug::Int=0, Z_wanted::AbstractVector{Int}=Int[], z::Vector{<:Integer}=Int[])
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
-    lowest_sig_Zs = Int[]
+    lowest_sig_Zs = ()
     discrete_test = isdiscrete(test_obj)
     num_tests = 0
     nz = is_zero_adjusted(test_obj)
@@ -290,7 +291,8 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
     for subset_size in max_k:-1:1
         Z_combos = isempty(Z_wanted) ? combinations(Z_total, subset_size) : combinations_with_whitelist(Z_total, Z_wanted, subset_size)
 
-        for Zs in Z_combos
+        for Zs_arr in Z_combos
+            Zs = Tuple(Zs_arr)
             if discrete_test
                 test_result = test(X, Y, Zs, data, test_obj, hps, z)
             else

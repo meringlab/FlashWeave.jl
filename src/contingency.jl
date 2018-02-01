@@ -30,7 +30,7 @@ end
 contingency_table(X::Int, Y::Int, data::AbstractMatrix{<:Integer}) = contingency_table(X, Y, data, length(unique(data[:, X])), length(unique(data[:, Y])))
 
 
-function contingency_table!{ElType<:Integer}(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{ElType}, cont_tab::Array{<:Integer, 3},
+function contingency_table!{ElType<:Integer}(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{ElType}, cont_tab::Array{<:Integer, 3},
     z::Vector{<:Integer}, cum_levels::Vector{<:Integer}, z_map_arr::Vector{<:Integer})
     fill!(cont_tab, 0)
     levels_z = level_map!(Zs, data, z, cum_levels, z_map_arr)
@@ -60,7 +60,7 @@ end
 
 
 # convenience wrapper for three-way contingency tables
-function contingency_table(X::Int, Y::Int, Zs::Vector{Int}, data::AbstractMatrix{<:Integer}, test_name::String,
+function contingency_table(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer}, test_name::String,
     levels::Vector{<:Integer}=get_levels(data))
     test_obj = make_test_object(test_name, true, max_k=length(Zs), levels=levels, cor_mat=zeros(Float64, 0, 0))
     if issparse(data)
@@ -87,7 +87,7 @@ function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer,Int}
     sparse_ctab_backend!((X, Y), data, test_obj, X_nz, Y_nz)
 end
 
-function contingency_table!(X::Int, Y::Int, Zs::Vector{Int}, data::SparseMatrixCSC{<:Integer,Int},
+function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::SparseMatrixCSC{<:Integer,Int},
         test_obj::ContTest3D)
     @inbounds if is_zero_adjusted(test_obj)
         X_nz = test_obj.levels[X] > 2

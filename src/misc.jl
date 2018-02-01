@@ -31,6 +31,7 @@ function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool
     test_obj
 end
 
+
 function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,Int})
     levels = length(unique(nonzeros(col_vec)))
     add_zero = col_vec.n > length(col_vec.nzind) ? one(ElType) : zero(ElType)
@@ -75,7 +76,6 @@ function signed_weight(stat::Float64, pval::Float64, kind::String="logpval")
 end
 
 
-
 function workers_all_local()
     local_host = gethostname()
     workers_local = true
@@ -114,30 +114,31 @@ function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_n
 end
 
 
-function make_cum_levels!{ElType <: Integer}(cum_levels::AbstractVector{ElType}, Zs::AbstractVector{Int}, levels::AbstractVector{ElType})
+function make_cum_levels!{ElType <: Integer}(cum_levels::AbstractVector{ElType}, Zs::Tuple{Vararg{Int64,N} where N<:Int}, levels::AbstractVector{ElType})
+
     cum_levels[1] = 1
 
-    for j in 2:length(Zs)
+    @inbounds for j in 2:length(Zs)
         Z_var = Zs[j]
         levels_z = levels[Z_var]
         cum_levels[j] = cum_levels[j - 1] * levels_z
     end
 end
 
-function make_cum_levels{ElType <: Integer}(Zs::AbstractVector{Int}, levels::AbstractVector{ElType})
+function make_cum_levels{ElType <: Integer}(Zs::Tuple{Vararg{Int64,N} where N<:Int}, levels::AbstractVector{ElType})
     cum_levels = zeros(Int, length(Zs))
     make_cum_levels!(cum_levels, Zs, levels)
     cum_levels
 end
 
 
-function level_map!{ElType <: Integer}(Zs::AbstractVector{Int}, data::AbstractMatrix{ElType}, z::AbstractVector{<:Integer},
+function level_map!{ElType <: Integer}(Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{ElType}, z::AbstractVector{<:Integer},
         cum_levels::AbstractVector{<:Integer},
     z_map_arr::AbstractVector{<:Integer})
     fill!(z_map_arr, -1)
     levels_z = zero(ElType)
 
-    for i in 1:size(data, 1)
+    @inbounds for i in 1:size(data, 1)
         gfp_map = one(ElType)
         for (j, Z_var) in enumerate(Zs)
             gfp_map += data[i, Z_var] * cum_levels[j]

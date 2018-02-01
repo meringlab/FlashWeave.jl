@@ -44,8 +44,8 @@ function fz_pval(stat::AbstractFloat, n::Int, len_z::Int)
 end
 
 
-function pcor(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Real})
-    sub_data = @view data[:, [X, Y, Zs...]]
+function pcor(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Real})
+    @inbounds sub_data = @view data[:, [X, Y, Zs...]]
 
     if size(sub_data, 1) < 1
         return 0.0
@@ -78,7 +78,9 @@ function pcor(X::Int, Y::Int, Zs::AbstractVector{Int}, data::AbstractMatrix{<:Re
 end
 
 
-function pcor_rec{ContType<:AbstractFloat}(X::Int, Y::Int, Zs::AbstractVector{Int}, cor_mat::AbstractMatrix{ContType}, pcor_set_dict::Dict{String,Dict{String,ContType}}, cache_result::Bool=true)
+function pcor_rec{ContType<:AbstractFloat}(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, cor_mat::AbstractMatrix{ContType},
+     pcor_set_dict::Dict{String,Dict{String,ContType}}, cache_result::Bool=true)
+
     XY_key = string(X) * "_" * string(Y)
     Zs_key = join(Zs, "_")
 

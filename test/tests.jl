@@ -35,10 +35,10 @@ for (test_name, data_norm) in [("mi", data_bin), ("mi_nz", data_mi_nz),
                 if cond_mode == "uni"
                     @test all([compare_test_results(r1, r2) for (r1, r2) in zip(FlashWeave.Tests.test(1, collect(2:50), sub_data, test_name), exp_res)])
                 elseif cond_mode == "condZ1"
-                    test_res = FlashWeave.Tests.test(31, 21, [7], sub_data, test_name)
+                    test_res = FlashWeave.Tests.test(31, 21, (7,), sub_data, test_name)
                     @test compare_test_results(test_res, exp_res)
                 elseif cond_mode == "condZ3"
-                    test_res = FlashWeave.Tests.test(31, 21, [7, 14, 18], sub_data, test_name)
+                    test_res = FlashWeave.Tests.test(31, 21, (7, 14, 18,), sub_data, test_name)
                     @test compare_test_results(test_res, exp_res)
                 end
 

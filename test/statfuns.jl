@@ -19,25 +19,8 @@ ctab12_34[2, 1, 3] = 2
 ctab12_34[2, 2, 4] = 1
 ctab12_34[2, 2, 5] = 1
 
-#data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 
-
-data_clr = FlashWeave.Preprocessing.preprocess_data_default(data, "fz", verbose=false,
-prec=64)
-exp_pcor_Z1 = -0.16393307352649364
-cor_mat = cor(data_clr)
-
-isapprox(FlashWeave.Statfuns.pcor(1, 16, [41], data_clr), exp_pcor_Z1, rtol=1e-6)
-isapprox(FlashWeave.Statfuns.pcor_rec(1, 16, [41], cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z1, rtol=1e-6)
-
-exp_pcor_Z3 = -0.07643814205965811
-
-isapprox(FlashWeave.Statfuns.pcor(31, 21, [7, 14, 18], data_clr), exp_pcor_Z3, rtol=1e-6)
-isapprox(FlashWeave.Statfuns.pcor_rec(31, 21, [7, 14, 18], cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z3, rtol=1e-6)
-
-isapprox(FlashWeave.Statfuns.fz_pval(exp_pcor_Z1, 351, 1), 0.0020593283914246987, rtol=1e-6)
-isapprox(FlashWeave.Statfuns.fz_pval(exp_pcor_Z3, 351, 3), 0.1548665431407692, rtol=1e-6)
 
 @testset "correlation" begin
     data_clr = FlashWeave.Preprocessing.preprocess_data_default(data, "fz", verbose=false,
@@ -45,13 +28,13 @@ isapprox(FlashWeave.Statfuns.fz_pval(exp_pcor_Z3, 351, 3), 0.1548665431407692, r
     exp_pcor_Z1 = -0.16393307352649364
     cor_mat = cor(data_clr)
     @testset "pcor_Z1" begin
-        @test isapprox(FlashWeave.Statfuns.pcor(1, 16, [41], data_clr), exp_pcor_Z1, rtol=1e-6)
-        @test isapprox(FlashWeave.Statfuns.pcor_rec(1, 16, [41], cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z1, rtol=1e-6)
+        @test isapprox(FlashWeave.Statfuns.pcor(1, 16, (41,), data_clr), exp_pcor_Z1, rtol=1e-6)
+        @test isapprox(FlashWeave.Statfuns.pcor_rec(1, 16, (41,), cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z1, rtol=1e-6)
     end
     exp_pcor_Z3 = -0.07643814205965811
     @testset "pcor_Z3" begin
-        @test isapprox(FlashWeave.Statfuns.pcor(31, 21, [7, 14, 18], data_clr), exp_pcor_Z3, rtol=1e-6)
-        @test isapprox(FlashWeave.Statfuns.pcor_rec(31, 21, [7, 14, 18], cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z3, rtol=1e-6)
+        @test isapprox(FlashWeave.Statfuns.pcor(31, 21, (7, 14, 18), data_clr), exp_pcor_Z3, rtol=1e-6)
+        @test isapprox(FlashWeave.Statfuns.pcor_rec(31, 21, (7, 14, 18), cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z3, rtol=1e-6)
     end
     @testset "pval_fz" begin
         @test isapprox(FlashWeave.Statfuns.fz_pval(exp_pcor_Z1, 351, 1), 0.0020593283914246987, rtol=1e-6)
