@@ -1,5 +1,5 @@
 using FlashWeave
-using JLD
+using JLD2, FileIO
 using Base.Test
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])

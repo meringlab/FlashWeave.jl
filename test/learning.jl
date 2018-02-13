@@ -1,5 +1,5 @@
 using FlashWeave
-using JLD
+using JLD2, FileIO
 using Base.Test
 using MetaGraphs
 using LightGraphs

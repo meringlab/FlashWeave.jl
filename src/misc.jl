@@ -4,7 +4,8 @@ using LightGraphs
 using StatsBase
 using Combinatorics
 using DataStructures
-using JLD
+using JLD2
+using FileIO
 using MetaGraphs
 
 using FlashWeave.Types

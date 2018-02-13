@@ -5,4 +5,5 @@ StatsBase 0.19.5
 Clustering 0.9.1
 MetaGraphs 0.3.0
 DataStructures 0.7.4
-JLD 0.8.3
+JLD2 0.0.5
+FileIO 0.6.1
