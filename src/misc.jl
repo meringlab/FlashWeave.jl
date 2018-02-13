@@ -407,8 +407,35 @@ function translate_results(results::LGLResult{T1}, header::Vector{T2}) where {T1
     translate_results(results, trans_dict)
 end
 
+# hacky/slow functions to get around JLD2 problems in saving/loading LGLResult objects
+function save_lglresult(out_path::String, net_obj::LGLResult)
+    weight_dict = Dict{Tuple{Int,Int},Float64}()
+    for (e, props) in net_obj.graph.eprops
+        e_tup = (e.src, e.dst)
+        weight_dict[e_tup] = props[:weight]
+    end
+
+    save(out_path, Dict("weight_dict"=>weight_dict, "rejections"=>Int,
+            "unfinished_states"=>Int, "max_node"=>nv(net_obj.graph)))
+end
+
+function load_lglresult(in_path)
+    d = load(in_path)
+    weight_dict = d["weight_dict"]
+    G = MetaGraph(d["max_node"])
+    eprop_dict = Dict{Edge, Dict{Symbol, Any}}()
+
+    for ((src, dst), weight) in weight_dict
+        add_edge!(G, src, dst)
+        set_prop!(G, src, dst, :weight, weight)
+    end
+    LGLResult(G, Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}(), Dict{Int, HitonState}())
+end
+
+
 function save_network(results::LGLResult, out_path::String; meta_dict::Dict=Dict(), fmt::String="auto",
         header::Vector{String}=String[])
+    """Currently unmaintained"""
     if fmt == "auto"
         fmt = split(out_path, ".")[end]
     end
