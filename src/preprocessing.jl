@@ -72,7 +72,7 @@ function adaptive_pseudocount{ElType <: AbstractFloat}(X::Matrix{ElType})
     max_depth_sample::Vector{ElType} = X[max_depth_index, :]
     #pseudo_counts = mapslices(x -> adaptive_pseudocount(1.0, max_depth_sample, x), X, 2)
     min_abund = minimum(X[X .!= 0])
-    base_pcount = 1.0#min_abund >= 1 ? 1.0 : min_abund / 10
+    base_pcount = min_abund >= 1 ? 1.0 : min_abund / 10
     pseudo_counts = [adaptive_pseudocount(base_pcount, max_depth_sample, X[x, :]) for x in 1:size(X, 1)]
 
     X_pcount = copy(X)

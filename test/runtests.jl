@@ -18,7 +18,6 @@ for test_module in ["preprocessing.jl", "misc.jl", "contingency.jl", "statfuns.j
         println("(this can take a couple of minutes)")
         #include(test_module)
     end
-
     include(test_module)
 end
 
