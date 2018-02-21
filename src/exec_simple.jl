@@ -24,6 +24,7 @@ function main(input_args::Vector{String})
     write_table = input_args[11]
     max_k = input_args[12]
     weight_type = input_args[13]
+    norm_type = input_args[14]
 
     #println("Starting processes and importing modules")
     #tic()
@@ -46,13 +47,7 @@ function main(input_args::Vector{String})
     else
         data_full = readdlm(input_path, '\t')
         header = convert(Array{String,1}, data_full[1, 2:end])
-        #data = convert(Matrix{Int}, round.(data_full[2:end, 2:end], 0))
         data = convert(Matrix{Float64}, data_full[2:end, 2:end])
-        #println(typeof(data))
-        #println(test_name)
-        #println(typeof(data) <: AbstractMatrix{Real})
-        #println(data)
-        #println("Finished after $(toc())s\n")
     end
     toc()
 
@@ -62,7 +57,11 @@ function main(input_args::Vector{String})
 
         skip_cols = Int[x for x in 1:length(header) if startswith(header[x], "ENV")]
 
-        data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
+        if norm_type in ["binary", "binned_nz_clr", "clr_adapt", "clr_nz", "binned_nz_clr"]
+            data_norm, header = FlashWeave.Preprocessing.preprocess_data(data, norm_type, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
+        else
+            data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
+        end
         toc()
     else
         data_norm = data

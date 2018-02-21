@@ -238,7 +238,7 @@ function discretize_env{ElType <: Real}(env_data::SparseMatrixCSC{ElType}, norm,
 end
 
 function balance_transform_single_coord(x_i::Int, arr::AbstractVector)
-    
+
 end
 
 function clrnorm_data(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
@@ -278,7 +278,7 @@ function rownorm_data(data::AbstractMatrix)
 end
 
 function balnorm_data(data::AbstractMatrix)
-    
+
 end
 
 function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
@@ -292,7 +292,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         env_data = data[:, env_cols]
         noenv_mask = map(x -> !(x in env_cols), 1:size(data, 2))
         data = data[:, noenv_mask]
-        
+
         if !isempty(header)
             env_header = header[env_cols]
             header = header[noenv_mask]
@@ -308,7 +308,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         if !isempty(env_cols)
             env_data = env_data[row_mask, :]
         end
-        
+
         if !isempty(header)
             header = header[col_mask]
         end
@@ -337,7 +337,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         unreduced_vars = size(data, 2)
         bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]
         data = data[:, bin_mask]
-        
+
         if !isempty(header)
             header = header[bin_mask]
         end
@@ -360,7 +360,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         unreduced_vars = size(data, 2)
         bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== n_bins)[:]
         data = data[:, bin_mask]
-        
+
         if !isempty(header)
             header = header[bin_mask]
         end
@@ -379,7 +379,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
             discretize_env!(env_data, norm, n_bins)
         end
         data = hcat(data, convert(typeof(data), env_data))
-        
+
         if !isempty(header)
             append!(header, env_header)
         end
@@ -399,7 +399,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         end
         data = convert(Matrix{T}, data)
     end
-    
+
     if !isempty(header)
         return data, header
     else
