@@ -372,7 +372,7 @@ end
 
 
 function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
-                            test_obj::String, hps::Integer, n_obs_min::Integer)
+                            test_obj::AbstractTest, hps::Integer, n_obs_min::Integer)
     n_vars = size(data, 2)
 
     if needs_nz_view(X, data, test_obj)
