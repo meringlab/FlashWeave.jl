@@ -436,7 +436,7 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
             # otherwise make workers store test results remotely and gather them in the end via network
             else
                 all_test_results = @parallel (vcat) for work_item in work_items
-                    pw_univar_kernel(work_item[1], work_item[2], data, test_name, hps, n_obs_min)
+                    pw_univar_kernel(work_item[1], work_item[2], data, test_obj, hps, n_obs_min)
                 end
 
                 pvals = ones(Float64, n_pairs)
