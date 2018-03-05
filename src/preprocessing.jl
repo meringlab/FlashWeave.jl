@@ -320,7 +320,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
     elseif norm == "binary"
         n_bins = 2
         if issparse(data)
-            map!(sign, data.nzval)
+            map!(sign, data.nzval, data.nzval)
             data = convert(SparseMatrixCSC{Int}, data)
         else
             data = sign.(data)
