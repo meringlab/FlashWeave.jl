@@ -120,14 +120,14 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
     end
 
     remaining_jobs = jobs_total
-
+    n_vars = size(data, 2)
     graph_dict = Dict{Int, HitonState{Int}}()
 
     # this graph is just used for efficiently keeping track of graph stats during the run
-    graph = Graph(length(target_vars))
+    graph = Graph(n_vars)
 
     if edge_rule == "AND"
-        blacklist_graph = Graph(length(target_vars))
+        blacklist_graph = Graph(n_vars)
     end
 
     edge_set = Set{Tuple{Int,Int}}()
