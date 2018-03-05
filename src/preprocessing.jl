@@ -14,13 +14,6 @@ function mapslices_sparse_nz(f, A::SparseMatrixCSC, dim::Integer=1)
     end
     result_vec = zeros(eltype(A), size(A, 2))
     for j in 1:size(A, 2)
-        #if dim == 1
-        #    col_vec = A[j, :]
-        #elseif dim == 2
-        #    col_vec = A[:, j]
-        #else
-        #    error("dim must be 1 or 2")
-        #end
         col_vec = A[:, j]
         result_vec[j] = f(col_vec.nzval)
     end
@@ -88,7 +81,7 @@ end
 function clr{ElType <: AbstractFloat}(X::SparseMatrixCSC{ElType})
     """Specialized version for sparse matrices that always excludes zero entries (thereby no need for pseudo counts)"""
     dest = full(similar(X))
-    gmeans_vec = mapslices_sparse_nz(geomean, X', 2)
+    gmeans_vec = mapslices_sparse_nz(geomean, X, 1)
     broadcast!(/, dest, X, gmeans_vec)
     #dest_sparse = sparse(dest)
     #map!(log, dest_sparse.nzval)
@@ -113,7 +106,7 @@ function clr{ElType <: AbstractFloat}(X::Matrix{ElType}; pseudo_count::ElType=1e
         X_trans = log.(X_trans ./ mapslices(center_fun, X_trans, 2))
 
         if ignore_zeros
-            X_trans[X .== 0.0] = 0.0#minimum(X_trans) - 1
+            X_trans[X .== 0.0] = 0.0
         end
     end
 

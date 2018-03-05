@@ -272,35 +272,50 @@ function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     graph_dict
 end
 
-function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String, edge_merge_fun=maxweight)
-    G = MetaGraph(maximum(keys(weights_dict)))
+function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight,
+    wanted_vars::Set{Int}=Set{Int}(), max_var::Int=-1)
+    if max_var < 0
+        max_val_key = maximum(map(x -> !isempty(x) ? maximum(keys(x)) : 0, values(weights_dict)))
+        max_key_key = maximum(keys(weights_dict))
+        max_var = max(max_key_key, max_val_key)
+    end
 
+    G = MetaGraph(max_var)
     for node1 in keys(weights_dict)
         for node2 in keys(weights_dict[node1])
 
             if !has_edge(G, node1, node2)
-                # if only one direction is present and "AND" rule is specified, skip this edge
-                if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
-                    continue
-                end
 
-                e = Edge(node1, node2)
-                add_edge!(G, e)
-
-                weight = weights_dict[node1][node2]
-                rev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
-
-                weight = edge_merge_fun(weight, rev_weight)
-                if edge_rule == "OR"
-                    if haskey(weights_dict[node2], node1)
-                        edge_dir = '='
-                    elseif node1 < node2
-                        edge_dir = '>'
-                    else
-                        edge_dir = '<'
+                if isempty(wanted_vars)
+                    # if only one direction is present and "AND" rule is specified, skip this edge
+                    if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
+                        continue
                     end
-                    set_props!(G, e, Dict(:weight=>weight, :dir=>edge_dir))
+
+                    e = Edge(node1, node2)
+                    add_edge!(G, e)
+
+                    weight = weights_dict[node1][node2]
+
+                    rev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
+
+                    weight = edge_merge_fun(weight, rev_weight)
+                    if edge_rule == "OR"
+                        if haskey(weights_dict[node2], node1)
+                            edge_dir = '='
+                        elseif node1 < node2
+                            edge_dir = '>'
+                        else
+                            edge_dir = '<'
+                        end
+                        set_props!(G, e, Dict(:weight=>weight, :dir=>edge_dir))
+                    else
+                        set_prop!(G, e, :weight, weight)
+                    end
                 else
+                    e = Edge(node1, node2)
+                    add_edge!(G, e)
+                    weight = weights_dict[node1][node2]
                     set_prop!(G, e, :weight, weight)
                 end
             end

@@ -397,13 +397,20 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
         chunk_size::Int=500, correct_reliable_only::Bool=true)
 
+
+    target_vars = collect(1:size(data, 2))
+
+    #if !isempty(wanted_vars)
+    #    target_vars = filter(x -> x in wanted_vars, target_vars)
+    #end
+
     if startswith(test_name, "mi") && isempty(levels)
-        levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))
+        levels = map(x -> get_levels(data[:, x]), target_vars)
     end
 
     test_obj = make_test_object(test_name, false, levels=levels, cor_mat=cor_mat)
 
-    n_vars = size(data, 2)
+    n_vars = length(target_vars)
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
 
     nz = is_zero_adjusted(test_obj)

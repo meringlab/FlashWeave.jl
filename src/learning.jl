@@ -36,11 +36,6 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         fast_elim = true
     end
 
-    #if recursive_pcor && iscontinuous(test_name)
-    #    warn("setting 'recursive_pcor' to true produces different results in case of perfectly correlated
-    #          variables, caution advised")
-    #end
-
     disc_type = Int32
     cont_type = Float32
 
@@ -80,7 +75,7 @@ end
 
 function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String, alpha::AbstractFloat, hps::Integer,
     n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
-    correct_reliable_only::Bool, verbose::Bool) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+    correct_reliable_only::Bool, verbose::Bool, wanted_vars::Set{Int}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
     if verbose
@@ -88,11 +83,20 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
         tic()
     end
 
+    if !isempty(wanted_vars)
+
+        warn("FlashWeave is currently computing all pairwise univariate associations, even if 'wanted_vars' was specified")
+    end
+
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                           levels=levels, parallel=parallel, workers_local=workers_all_local(),
                                           cor_mat=cor_mat, correct_reliable_only=correct_reliable_only)
     var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
     target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
+
+    if !isempty(wanted_vars)
+        target_vars = filter(x -> x in wanted_vars, target_vars)
+    end
 
     if verbose
         println("\nUnivariate degree stats:")
@@ -201,14 +205,18 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
     all_univar_nbrs::Dict{Int,NbrStatDict},
     levels::Vector{DiscType}, cor_mat::AbstractMatrix{ContType}, parallel::String, recursive_pcor::Bool,
     cont_type::DataType, time_limit::AbstractFloat, nonsparse_cond::Bool, verbose::Bool, track_rejections::Bool,
-    hiton_kwargs::Dict{Symbol, Any}, interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+    hiton_kwargs::Dict{Symbol, Any}, interleaved_kwargs::Dict{Symbol, Any}, wanted_vars::Set{Int}=Set{Int}()) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     rej_dict = Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
     unfinished_state_dict = Dict{Int, HitonState{Int}}()
 
     # if only univar network should be learned, dont do anything
     if hiton_kwargs[:max_k] == 0
-        nbr_dict = all_univar_nbrs
+        if !isempty(wanted_vars)
+            nbr_dict = filter((x,y) -> x in wanted_vars, all_univar_nbrs)#Dict{Int,NbrStatDict}([(key, val) for (key, val) in all_univar_nbrs if in(key, wanted_vars)])
+        else
+            nbr_dict = all_univar_nbrs
+        end
 
     # else, run full conditioning
     else
@@ -262,7 +270,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true, cache_pcor::Bool=true, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, cluster_mode="greedy") where {ElType<:Real}
+    track_rejections::Bool=false, cluster_mode::AbstractString="greedy", wanted_vars::Set{Int}=Set{Int}()) where {ElType<:Real}
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
@@ -278,7 +286,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                   :time_limit => time_limit, :track_rejections => track_rejections, :cache_pcor => cache_pcor)
 
     target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min, FDR, levels,
-                                                          parallel, cor_mat, correct_reliable_only, verbose)
+                                                          parallel, cor_mat, correct_reliable_only, verbose, wanted_vars)
 
     target_vars, all_univar_nbrs, clust_dict, clust_var_dict, levels = make_preclustering(precluster_sim, data, target_vars, cor_mat, levels,
                                                                           test_name, all_univar_nbrs, cluster_mode, verbose)
@@ -286,9 +294,11 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     interleaved_kwargs = Dict(:update_interval => update_interval, :convergence_threshold => convergence_threshold,
                                   :feed_forward => feed_forward, :edge_rule => edge_rule, :workers_local=> workers_all_local())
 
-    nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data, all_univar_nbrs, levels, cor_mat, parallel, recursive_pcor,
+    nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data, all_univar_nbrs, levels, cor_mat, parallel,
+                                                                      recursive_pcor,
                                                                       cont_type, time_limit, nonsparse_cond,
-                                                                      verbose, track_rejections, hiton_kwargs, interleaved_kwargs)
+                                                                      verbose, track_rejections, hiton_kwargs,
+                                                                       interleaved_kwargs, wanted_vars)
 
     if verbose
         println("Postprocessing..")
@@ -304,7 +314,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
         weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type, test_name)
     end
 
-    graph = make_symmetric_graph(weights_dict, edge_rule)
+    graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, wanted_vars=wanted_vars, max_var=size(data, 2))
 
     if verbose
         println("Complete.")
