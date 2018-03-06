@@ -83,11 +83,6 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
         tic()
     end
 
-    if !isempty(wanted_vars)
-
-        warn("FlashWeave is currently computing all pairwise univariate associations, even if 'wanted_vars' was specified")
-    end
-
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                           levels=levels, parallel=parallel, workers_local=workers_all_local(),
                                           cor_mat=cor_mat, correct_reliable_only=correct_reliable_only, wanted_vars=wanted_vars)
