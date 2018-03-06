@@ -2,6 +2,8 @@ __precompile__()
 
 module FlashWeave
 
+using Iterators
+
 include("types.jl")
 include("misc.jl")
 include("statfuns.jl")

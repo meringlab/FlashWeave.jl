@@ -90,7 +90,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                           levels=levels, parallel=parallel, workers_local=workers_all_local(),
-                                          cor_mat=cor_mat, correct_reliable_only=correct_reliable_only)
+                                          cor_mat=cor_mat, correct_reliable_only=correct_reliable_only, wanted_vars=wanted_vars)
     var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
     target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
 
@@ -213,7 +213,7 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
     # if only univar network should be learned, dont do anything
     if hiton_kwargs[:max_k] == 0
         if !isempty(wanted_vars)
-            nbr_dict = filter((x,y) -> x in wanted_vars, all_univar_nbrs)#Dict{Int,NbrStatDict}([(key, val) for (key, val) in all_univar_nbrs if in(key, wanted_vars)])
+            nbr_dict = filter((x,y) -> x in wanted_vars, all_univar_nbrs)
         else
             nbr_dict = all_univar_nbrs
         end
@@ -288,8 +288,8 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min, FDR, levels,
                                                           parallel, cor_mat, correct_reliable_only, verbose, wanted_vars)
 
-    target_vars, all_univar_nbrs, clust_dict, clust_var_dict, levels = make_preclustering(precluster_sim, data, target_vars, cor_mat, levels,
-                                                                          test_name, all_univar_nbrs, cluster_mode, verbose)
+    target_vars, all_univar_nbrs, clust_dict, clust_var_dict, levels = make_preclustering(precluster_sim, data, target_vars, cor_mat,
+                                                                                          levels, test_name, all_univar_nbrs, cluster_mode, verbose)
 
     interleaved_kwargs = Dict(:update_interval => update_interval, :convergence_threshold => convergence_threshold,
                                   :feed_forward => feed_forward, :edge_rule => edge_rule, :workers_local=> workers_all_local())
@@ -313,7 +313,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     for target_var in keys(nbr_dict)
         weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type, test_name)
     end
-
+    #println(weights_dict)
     graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, wanted_vars=wanted_vars, max_var=size(data, 2))
 
     if verbose

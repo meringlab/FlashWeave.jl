@@ -49,11 +49,15 @@ function compare_graph_results(g1::Dict, g2::MetaGraph; verbose=false, rtol=0.0,
 end
 
 # For sanity checking
-#max_k = 3
+#max_k = 0
 #make_sparse = false
 #parallel = "single"
 #test_name = "mi"
 #graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true)
+
+
+
+#graph2 = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, wanted_vars=Set([1,2,3]))
 
 #@code_warntype make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, verbose=true)
 
@@ -130,6 +134,13 @@ end
 
         @testset "$test_name" begin
             @test compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol)
+        end
+    end
+end
+
+@testset "wanted_vars" begin
+    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
+        @testset "$test_name" begin
         end
     end
 end
