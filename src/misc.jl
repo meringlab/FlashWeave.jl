@@ -272,8 +272,7 @@ function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     graph_dict
 end
 
-function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight,
-    wanted_vars::Set{Int}=Set{Int}(), max_var::Int=-1)
+function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight, max_var::Int=-1)
     if max_var < 0
         max_val_key = maximum(map(x -> !isempty(x) ? maximum(keys(x)) : 0, values(weights_dict)))
         max_key_key = maximum(keys(weights_dict))
@@ -286,36 +285,29 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
 
             if !has_edge(G, node1, node2)
 
-                if isempty(wanted_vars)
-                    # if only one direction is present and "AND" rule is specified, skip this edge
-                    if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
-                        continue
-                    end
+                # if only one direction is present and "AND" rule is specified, skip this edge
+                if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
+                    continue
+                end
 
-                    e = Edge(node1, node2)
-                    add_edge!(G, e)
+                e = Edge(node1, node2)
+                add_edge!(G, e)
 
-                    weight = weights_dict[node1][node2]
+                weight = weights_dict[node1][node2]
 
-                    rev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
+                rev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
 
-                    weight = edge_merge_fun(weight, rev_weight)
-                    if edge_rule == "OR"
-                        if haskey(weights_dict[node2], node1)
-                            edge_dir = '='
-                        elseif node1 < node2
-                            edge_dir = '>'
-                        else
-                            edge_dir = '<'
-                        end
-                        set_props!(G, e, Dict(:weight=>weight, :dir=>edge_dir))
+                weight = edge_merge_fun(weight, rev_weight)
+                if edge_rule == "OR"
+                    if haskey(weights_dict[node2], node1)
+                        edge_dir = '='
+                    elseif node1 < node2
+                        edge_dir = '>'
                     else
-                        set_prop!(G, e, :weight, weight)
+                        edge_dir = '<'
                     end
+                    set_props!(G, e, Dict(:weight=>weight, :dir=>edge_dir))
                 else
-                    e = Edge(node1, node2)
-                    add_edge!(G, e)
-                    weight = weights_dict[node1][node2]
                     set_prop!(G, e, :weight, weight)
                 end
             end
@@ -576,6 +568,6 @@ function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMat
 end
 
 make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))
-work_chunker(n_vars, chunk_size=1000, wanted_vars=Set{Int}()) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))
+work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))
 
 end

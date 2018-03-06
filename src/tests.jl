@@ -319,7 +319,9 @@ end
 
 # backend functions for pairwise univariate tests
 
-function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}, stats::AbstractVector{Float64}, alpha::AbstractFloat)
+function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}, stats::AbstractVector{Float64},
+     alpha::AbstractFloat)
+
     nbr_dict = Dict([(X, OrderedDict{Int,Tuple{Float64,Float64}}()) for X in 1:n_vars])
 
     for X in 1:n_vars-1, Y in X+1:n_vars
@@ -336,7 +338,7 @@ function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}
 end
 
 
-function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
+function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
                             stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
                             test_obj::AbstractTest, hps::Integer, n_obs_min::Integer,
                             correct_reliable_only::Bool=false)
@@ -372,7 +374,7 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, dat
 end
 
 
-function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::UnitRange{Int}, data::AbstractMatrix{ElType},
+function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
                             test_obj::AbstractTest, hps::Integer, n_obs_min::Integer)
     n_vars = size(data, 2)
 
@@ -396,7 +398,7 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
         test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
         levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
-        chunk_size::Int=500, correct_reliable_only::Bool=true, wanted_vars::Set{Int}=Set{Int})
+        chunk_size::Int=500, correct_reliable_only::Bool=true)
 
 
     target_vars = collect(1:size(data, 2))
@@ -413,13 +415,8 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
     nz = is_zero_adjusted(test_obj)
 
 
-    work_items_itr = work_chunker(n_vars, min(chunk_size, div(n_vars, 3)))
-    if isempty(wanted_vars)
-        work_items = collect(work_items_itr)
-    else
-        work_items = collect(Iterators.filter(x -> x[1] in wanted_vars, work_items_itr))
-        println("work items: ", length(work_items))
-    end
+    effective_chunk_size = min(chunk_size, Int(ceil(n_vars / 3)))
+    work_items = collect(work_chunker(n_vars, effective_chunk_size))
 
     pvals = fill(NaN64, n_pairs)#ones(Float64, n_pairs)
     stats = fill(NaN64, n_pairs)#zeros(Float64, n_pairs)
@@ -480,7 +477,7 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
     end
 
     if FDR
-        if (correct_reliable_only || !isempty(wanted_vars)) && any(isnan(x) for x in pvals)
+        if correct_reliable_only && any(isnan(x) for x in pvals)
             reliable_mask = .!isnan.(pvals)
             reliable_pvals = pvals[reliable_mask]
             reliable_pvals = benjamini_hochberg(reliable_pvals)

@@ -277,7 +277,7 @@ end
 
 function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscType}=DiscType[], cor_mat::Matrix{ContType}=zeros(ContType);
         test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0,
-        fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_logpval",
+        fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_stat",
         whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::NbrStatDict=NbrStatDict(),
         prev_state::HitonState{Int}=HitonState{Int}('S', OrderedDict(), OrderedDict(), [], Dict()),

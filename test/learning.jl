@@ -53,11 +53,17 @@ end
 #make_sparse = false
 #parallel = "single"
 #test_name = "mi"
-#graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true)
+#graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=false)
 
 
+#wanted_vars = Set([1,2,3])
+#graph2 = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, wanted_vars=wanted_vars, FDR=false)
 
-#graph2 = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, wanted_vars=Set([1,2,3]))
+#wanted_vars2 = Set([1,25,50])
+#graph3 = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, wanted_vars=wanted_vars2, FDR=false)
+
+#[(x, Set(neighbors(graph, x)) == Set(neighbors(graph2, x))) for x in wanted_vars]
+#[(x, Set(neighbors(graph, x)) == Set(neighbors(graph3, x))) for x in wanted_vars2]
 
 #@code_warntype make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, verbose=true)
 
@@ -138,12 +144,12 @@ end
     end
 end
 
-@testset "wanted_vars" begin
-    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
-        @testset "$test_name" begin
-        end
-    end
-end
+#@testset "wanted_vars" begin
+#    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
+#        @testset "$test_name" begin
+#        end
+#    end
+#end
 
 #@testset "fast_elim_OFF" begin
 #    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
