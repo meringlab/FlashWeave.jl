@@ -114,11 +114,15 @@ end
 end
 
 @testset "precision_32" begin
-    @testset "mi_sparse_single" begin
-        graph = make_network(data, "mi", true, 32, max_k=3, parallel="single", time_limit=0.0,
-            correct_reliable_only=false, n_obs_min=0)
-        exp_graph_dict = exp_dict["exp_mi_maxk3_parasingle"]
-        @test compare_graph_results(exp_graph_dict, graph, rtol=0.0, atol=1e-2)
+    for (test_name, make_sparse) in [("mi_nz", true), ("fz", false)]
+        for make_sparse in [true]
+            @testset "$(test_name)_$(make_sparse)_single" begin
+                graph = make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single", time_limit=0.0,
+                    correct_reliable_only=false, n_obs_min=0)
+                exp_graph_dict = exp_dict["exp_$(test_name)_maxk3_parasingle"]
+                @test compare_graph_results(exp_graph_dict, graph, rtol=0.0, atol=1e-2)
+            end
+        end
     end
 
     #@testset "fz_nz_nonsparse_multi_il" begin

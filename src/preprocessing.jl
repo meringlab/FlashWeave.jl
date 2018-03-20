@@ -106,7 +106,7 @@ function clr!{ElType <: AbstractFloat}(X::Matrix{ElType}; pseudo_count::ElType=1
 end
 
 
-function adaptive_clr{ElType <: AbstractFloat}(X::Matrix{ElType})
+function adaptive_clr!{ElType <: AbstractFloat}(X::Matrix{ElType})
     adaptive_pseudocount!(X)
     clr!(X, pseudo_count=0.0, ignore_zeros=false)
 end
@@ -232,7 +232,7 @@ function balance_transform_single_coord(x_i::Int, arr::AbstractVector)
 
 end
 
-function clrnorm_data!(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
+function clrnorm_data(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
     """Covers all flavors of clr transform, makes sparse matrices dense if pseudo-counts
     are used to make computations more efficient"""
 
@@ -241,7 +241,7 @@ function clrnorm_data!(data::AbstractMatrix, norm::String, clr_pseudo_count::Abs
         clr!(data, pseudo_count=clr_pseudo_count)
     elseif norm == "clr_adapt"
         data = convert(Matrix{Float64}, data)
-        data = adaptive_clr(data)
+        adaptive_clr!(data)
     elseif norm == "clr_nz"
         if issparse(data)
             data = convert(SparseMatrixCSC{Float64}, data)
@@ -251,6 +251,8 @@ function clrnorm_data!(data::AbstractMatrix, norm::String, clr_pseudo_count::Abs
             clr!(data, pseudo_count=0.0, ignore_zeros=true)
         end
     end
+    
+    data
 end
 
 
@@ -310,7 +312,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
     if norm == "rows"
         data = rownorm_data(data)
     elseif startswith(norm, "clr")
-        clrnorm_data!(data, norm, clr_pseudo_count)
+        data = clrnorm_data(data, norm, clr_pseudo_count)
     elseif norm == "binary"
         n_bins = 2
         if issparse(data)
@@ -337,7 +339,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
             if endswith(norm, "rows")
                 data = rownorm_data(data)
             elseif endswith(norm, "clr")
-                clrnorm_data!(data, "clr_nz", 0.0)
+                data = clrnorm_data(data, "clr_nz", 0.0)
             end
             data = discretize(data, n_bins=n_bins, nz=true, rank_method=rank_method, disc_method=disc_method)
         else
