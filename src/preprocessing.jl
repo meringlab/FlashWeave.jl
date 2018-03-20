@@ -3,7 +3,6 @@ module Preprocessing
 export preprocess_data, preprocess_data_default
 
 using StatsBase
-#using DataFrames
 using FlashWeave.Misc
 using FlashWeave.Learning
 
@@ -60,7 +59,7 @@ function adaptive_pseudocount{ElType <: AbstractFloat}(x1::ElType, s1::Vector{El
 end
 
 
-function adaptive_pseudocount{ElType <: AbstractFloat}(X::Matrix{ElType})
+function adaptive_pseudocount!{ElType <: AbstractFloat}(X::Matrix{ElType})
     max_depth_index = findmax(sum(X, 2))[2]
     max_depth_sample::Vector{ElType} = X[max_depth_index, :]
     #pseudo_counts = mapslices(x -> adaptive_pseudocount(1.0, max_depth_sample, x), X, 2)
@@ -68,49 +67,48 @@ function adaptive_pseudocount{ElType <: AbstractFloat}(X::Matrix{ElType})
     base_pcount = min_abund >= 1 ? 1.0 : min_abund / 10
     pseudo_counts = [adaptive_pseudocount(base_pcount, max_depth_sample, X[x, :]) for x in 1:size(X, 1)]
 
-    X_pcount = copy(X)
+    #X_pcount = copy(X)
 
     for i in 1:size(X, 1)
-        s_vec = @view X_pcount[i, :]
+        s_vec = @view X[i, :]
         s_vec[s_vec .== 0] = pseudo_counts[i]
     end
-    X_pcount
 end
 
-
-function clr{ElType <: AbstractFloat}(X::SparseMatrixCSC{ElType})
-    """Specialized version for sparse matrices that always excludes zero entries (thereby no need for pseudo counts)"""
-    dest = full(similar(X))
+function clr!{ElType <: AbstractFloat}(X::SparseMatrixCSC{ElType})
+    """Specialized in-place version for sparse matrices that always excludes zero entries (thereby no need for pseudo counts)"""
     gmeans_vec = mapslices_sparse_nz(geomean, X, 1)
-    broadcast!(/, dest, X, gmeans_vec)
-    #dest_sparse = sparse(dest)
-    #map!(log, dest_sparse.nzval)
-    zmask = dest .== 0.0
-    dest = log.(dest)
-    dest[zmask] = 0.0
-    sparse(dest)
-end
+    rows = rowvals(X)
 
-
-function clr{ElType <: AbstractFloat}(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false)
-    if pseudo_count == -1 && !ignore_zeros
-        X_trans = clr(adaptive_pseudocount(X), pseudo_count=0.0, ignore_zeros=false)
-    else
-        if pseudo_count != 0.0
-            X_trans = X + pseudo_count
-        else
-            X_trans = X
-        end
-        center_fun = ignore_zeros ? x -> geomean(x[x .!= pseudo_count]) : geomean
-
-        X_trans = log.(X_trans ./ mapslices(center_fun, X_trans, 2))
-
-        if ignore_zeros
-            X_trans[X .== 0.0] = 0.0
+    for i in 1:size(X, 2)
+        for j in nzrange(X, i)
+            row_gmean = gmeans_vec[rows[j]]
+            X.nzval[j] .= log(X.nzval[j] / row_gmean)
         end
     end
+end
 
-    X_trans
+
+function clr!{ElType <: AbstractFloat}(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false)
+    if !ignore_zeros
+        X .+= pseudo_count
+        center_fun = geomean
+    else
+        center_fun = x -> geomean(x[x .!= 0.0])
+    end
+
+    X .= log.(X ./ mapslices(center_fun, X, 2))
+
+    if ignore_zeros
+        X[isinf.(X)] = 0.0
+    end
+    nothing
+end
+
+
+function adaptive_clr{ElType <: AbstractFloat}(X::Matrix{ElType})
+    adaptive_pseudocount!(X)
+    clr!(X, pseudo_count=0.0, ignore_zeros=false)
 end
 
 
@@ -234,29 +232,25 @@ function balance_transform_single_coord(x_i::Int, arr::AbstractVector)
 
 end
 
-function clrnorm_data(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
+function clrnorm_data!(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
+    """Covers all flavors of clr transform, makes sparse matrices dense if pseudo-counts
+    are used to make computations more efficient"""
+
     if norm == "clr"
-        if issparse(data)
-            data = full(data)
-        end
         data = convert(Matrix{Float64}, data)
-        data = clr(data, pseudo_count=clr_pseudo_count)
+        clr!(data, pseudo_count=clr_pseudo_count)
     elseif norm == "clr_adapt"
-        if issparse(data)
-            data = full(data)
-        end
         data = convert(Matrix{Float64}, data)
-        data = clr(data, pseudo_count=-1.0)
+        data = adaptive_clr(data)
     elseif norm == "clr_nz"
         if issparse(data)
             data = convert(SparseMatrixCSC{Float64}, data)
-            data = clr(data)
+            clr!(data)
         else
             data = convert(Matrix{Float64}, data)
-            data = clr(data, pseudo_count=0.0, ignore_zeros=true)
+            clr!(data, pseudo_count=0.0, ignore_zeros=true)
         end
     end
-    data
 end
 
 
@@ -316,7 +310,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
     if norm == "rows"
         data = rownorm_data(data)
     elseif startswith(norm, "clr")
-        data = clrnorm_data(data, norm, clr_pseudo_count)
+        clrnorm_data!(data, norm, clr_pseudo_count)
     elseif norm == "binary"
         n_bins = 2
         if issparse(data)
@@ -343,7 +337,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
             if endswith(norm, "rows")
                 data = rownorm_data(data)
             elseif endswith(norm, "clr")
-                data = clrnorm_data(data, "clr_nz", 0.0)
+                clrnorm_data!(data, "clr_nz", 0.0)
             end
             data = discretize(data, n_bins=n_bins, nz=true, rank_method=rank_method, disc_method=disc_method)
         else
