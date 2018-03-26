@@ -80,10 +80,10 @@ function clr!{ElType <: AbstractFloat}(X::SparseMatrixCSC{ElType})
     gmeans_vec = mapslices_sparse_nz(geomean, X, 1)
     rows = rowvals(X)
 
-    for i in 1:size(X, 2)
-        for j in nzrange(X, i)
-            row_gmean = gmeans_vec[rows[j]]
-            X.nzval[j] .= log(X.nzval[j] / row_gmean)
+    for j in 1:size(X, 2)
+        for i in nzrange(X, j)
+            row_gmean = gmeans_vec[rows[i]]
+            X.nzval[i] = log(X.nzval[i] / row_gmean)
         end
     end
 end
@@ -111,6 +111,35 @@ function adaptive_clr!{ElType <: AbstractFloat}(X::Matrix{ElType})
     clr!(X, pseudo_count=0.0, ignore_zeros=false)
 end
 
+
+function discretize_nz!(X::SparseMatrixCSC{ElType}; bin_fun=median) where ElType <: Real
+    thrsh_vec = bin_fun(X, 1)
+
+    for j in 1:size(X, 2)
+        bin_thrsh = thrsh_vec[j]
+        for i in nzrange(X, j)
+            X.nzval[i] = X.nzval[i] >= bin_thrsh ? ElType(2) : ElType(1)
+        end
+    end
+end
+
+
+function discretize{ElType <: AbstractFloat}(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
+        rank_method::String="tied", disc_method::String="median")
+    if nz
+        if issparse(X)
+            disc_vecs = SparseVector{Int}[]
+            for j in 1:size(X, 2)
+                push!(disc_vecs, discretize_nz(X[:, j], n_bins, rank_method=rank_method, disc_method=disc_method))
+            end
+            return hcat(disc_vecs...)
+        else
+            return mapslices(x -> discretize_nz(x, n_bins, rank_method=rank_method, disc_method=disc_method), X, 1)
+        end
+    else
+        return mapslices(x -> discretize(x, n_bins, rank_method=rank_method, disc_method=disc_method), X, 1)
+    end
+end
 
 function discretize{ElType <: AbstractFloat}(x_vec::Vector{ElType}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median")
     if disc_method == "median"
@@ -169,37 +198,23 @@ function discretize_nz{ElType <: AbstractFloat}(x_vec::Vector{ElType}, n_bins::I
 end
 
 
-function discretize{ElType <: AbstractFloat}(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
-        rank_method::String="tied", disc_method::String="median")
-    if nz
-        if issparse(X)
-            disc_vecs = SparseVector{Int}[]
-            for j in 1:size(X, 2)
-                push!(disc_vecs, discretize_nz(X[:, j], n_bins, rank_method=rank_method, disc_method=disc_method))
+function discretize!(X::Matrix{ElType}; bin_fun=median, nz::Bool=true) where ElType <: Real
+    thrsh_fun = nz ? x -> bin_fun(@view x[x .!= 0]) : bin_fun
+    thrsh_vec = thrsh_fun(X, 1)
+
+    for j in 1:size(X, 2)
+        bin_thrsh = thrsh_vec[j]
+
+        for i in 1:size(X, 1)
+            x = X[i, j]
+
+            if x > 0 || !nz
+                X[i, j] = x >= bin_thrsh ? ElType(2) : ElType(1)
             end
-            return hcat(disc_vecs...)
-        else
-            return mapslices(x -> discretize_nz(x, n_bins, rank_method=rank_method, disc_method=disc_method), X, 1)
         end
-    else
-        return mapslices(x -> discretize(x, n_bins, rank_method=rank_method, disc_method=disc_method), X, 1)
     end
 end
 
-
-#function factors_to_binary_cols!(data_df::DataFrame, factor_cols::Vector{Symbol})
-#    for f_col in factor_cols
-#        f_vec = data_df[:, f_col]
-#        f_uniques = unique(f_vec)
-#        if length(f_uniques) > 2
-#            for unique_val in f_uniques
-#                new_col = Symbol("$(f_col)_$unique_val")
-#                data_df[new_col] = convert(Vector{Int}, f_vec .== unique_val)
-#            end
-#            delete!(data_df, f_col)
-#        end
-#    end
-#end
 
 iscontinuousnorm(norm::String) = norm == "rows" || startswith(norm, "clr")
 
@@ -228,9 +243,6 @@ function discretize_env{ElType <: Real}(env_data::SparseMatrixCSC{ElType}, norm,
     sparse(env_data_dense)
 end
 
-function balance_transform_single_coord(x_i::Int, arr::AbstractVector)
-
-end
 
 function clrnorm_data(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
     """Covers all flavors of clr transform, makes sparse matrices dense if pseudo-counts
@@ -251,24 +263,152 @@ function clrnorm_data(data::AbstractMatrix, norm::String, clr_pseudo_count::Abst
             clr!(data, pseudo_count=0.0, ignore_zeros=true)
         end
     end
-    
+
     data
 end
 
+rownorm_data!(X::Matrix{ElType}) where ElType <: AbstractFloat = X ./= sum(X, 2)
 
-function rownorm_data(data::AbstractMatrix)
-    dest = similar(data, Float64)
-    row_sums = sum(data, 2)
-    if issparse(data)
-        row_sums = sparse(row_sums)
+function rownorm_data!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
+    """Specialized in-place version for sparse matrices that always excludes zero entries (thereby no need for pseudo counts)"""
+    sum_vec = sum(X, 1)
+    rows = rowvals(X)
+
+    for i in 1:size(X, 2)
+        for j in nzrange(X, i)
+            row_sum = sum_vec[rows[j]]
+            X.nzval[j] .= log(X.nzval[j] / row_sum)
+        end
     end
-    broadcast!(/, dest, data, row_sums)
-    dest
 end
 
-function balnorm_data(data::AbstractMatrix)
+binnorm_data!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat = map!(sign, data.nzval, data.nzval)
+binnorm_data!(X::Matrix{ElType}) where ElType <: AbstractFloat = map!(sign, data, data)
+
+function split_environment(data::AbstractMatrix{ElType}, header::Vector{String}=String[], env_cols::Vector{Int}=Int[]) where ElType <: Real
+    env_data = data[:, env_cols]
+    noenv_mask = map(x -> !(x in env_cols), 1:size(data, 2))
+    data = data[:, noenv_mask]
+
+    if !isempty(header)
+        env_header = header[env_cols]
+        header = header[noenv_mask]
+    else
+        env_header = String[]
+    end
+
+    data, env_data, header, env_header
+end
+
+
+function drop_uninformative_rows_and_cols(data::AbstractMatrix{ElType}, env_data::AbstractMatrix{ElType}, norm::String, header::Vector{String}=String[],
+    verbose::Bool=false) where ElType <: Real
+    if verbose
+        println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
+    end
+
+    unfilt_dims = size(data)
+    col_mask = (var(data, 1)[:] .> 0.0)[:]
+    data = data[:, col_mask]
+    row_mask = (sum(data, 2)[:] .> 0)[:]
+    data = data[row_mask, :]
+    if !isempty(env_cols)
+        env_data = env_data[row_mask, :]
+    else
+        env_data = typeof(data)(0, 0)
+    end
+
+    if !isempty(header)
+        header = header[col_mask]
+    end
+
+    if verbose
+        println("\tdiscarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
+    end
+
+    data, env_data, header
+end
+
+
+function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_count::AbstractFloat=-1.0,
+    bin_fun=median, verbose::Bool=false, header::Vector{String}=String[], env_cols::Vector{Int}=Int[]) where ElType <: AbstractFloat
+
+    if !isempty(env_cols)
+        data, env_data, header, env_header = split_environment(data, header, env_cols)
+    end
+
+    data_prep, env_data_prep, header = drop_uninformative_rows_and_cols(data, env_data, header, verbose)
+
+    # normalization by total row sum
+    if norm == "rows"
+        rownorm_data!(data)
+
+    # CLR transform
+    elseif startswith(norm, "clr")
+        data = clrnorm_data(data, norm, clr_pseudo_count)
+
+    # binarization (presence/absence)
+    elseif norm == "binary"
+        binnorm_data!(data)
+        bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]
+        data = data[:, bin_mask]
+
+        if !isempty(header)
+            header = header[bin_mask]
+        end
+
+        if !isempty(env_cols)
+            binnorm_data!(env_data)
+            env_bin_mask =  (map(x -> get_levels(env_data[:, x]), 1:size(env_data, 2)) .== 2)[:]
+            env_data = env_data[:, env_bin_mask]
+            if !isempty(header)
+                env_header = env_header[env_bin_mask]
+            end
+        end
+
+    # discretization
+    elseif startswith(norm, "binned_nz")
+        # do pre-normalization
+        if endswith(norm, "rows")
+            rownorm_data!(data)
+        elseif endswith(norm, "clr")
+            data = clrnorm_data(data, "clr_nz", 0.0)
+        end
+
+        # discretize
+        data = discretize(data, nz=true, bin_fun=bin_fun)
+        bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .> 1)[:]
+        data = data[:, bin_mask]
+
+        if !isempty(header)
+            header = header[bin_mask]
+        end
+
+        if !isempty(env_cols)
+            env_bin_mask =  (map(x -> get_levels(env_data[:, x]), 1:size(env_data, 2)) .== 2)[:]
+            env_data = env_data[:, env_bin_mask]
+            if !isempty(header)
+                env_header = env_header[env_bin_mask]
+            end
+        end
+
+    end
+
+    if !isempty(env_cols)
+        if issparse(env_data)
+            env_data = discretize_env(env_data, norm, n_bins)
+        else
+            discretize_env!(env_data, norm, n_bins)
+        end
+        data = hcat(data, convert(typeof(data), env_data))
+
+        if !isempty(header)
+            append!(header, env_header)
+        end
+    end
 
 end
+
 
 function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
     disc_method::String="median", verbose::Bool=true, env_cols::Vector{Int}=Int[], make_sparse::Bool=issparse(data), factor_cols::Vector{Int}=Int[],
@@ -403,5 +543,13 @@ function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String
     data
 end
 
+
+function normalize(data::AbstractMatrix{ElType}, test_name::AbstractString; env_cols::Vector{Int}=Int[], header::Vector{String}=String[],
+    verbose::Bool=false, prec::Integer=32) where ElType <: Real
+    T = eval(Symbol("Float$prec"))
+    MatType = issparse(data) ? SparseMatrixCSC{T, eval(Symbol("Int$prec"))} : Matrix{T}
+    data = convert(MatType, data)
+    preprocess_data_default(data, test_name; env_cols=env_cols, header=header, verbose=verbose)
+end
 
 end

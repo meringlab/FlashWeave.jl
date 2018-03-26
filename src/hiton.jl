@@ -300,7 +300,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
     if debug > 0
         println("UNIVARIATE")
-        println("\t", collect(zip(test_variables, univar_nbrs)))
+        println("\tFirst up to 200 neighbors:", collect(zip(test_variables, univar_nbrs))[1:200])
     end
 
     # if conditioning should be performed

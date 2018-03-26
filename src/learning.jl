@@ -1,6 +1,6 @@
 module Learning
 
-export LGL, si_HITON_PC
+export LGL, learn_network
 
 using DataStructures
 using StatsBase
@@ -167,7 +167,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     if nonsparse_cond && !endswith(parallel, "il")
         data = full(data)
     end
-    
+
     if parallel == "single"
         nbr_results = HitonState{Int}[si_HITON_PC(x, data, levels, cor_mat; univar_nbrs=all_univar_nbrs[x], hiton_kwargs...) for x in target_vars]
     else
@@ -313,63 +313,46 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
 end
 
 
-function learn_network(data::AbstractArray{ElType}, mode::String="cont"; zero_adjust::Bool=false,
-                       make_sparse::Bool=false, maxk::Integer=3, alpha::AbstractFloat=0.01,
-                       normalize::Bool=true, parallel::Union{Bool,Void}=nothing,
-                       preclust_sim::AbstractFloat=0.0, feed_forward::Bool=true,
-                       join_rule::String="OR", verbose::Bool=true, kwargs...) where {ElType<:Real}
-
-    if preclust_sim > 0.0
-        error("Preclustering currently unmaintained, run with 'preclust_sim = 0.0'")
-    end
+function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true, heterogeneous::Bool=false,
+                       maxk::Integer=3, alpha::AbstractFloat=0.01, hps::Integer=5,
+                       normalize_data::Bool=true, verbose::Bool=true, lgl_kwargs...) where {ElType<:Real}
 
     start_time = time()
-    if mode == "cont"
-        test_name = "fz"
-    elseif mode == "disc" || mode == "bin"
-        test_name = "mi"
-    else
-        error("$mode is not a valid testing mode")
-    end
 
-    if zero_adjust
-        test_name = test_name * "_nz"
-    end
+    cont_mode = sensitive ? "fz" : "mi"
+    het_mode = heterogeneous ? "_nz" : ""
 
-    if feed_forward
-        if !parallel
-            parallel_mode = "single_il"
-        else
-            parallel_mode = "multi_il"
-        end
-    else
-        parallel_mode = parallel ? "multi_ep" : "single"
-    end
+    test_name = cont_mode * het_mode
+    parallel_mode = nprocs() > 1 ? "multi_il" : "single_il"
 
-    if verbose
-        println("Normalizing")
-    end
 
-    data_norm = normalize ? preprocess_data_default(data, test_name, make_sparse=make_sparse) : data
+    if normalize_data
+        normalize!(data)
+    end
 
     if verbose
         println("""Inferring network\n
         \tSettings:
-        \t\tmode - $mode
-        \t\tzero_adjust - $zero_adjust
-        \t\tmax_k - $max_k
-        \t\tsparse - $make_sparse
-        \t\tfeed_forward - $feed_forward
-        \t\tpreclustering - $(preclust_sim != 0.0)
+        \t\tsensitive - $sensitive
+        \t\theterogeneous - $heterogeneous
+        \t\tmax_k - $(max_k)
+        \t\talpha - $alpha
+        \t\tsparse - $(issparse(data))
         \t\tworkers - $(nprocs())""")
     end
 
-    params_dict = Dict(:test_name=>test_name, :max_k=>max_k, :alpha=>alpha, :preclust_sim=>preclust_sim,
-                     :parallel=>parallel_mode, :edge_rule=>join_rule)
-    merge!(params_dict, kwargs)
-    lgl_results = LGL(data_norm, test_name=test_name, max_k=max_k, alpha=alpha, preclust_sim=preclust_sim, parallel=parallel_mode, edge_rule=join_rule, verbose=verbose; kwargs...)
+    params_dict = Dict(:test_name=>test_name, :max_k=>max_k, :alpha=>alpha, :hps=>hps,
+                     :parallel=>parallel_mode)
+    merge!(params_dict, lgl_kwargs)
+
+    lgl_results = LGL(data; params_dict...)
 
     time_taken = time() - start_time()
+
+    if verbose
+        println("Finished inference. Time taken: ", time_taken, "s")
+    end
+
     stats_dict = Dict(:time_taken=>time_taken, :converged=>!isempty(lgl_results.unfinished_states))
     meta_dict = Dict("params"=>params_dict, "stats"=>stats_dict)
     lgl_results, meta_dict
