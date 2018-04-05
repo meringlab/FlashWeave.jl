@@ -247,7 +247,7 @@ end
 
 # convenience function for module tests
 
-function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Real}, test_name::String;
+function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:AbstractFloat}, test_name::String;
      recursive::Bool=true, n_obs_min::Integer=0)
     """Convenience function for module tests"""
     cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)

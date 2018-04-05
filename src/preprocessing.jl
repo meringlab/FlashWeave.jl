@@ -270,14 +270,14 @@ end
 rownorm_data!(X::Matrix{ElType}) where ElType <: AbstractFloat = X ./= sum(X, 2)
 
 function rownorm_data!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
-    """Specialized in-place version for sparse matrices that always excludes zero entries (thereby no need for pseudo counts)"""
-    sum_vec = sum(X, 1)
+    """Specialized in-place version for sparse matrices"""
+    sum_vec = sum(X, 2)
     rows = rowvals(X)
 
     for i in 1:size(X, 2)
         for j in nzrange(X, i)
             row_sum = sum_vec[rows[j]]
-            X.nzval[j] .= log(X.nzval[j] / row_sum)
+            X.nzval[j] = X.nzval[j] / row_sum
         end
     end
 end
