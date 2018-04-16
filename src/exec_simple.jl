@@ -5,7 +5,7 @@ tic()
 #end
 
 using FlashWeave
-using JLD
+#using JLD
 toc()
 
 function main(input_args::Vector{String})
@@ -41,9 +41,10 @@ function main(input_args::Vector{String})
     println("Reading data")
     tic()
     if endswith(input_path, ".jld")
-        data_dict = load(input_path)
-        data = data_dict["data"]
-        header = data_dict["header"]
+        #data_dict = load(input_path)
+        #data = data_dict["data"]
+        #header = data_dict["header"]
+        error("Cannot read .jld files")
     else
         data_full = readdlm(input_path, '\t')
         header = convert(Array{String,1}, data_full[1, 2:end])
