@@ -257,7 +257,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
     verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
-    recursive_pcor::Bool=true, cache_pcor::Bool=true, correct_reliable_only::Bool=true, feed_forward::Bool=true,
+    recursive_pcor::Bool=true, cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
     track_rejections::Bool=false, cluster_mode::AbstractString="greedy") where {ElType<:Real}
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
