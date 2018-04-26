@@ -288,8 +288,10 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
         end
     end
 
+    num_tests_total = 0
     for subset_size in max_k:-1:1
-        Z_combos = isempty(Z_wanted) ? combinations(Z_total, subset_size) : combinations_with_whitelist(Z_total, Z_wanted, subset_size)
+        Z_combos = combinations(Z_total, subset_size)#isempty(Z_wanted) ? combinations(Z_total, subset_size) : combinations_with_whitelist(Z_total, Z_wanted, subset_size)
+        num_tests_total += length(Z_combos)
 
         for Zs_arr in Z_combos
             Zs = Tuple(Zs_arr)
@@ -305,7 +307,14 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
             end
 
             if !issig(test_result, alpha)
-                return test_result, Zs
+                if subset_size > 1
+                    for remaining_subset_size in subset_size-1:-1:1
+                        num_tests_total += length(combinations(Z_total, remaining_subset_size))
+                    end
+                end
+
+                return test_result, Zs, num_tests, num_tests / num_tests_total
+                
             elseif test_result.pval >= lowest_sig_result.pval
                 lowest_sig_result = test_result
                 lowest_sig_Zs = Zs
@@ -313,7 +322,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
         end
     end
 
-    lowest_sig_result, lowest_sig_Zs
+    lowest_sig_result, lowest_sig_Zs, num_tests, num_tests / num_tests_total
 end
 
 
@@ -372,7 +381,6 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::AbstractVector{Int}
         pvals[pair_index] = curr_pval
     end
 end
-
 
 function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
                             test_obj::AbstractTest, hps::Integer, n_obs_min::Integer)

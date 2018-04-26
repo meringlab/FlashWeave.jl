@@ -8,7 +8,7 @@ export NbrStatDict, PairMeanObj, PairCorObj,
        AbstractTest, AbstractContTest, AbstractCorTest, ContTest2D, ContTest3D, AbstractNz, Nz, NoNz,
        MiTest, MiTestCond, FzTest, FzTestCond, TestResult,
        reset!, is_zero_adjusted, isdiscrete, iscontinuous,
-       HitonState, LGLResult, combinations_with_whitelist
+       RejDict, HitonState, LGLResult, combinations_with_whitelist
 
 
 #####################
@@ -158,18 +158,19 @@ end
 ##################
 ## RESULT TYPES ##
 ##################
+const RejDict{T} = Dict{T,Tuple{Tuple,TestResult,Tuple{Int,Float64}}}
 
 struct HitonState{T}
     phase::Char
     state_results::OrderedDict{T,Tuple{Float64,Float64}}
     inter_results::OrderedDict{T,Tuple{Float64,Float64}}
     unchecked_vars::Vector{T}
-    state_rejections::Dict{T,Tuple{Tuple,TestResult}}
+    state_rejections::RejDict{T}
 end
 
 struct LGLResult{T}
     graph::MetaGraph{T,Float64}
-    rejections::Dict{T, Dict{T, Tuple{Tuple,TestResult}}}
+    rejections::Dict{T, RejDict{T}}
     unfinished_states::Dict{T, HitonState}
 end
 

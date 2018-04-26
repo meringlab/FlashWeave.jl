@@ -198,7 +198,7 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
     cont_type::DataType, time_limit::AbstractFloat, nonsparse_cond::Bool, verbose::Bool, track_rejections::Bool,
     hiton_kwargs::Dict{Symbol, Any}, interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
-    rej_dict = Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
+    rej_dict = Dict{Int, RejDict{Int}}()#Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}()
     unfinished_state_dict = Dict{Int, HitonState{Int}}()
 
     # if only univar network should be learned, dont do anything
