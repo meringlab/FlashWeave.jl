@@ -260,7 +260,7 @@ end
 ## MAIN SUBSET TEST FUNCTION ##
 
 function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::AbstractMatrix{<:Real},
-    test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, n_obs_min::Integer=0,
+    test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, n_obs_min::Integer=0, max_tests::Integer=Int(1.5e9),
     debug::Int=0, Z_wanted::AbstractVector{Int}=Int[], z::Vector{<:Integer}=Int[])
 
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
@@ -306,15 +306,18 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
                 println("\t subset ", Zs, " : ", test_result)
             end
 
-            if !issig(test_result, alpha)
+            if !issig(test_result, alpha) || num_tests >= max_tests
                 if subset_size > 1
                     for remaining_subset_size in subset_size-1:-1:1
                         num_tests_total += length(combinations(Z_total, remaining_subset_size))
                     end
                 end
+                test_fraction = num_tests / num_tests_total
 
-                return test_result, Zs, num_tests, num_tests / num_tests_total
-                
+                num_tests >= max_tests && warn("Maximum number of tests for variable pair $X / $Y at $num_tests out fo $num_tests_total tests (fraction: $(round(test_fraction, 3))).")
+
+                return test_result, Zs, num_tests, test_fraction
+
             elseif test_result.pval >= lowest_sig_result.pval
                 lowest_sig_result = test_result
                 lowest_sig_Zs = Zs

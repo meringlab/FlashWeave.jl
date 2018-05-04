@@ -252,7 +252,7 @@ end
 
 
 function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
-    hps::Integer=5, n_obs_min::Integer=-1, convergence_threshold::AbstractFloat=0.01, FDR::Bool=true,
+    hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(1.5e9), convergence_threshold::AbstractFloat=0.01, FDR::Bool=true,
     parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
     verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
@@ -268,7 +268,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                                                                                           feed_forward, max_k, n_obs_min, hps, fast_elim,
                                                                                           recursive_pcor, verbose)
 
-    hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min,
+    hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min, :max_tests => max_tests,
                   :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
                   :weight_type => weight_type, :debug => debug,
                   :time_limit => time_limit, :track_rejections => track_rejections, :cache_pcor => cache_pcor)

@@ -101,7 +101,7 @@ function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_n
         nbr_dict = Dict([(nbr, signed_weight(univar_nbrs[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
     else
         if startswith(test_name, "mi")
-            nbr_dict = Dict{Int, Float64}()
+            nbr_dict = Dict{Int,Float64}()
             for nbr in keys(PC_dict)
                 edge_sign = sign(univar_nbrs[nbr][1])
                 nbr_dict[nbr] = edge_sign * abs(signed_weight(PC_dict[nbr]..., weight_kind))

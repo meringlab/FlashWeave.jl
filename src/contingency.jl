@@ -75,7 +75,7 @@ end
 
 # SPARSE DATA
 
-function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer,Int},
+function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer,<:Integer},
         test_obj::ContTest2D)
     @inbounds if is_zero_adjusted(test_obj)
         X_nz = test_obj.levels[X] > 2

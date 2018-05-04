@@ -89,20 +89,20 @@ function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg
  end
 
 function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, accepted::Vector{Int}, accepted_dict::NbrStatDict,
-    test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer, n_obs_min::Integer, debug::Integer, rej_dict::RejDict{Int},
+    test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer, n_obs_min::Integer, max_tests::Integer, debug::Integer, rej_dict::RejDict{Int},
     track_rejections::Bool, z::Vector{DiscType}, phase::Char, fast_elim::Bool)  where {ElType<:Real, DiscType<:Integer}
 
     data_prep = prepare_nzdata(candidate, data, test_obj)
 
     test_result, lowest_sig_Zs, num_tests, frac_tests = test_subsets(T, candidate, accepted, data_prep, test_obj, max_k, alpha, hps=hps,
-                               n_obs_min=n_obs_min, debug=debug, z=z)
+                               n_obs_min=n_obs_min, max_tests=max_tests, debug=debug, z=z)
 
     update_sig_result!(test_result, lowest_sig_Zs, candidate, accepted, accepted_dict, alpha, debug, rej_dict,
                              track_rejections, phase, fast_elim, (num_tests, frac_tests))
 end
 
 function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
-        test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0,
+        test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, max_tests::Integer=Int(1.5e9),
         prev_accepted_dict::NbrStatDict=Dict(),
         candidates_unchecked::Vector{Int}=Int[], time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0,
         debug::Integer=0, whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
@@ -129,7 +129,7 @@ function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMa
                 deleteat!(accepted, findin(accepted, candidate))
             end
 
-            check_candidate!(candidate, T, data, accepted, accepted_dict, test_obj, max_k, alpha, hps, n_obs_min, debug,
+            check_candidate!(candidate, T, data, accepted, accepted_dict, test_obj, max_k, alpha, hps, n_obs_min, max_tests, debug,
                  rej_dict, track_rejections, z, phase, fast_elim)
         end
 
@@ -276,7 +276,7 @@ end
 # Main function for Hiton-PC
 
 function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscType}=DiscType[], cor_mat::Matrix{ContType}=zeros(ContType);
-        test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0,
+        test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, max_tests::Int=Int(1.5e9),
         fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_stat",
         whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::NbrStatDict=NbrStatDict(),
@@ -332,7 +332,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
                 end
 
                 TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data_prep, test_obj, max_k,
-                                                                    alpha, hps, n_obs_min, prev_TPC_dict, candidates_unchecked,
+                                                                    alpha, hps, n_obs_min, max_tests, prev_TPC_dict, candidates_unchecked,
                                                                      time_limit, start_time, debug, whitelist, blacklist,
                                                                     rej_dict, track_rejections, z, add_initial_candidate=prev_state.phase=='S',
                                                                     univar_nbrs=univar_nbrs)
@@ -364,7 +364,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
 
             PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data_prep, test_obj, max_k, alpha,
-                                                       hps, n_obs_min, prev_PC_dict, PC_unchecked, time_limit,
+                                                       hps, n_obs_min, max_tests, prev_PC_dict, PC_unchecked, time_limit,
                                                         start_time, debug, whitelist, blacklist, rej_dict,
                                                         track_rejections, z, fast_elim=fast_elim,
                                                          no_red_tests=no_red_tests)
