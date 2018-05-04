@@ -1,19 +1,19 @@
 module Misc
 
 using LightGraphs
+using MetaGraphs
 using StatsBase
 using Combinatorics
 using DataStructures
-using JLD2
-using FileIO
-using MetaGraphs
+#using JLD2
+#using FileIO
 
 using FlashWeave.Types
 
 export make_test_object, needs_nz_view, get_levels, stop_reached, signed_weight,
        workers_all_local, make_cum_levels!, make_cum_levels, level_map!,
-       print_network_stats, maxweight, make_symmetric_graph, map_edge_keys,
-       pw_unistat_matrix, dict_to_adjmat, make_weights, iter_apply_sparse_rows!,
+       print_network_stats, maxweight, add_symmetric_edge!, make_symmetric_graph, map_edge_keys,
+       pw_unistat_matrix, dict_to_adjmat, make_single_weight, make_weights, write_edgelist, iter_apply_sparse_rows!,
        make_chunks, work_chunker
 
 const inf_weight = 708.3964185322641
@@ -57,9 +57,9 @@ function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_obj::A
     nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))# || isa(test_obj, MiTestCond))
 end
 
-signed_weight(test_result::TestResult, kind::String="logpval") = signed_weight(test_result.stat, test_result.pval, kind)
+signed_weight(test_result::TestResult, kind::AbstractString="stat") = signed_weight(test_result.stat, test_result.pval, kind)
 
-function signed_weight(stat::Float64, pval::Float64, kind::String="logpval")
+function signed_weight(stat::Float64, pval::Float64, kind::AbstractString="stat")
     if kind == "stat"
         weight = stat
     elseif endswith(kind, "pval")
@@ -92,10 +92,25 @@ function workers_all_local()
 end
 
 
+function make_single_weight(cond_stat, cond_pval, uni_stat, uni_pval, weight_type, test_name)
+    weight_kind = split(weight_type, "_")[2]
+
+    if startswith(weight_type, "uni")
+        return signed_weight(uni_stat, uni_pval, weight_kind)
+    else
+        weight = signed_weight(cond_stat, cond_pval, weight_kind)
+
+        if startswith(test_name, "mi")
+            weight = sign(uni_stat) * abs(weight)
+        end
+        return weight
+    end
+end
+
 function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}, weight_type::String, test_name::String)
     # create weights
     nbr_dict = Dict{Int,Float64}()
-    weight_kind = String(split(weight_type, "_")[2])
+    weight_kind = split(weight_type, "_")[2]
 
     if startswith(weight_type, "uni")
         nbr_dict = Dict([(nbr, signed_weight(univar_nbrs[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
@@ -272,6 +287,38 @@ function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     graph_dict
 end
 
+function add_symmetric_edge!(G::AbstractMetaGraph, node1, node2, weight, rev_weight, edge_dir, edge_merge_fun)
+    e = Edge(node1, node2)
+    add_edge!(G, e)
+    weight = edge_merge_fun(weight, rev_weight)
+    set_props!(G, e, Dict(:weight=>weight, :dir=>edge_dir))
+end
+
+function add_symmetric_edge!(G::AbstractMetaGraph, node1, node2, weights_dict, edge_rule, edge_merge_fun)
+
+    # if only one direction is present and "AND" rule is specified, skip this edge
+    if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
+        return
+    else
+        weight = weights_dict[node1][node2]
+        rev_weight = get(weights_dict[node2], node1, NaN64)
+
+        edge_dir = '='
+        if edge_rule == "OR"
+            if haskey(weights_dict[node2], node1)
+                edge_dir = '='
+            elseif node1 < node2
+                edge_dir = '>'
+            else
+                edge_dir = '<'
+            end
+        end
+
+        add_symmetric_edge!(G, node1, node2, weight, rev_weight, edge_dir, edge_merge_fun)
+    end
+end
+
+
 function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight, max_var::Int=-1)
     if max_var < 0
         max_val_key = maximum(map(x -> !isempty(x) ? maximum(keys(x)) : 0, values(weights_dict)))
@@ -282,34 +329,8 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     G = MetaGraph(max_var)
     for node1 in keys(weights_dict)
         for node2 in keys(weights_dict[node1])
-
             if !has_edge(G, node1, node2)
-
-                # if only one direction is present and "AND" rule is specified, skip this edge
-                if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
-                    continue
-                end
-
-                e = Edge(node1, node2)
-                add_edge!(G, e)
-
-                weight = weights_dict[node1][node2]
-
-                rev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
-
-                weight = edge_merge_fun(weight, rev_weight)
-                if edge_rule == "OR"
-                    if haskey(weights_dict[node2], node1)
-                        edge_dir = '='
-                    elseif node1 < node2
-                        edge_dir = '>'
-                    else
-                        edge_dir = '<'
-                    end
-                    set_props!(G, e, Dict(:weight=>weight, :dir=>edge_dir))
-                else
-                    set_prop!(G, e, :weight, weight)
-                end
+                add_symmetric_edge!(G, node1, node2, weights_dict, edge_rule, edge_merge_fun)
             end
         end
     end
@@ -415,64 +436,106 @@ function translate_results(results::LGLResult{T1}, header::Vector{T2}) where {T1
     translate_results(results, trans_dict)
 end
 
-# hacky/slow functions to get around JLD2 problems in saving/loading LGLResult objects
-function save_lglresult(out_path::String, net_obj::LGLResult)
-    weight_dict = Dict{Tuple{Int,Int},Float64}()
-    for (e, props) in net_obj.graph.eprops
-        e_tup = (e.src, e.dst)
-        weight_dict[e_tup] = props[:weight]
-    end
 
-    save(out_path, Dict("weight_dict"=>weight_dict, "rejections"=>Int,
-            "unfinished_states"=>Int, "max_node"=>nv(net_obj.graph)))
-end
-
-function load_lglresult(in_path)
-    d = load(in_path)
-    weight_dict = d["weight_dict"]
-    G = MetaGraph(d["max_node"])
-    eprop_dict = Dict{Edge, Dict{Symbol, Any}}()
-
-    for ((src, dst), weight) in weight_dict
-        add_edge!(G, src, dst)
-        set_prop!(G, src, dst, :weight, weight)
-    end
-    LGLResult(G, Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}(), Dict{Int, HitonState}())
-end
-
-
-function save_network(results::LGLResult, out_path::String; meta_dict::Dict=Dict(), fmt::String="auto",
-        header::Vector{String}=String[])
-    """Currently unmaintained"""
-    if fmt == "auto"
-        fmt = split(out_path, ".")[end]
-    end
-
-    if fmt == "jld"
-        save(out_path, "results", results, "meta_data", meta_dict)
-    else
-        base_path = splitext(out_path)[1]
-        meta_path = join([base_path, "_meta_data.txt"])
-
-        if !isempty(meta_dict)
-            open(meta_path, "w") do meta_f
-                for key in keys(meta_dict)
-                    write(meta_f, string(key), " : ", string(meta_dict[key]))
-                end
+function write_edgelist(out_path::String, G::AbstractMetaGraph; attrs::Vector{Symbol}=Symbol[:weight], header=nothing)
+    open(out_path, "w") do out_f
+        for (e, e_props) in G.eprops
+            if header == nothing
+                e1 = e.src
+                e2 = e.dst
+            else
+                e1 = header[e.src]
+                e2 = header[e.dst]
             end
-        end
-
-        if fmt == "adj"
-            if isempty(header)
-                error("fmt \"adj\" can only be used if header is provided")
-            end
-            adj_mat = dict_to_adjmat(results.graph, header)
-            writedlm(out_path, adj_mat, '\t')
-        else
-            error("fmt \"$fmt\" is not a valid output format.")
+            write(out_f, string(e1) * " " * string(e2) * " " * join([string(G.eprops[e][attr]) for attr in attrs], " "), "\n")
         end
     end
 end
+
+
+function read_edgelist(in_path; attrs::Vector{Symbol}=Symbol[:weight], attr_types::Dict{Symbol,DataType}=Dict(:weight=>Float64))
+    G = MetaGraph()
+
+    open(in_path, "r") do in_f
+        for line in eachline(in_f)
+            line_items = split(chomp(line), ' ')
+            e1 = parse(Int, line_items[1])
+            e2 = parse(Int, line_items[2])
+            e_max = max(e1, e2)
+
+            if e_max > nv(G)
+                add_vertices!(G, e_max - nv(G))
+            end
+
+            add_edge!(G, e1, e2)
+            raw_e_props = line_items[3:end]
+            e_props = attr_types == nothing ? raw_e_props : [haskey(attr_types, attr) ? parse(attr_types[attr], x) : x for (attr, x) in zip(attrs, raw_e_props)]
+            set_props!(G, e1, e2, Dict(zip(attrs, e_props)))
+        end
+    end
+    G
+end
+
+
+
+# # hacky/slow functions to get around JLD2 problems in saving/loading LGLResult objects
+# function save_lglresult(out_path::String, net_obj::LGLResult)
+#     weight_dict = Dict{Tuple{Int,Int},Float64}()
+#     for (e, props) in net_obj.graph.eprops
+#         e_tup = (e.src, e.dst)
+#         weight_dict[e_tup] = props[:weight]
+#     end
+#
+#     save(out_path, Dict("weight_dict"=>weight_dict, "rejections"=>Int,
+#             "unfinished_states"=>Int, "max_node"=>nv(net_obj.graph)))
+# end
+#
+# function load_lglresult(in_path)
+#     d = load(in_path)
+#     weight_dict = d["weight_dict"]
+#     G = MetaGraph(d["max_node"])
+#     eprop_dict = Dict{Edge, Dict{Symbol, Any}}()
+#
+#     for ((src, dst), weight) in weight_dict
+#         add_edge!(G, src, dst)
+#         set_prop!(G, src, dst, :weight, weight)
+#     end
+#     LGLResult(G, Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}(), Dict{Int, HitonState}())
+# end
+#
+#
+# function save_network(results::LGLResult, out_path::String; meta_dict::Dict=Dict(), fmt::String="auto",
+#         header::Vector{String}=String[])
+#     """Currently unmaintained"""
+#     if fmt == "auto"
+#         fmt = split(out_path, ".")[end]
+#     end
+#
+#     if fmt == "jld"
+#         save(out_path, "results", results, "meta_data", meta_dict)
+#     else
+#         base_path = splitext(out_path)[1]
+#         meta_path = join([base_path, "_meta_data.txt"])
+#
+#         if !isempty(meta_dict)
+#             open(meta_path, "w") do meta_f
+#                 for key in keys(meta_dict)
+#                     write(meta_f, string(key), " : ", string(meta_dict[key]))
+#                 end
+#             end
+#         end
+#
+#         if fmt == "adj"
+#             if isempty(header)
+#                 error("fmt \"adj\" can only be used if header is provided")
+#             end
+#             adj_mat = dict_to_adjmat(results.graph, header)
+#             writedlm(out_path, adj_mat, '\t')
+#         else
+#             error("fmt \"$fmt\" is not a valid output format.")
+#         end
+#     end
+# end
 
 
 

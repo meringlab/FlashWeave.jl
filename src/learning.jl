@@ -280,7 +280,8 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                                                                                           levels, test_name, all_univar_nbrs, cluster_mode, verbose)
 
     interleaved_kwargs = Dict(:update_interval => update_interval, :convergence_threshold => convergence_threshold,
-                                  :feed_forward => feed_forward, :edge_rule => edge_rule, :workers_local=> workers_all_local())
+                                  :feed_forward => feed_forward, :edge_rule => edge_rule, :edge_merge_fun => edge_merge_fun,
+                                  :workers_local=> workers_all_local())
 
     nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data, all_univar_nbrs, levels, cor_mat, parallel,
                                                                       recursive_pcor,

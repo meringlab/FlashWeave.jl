@@ -1,6 +1,7 @@
 module Interleaved
 
 using LightGraphs
+using MetaGraphs
 using DataStructures
 
 using FlashWeave.Misc
@@ -70,11 +71,13 @@ end
 
 function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType},
         all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, levels::Vector{DiscType}, cor_mat::Matrix{ContType}, GLL_args::Dict{Symbol,Any};
-        update_interval::Real=30.0, convergence_threshold::AbstractFloat=0.01,
+        update_interval::Real=30.0, output_folder::String="", output_interval::Real=update_interval*10, convergence_threshold::AbstractFloat=0.01,
         conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi_il",
-        edge_rule::String="OR", nonsparse_cond::Bool=false, verbose::Bool=true, workers_local::Bool=true,
+        edge_rule::String="OR", edge_merge_fun=maxweight, nonsparse_cond::Bool=false, verbose::Bool=true, workers_local::Bool=true,
         feed_forward::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
+    test_name = GLL_args[:test_name]
+    weight_type = GLL_args[:weight_type]
     jobs_total = length(target_vars)
 
     if startswith(parallel, "multi") || startswith(parallel, "threads")
@@ -130,10 +133,15 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         blacklist_graph = Graph(n_vars)
     end
 
+    if !isempty(output_folder)
+        output_graph = MetaGraph(n_vars)
+    end
+
     edge_set = Set{Tuple{Int,Int}}()
     kill_signals_sent = 0
     start_time = time()
     last_update_time = start_time
+    last_output_time = start_time
     check_convergence = false
     converged = false
 
@@ -166,6 +174,23 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
                 for nbr in keys(curr_state.state_results)
                     add_edge!(graph, target_var, nbr)
+                end
+
+                # update output graph if requested
+                if !isempty(output_folder)
+                    for nbr in keys(curr_state.state_results)
+                        weight = make_single_weight(curr_state.state_results[nbr]..., all_univar_nbrs[target_var][nbr]..., weight_type, test_name)
+
+                        if has_edge(G, target_var, nbr)
+                            rev_weight = get_prop(G, target_var, nbr, :weight)
+                            edge_dir = '='
+                        else
+                            rev_weight = NaN64
+                            edge_dir = target_var < nbr ? '>' : '<'
+                        end
+
+                        add_symmetric_edge!(output_graph, target_var, nbr, weight, rev_weight, edge_dir, edge_merge_fun)
+                    end
                 end
 
                 if feed_forward && edge_rule == "AND"
@@ -227,6 +252,17 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
             end
             print_network_stats(graph)
             last_update_time = curr_time
+        end
+
+        if !isempty(output_folder) && curr_time - last_output_time > output_interval
+            curr_out_path = joinpath(output_folder, "TempGraph_" * string(now())[1:end-4])
+
+            if verbose
+                println("Writing temporary graph to $curr_out_path")
+            end
+
+            write_edgelist(curr_out_path, output_graph, attrs=[:weight, :dir])
+            last_output_time = curr_time
         end
 
 
