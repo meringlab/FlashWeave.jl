@@ -537,9 +537,9 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
 end
 
 
-function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String; verbose::Bool=true, make_sparse::Bool=issparse(data), env_cols::Vector{Int}=Int[], factor_cols::Vector{Int}=Int[], prec::Integer=32, header::Vector{String}=String[]) where ElType <: Real
+function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String; verbose::Bool=true, make_sparse::Bool=issparse(data), env_cols::Vector{Int}=Int[], factor_cols::Vector{Int}=Int[], prec::Integer=32, header::Vector{String}=String[], preprocess_kwargs...) where ElType <: Real
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
-    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, env_cols=env_cols, prec=prec, header=header)
+    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, env_cols=env_cols, prec=prec, header=header, preprocess_kwargs...)
     data
 end
 
