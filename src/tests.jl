@@ -83,8 +83,10 @@ end
 
 # convenience wrapper
 function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Integer},
-        test_name::String, hps::Integer=5, n_obs_min::Int=0)
-    levels = map(x -> length(unique(data[:, x])), 1:size(data, 2))
+        test_name::String, hps::Integer=5, n_obs_min::Int=0, levels::Vector{<:Integer}=Int[])
+    if isempty(levels)
+        levels = get_levels(data)#map(x -> length(unique(data[:, x])), 1:size(data, 2))
+    end
     test_obj = make_test_object(test_name, false, max_k=0, levels=levels, cor_mat=zeros(Float64, 0, 0))
     test(X, Ys, data, test_obj, hps, n_obs_min)
 end
@@ -147,7 +149,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Real}, test_obj::FzTest,
 end
 
 
-function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Real},
+function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFloat},
         test_obj::AbstractCorTest, n_obs_min::Integer=0)
     """CRITICAL: expects zeros to be trimmed from X if nz_test
     is provided!
@@ -158,7 +160,7 @@ function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Real},
 end
 
 #convenience wrapper
-function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Real},
+function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFloat},
         test_name::String, n_obs_min::Integer=0)
     test_obj = make_test_object(test_name, false, max_k=0, levels=Int[], cor_mat=zeros(Float64, 0, 0))
     test(X, Ys, data, test_obj, n_obs_min)

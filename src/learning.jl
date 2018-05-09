@@ -252,10 +252,10 @@ end
 
 
 function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
-    hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(1.5e9), convergence_threshold::AbstractFloat=0.01, FDR::Bool=true,
+    hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(1.5e6), convergence_threshold::AbstractFloat=0.01, FDR::Bool=true,
     parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
-    verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
+    verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="", output_interval::Real=update_interval*10, edge_merge_fun=maxweight,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true, cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
     track_rejections::Bool=false, cluster_mode::AbstractString="greedy") where {ElType<:Real}
@@ -281,7 +281,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
 
     interleaved_kwargs = Dict(:update_interval => update_interval, :convergence_threshold => convergence_threshold,
                                   :feed_forward => feed_forward, :edge_rule => edge_rule, :edge_merge_fun => edge_merge_fun,
-                                  :workers_local=> workers_all_local())
+                                  :workers_local => workers_all_local(), :output_folder => output_folder, :output_interval => output_interval)
 
     nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data, all_univar_nbrs, levels, cor_mat, parallel,
                                                                       recursive_pcor,
