@@ -1,5 +1,5 @@
 using FlashWeave
-using MetaGraphs
+using SimpleWeightedGraphs
 using JLD2, FileIO
 using Base.Test
 
@@ -7,8 +7,8 @@ graph = load(joinpath("data", "misc_expected.jld"))["graph"]
 
 @testset "IO" begin
     tmp_path = tempname()
-    FlashWeave.Misc.write_edgelist(tmp_path, graph, attrs=[:weight, :dir])
-    graph_el = FlashWeave.Misc.read_edgelist(tmp_path, attrs=[:weight, :dir], attr_types=Dict(:weight=>Float64))
+    FlashWeave.Misc.write_edgelist(tmp_path, graph)
+    graph_el = FlashWeave.Misc.read_edgelist(tmp_path)
     @test graph == graph_el
 end
 

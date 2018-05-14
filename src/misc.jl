@@ -1,19 +1,18 @@
 module Misc
 
 using LightGraphs
-using MetaGraphs
+using SimpleWeightedGraphs
 using StatsBase
 using Combinatorics
 using DataStructures
-#using JLD2
-#using FileIO
+
 
 using FlashWeave.Types
 
-export make_test_object, needs_nz_view, get_levels, stop_reached, signed_weight,
+export make_test_object, get_levels, stop_reached, needs_nz_view, signed_weight,
        workers_all_local, make_cum_levels!, make_cum_levels, level_map!,
        print_network_stats, maxweight, add_symmetric_edge!, make_symmetric_graph, map_edge_keys,
-       pw_unistat_matrix, dict_to_adjmat, make_single_weight, make_weights, write_edgelist, iter_apply_sparse_rows!,
+       make_single_weight, make_weights, write_edgelist, read_edgelist, iter_apply_sparse_rows!,
        make_chunks, work_chunker
 
 const inf_weight = 708.3964185322641
@@ -44,12 +43,14 @@ function get_levels{ElType <: Integer}(col_vec::AbstractVector{ElType})
     length(unique(col_vec))
 end
 
+
 function get_levels{ElType <: Integer}(data::AbstractMatrix{ElType})
     map(x -> get_levels(data[:, x]), 1:size(data, 2))
 end
 
 
 stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit > 0.0 ? time() - start_time > time_limit : false
+
 
 function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest)
     nz = is_zero_adjusted(test_obj)
@@ -141,6 +142,7 @@ function make_cum_levels!{ElType <: Integer}(cum_levels::AbstractVector{ElType},
     end
 end
 
+
 function make_cum_levels{ElType <: Integer}(Zs::Tuple{Vararg{Int64,N} where N<:Int}, levels::AbstractVector{ElType})
     cum_levels = zeros(Int, length(Zs))
     make_cum_levels!(cum_levels, Zs, levels)
@@ -173,57 +175,6 @@ function level_map!{ElType <: Integer}(Zs::Tuple{Vararg{Int64,N} where N<:Int}, 
     levels_z
 end
 
-function dict_to_graph{T}(graph_dict::Dict{T,Dict{T,Float64}})
-    G = Graph(maximum(keys(graph_dict)))
-    for key in keys(graph_dict)
-        @assert key <= nv(G) "nodes are missing from graph_dict"
-        for nbr in keys(graph_dict[key])
-            @assert nbr <= nv(G) "nodes are missing from graph_dict"
-            add_edge!(G, var_A, var_B)
-        end
-    end
-    G
-end
-
-
-function dict_to_metagraph{T}(graph_dict::Dict{T,Dict{T,Float64}})
-    Gm = MetaGraph(length(graph_dict))
-    for (i, (key, nbr_dict)) in enumerate(graph_dict)
-        @assert key <= nv(G) "nodes are missing from graph_dict"
-        for (nbr, weight) in nbr_dict
-            if !has_edge(G, key, nbr)
-                @assert nbr <= nv(G) "nodes are missing from graph_dict"
-                add_edge!(G, key, nbr)
-                set_prop!(G, key, nbr, :weight, nbr_dict[nbr])
-            end
-        end
-    end
-    G
-end
-
-
-function neighbor_distances(G1, G2, G2_sps=zeros(Float64, 0, 0))
-    """Shortest path distances in G2, for each edge present in G1"""
-    if isempty(G2_sps)
-        G2_sps = convert(Matrix{Float64}, floyd_warshall_shortest_paths(G2).dists)
-    end
-    G2_sps[G2_sps .> nv(G2)] = NaN64
-    nbr_dists = [G2_sps[e.src, e.dst] for e in edges(G1)]
-    nbr_dists
-end
-
-function jaccard_similarity(graph_dict1::Dict, graph_dict2::Dict)
-    G1 = dict_to_graph(graph_dict1)
-    G2 = dict_to_graph(graph_dict2)
-    jaccard_similarity(G1, G2)
-end
-
-function jaccard_similarity(G1::LightGraphs.Graph, G2::LightGraphs.Graph)
-    edge_set1 = Set(map(Tuple, edges(G1)))
-    edge_set2 = Set(map(Tuple, edges(G2)))
-    length(intersect(edge_set1, edge_set2)) / length(union(edge_set1, edge_set2))
-end
-
 
 function print_network_stats(graph::LightGraphs.Graph)
     n_nodes = nv(graph)
@@ -252,71 +203,13 @@ function maxweight(weight1::Float64, weight2::Float64)
             warn("Opposite signs for the same edge detected. Arbitarily choosing one.")
             return weight1
         else
-            return maximum(abs.([weight1, weight2])) * sign1
+            return max(abs(weight1), abs(weight2)) * sign1
         end
     end
 end
 
 
-function make_graph_symmetric(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String, edge_merge_fun=maxweight)
-    checked_G = Graph(maximum(keys(weights_dict)))
-    graph_dict = Dict{Int,Dict{Int,Float64}}([(target_var, Dict{Int,Float64}()) for target_var in keys(weights_dict)])
-
-    for node1 in keys(weights_dict)
-        for node2 in keys(weights_dict[node1])
-
-            if !has_edge(checked_G, node1, node2)
-                add_edge!(checked_G, node1, node2)
-                weight = weights_dict[node1][node2]
-
-                # if only one direction is present and "AND" rule is specified, skip this edge
-                if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
-                    continue
-                end
-
-                prev_weight = haskey(weights_dict[node2], node1) ? weights_dict[node2][node1] : NaN64
-
-                weight = edge_merge_fun(weight, prev_weight)
-
-                graph_dict[node1][node2] = weight
-                graph_dict[node2][node1] = weight
-            end
-        end
-    end
-
-    graph_dict
-end
-
-function add_symmetric_edge!(G::AbstractMetaGraph, node1, node2, weight, rev_weight, edge_dir, edge_merge_fun)
-    e = Edge(node1, node2)
-    add_edge!(G, e)
-    weight = edge_merge_fun(weight, rev_weight)
-    set_props!(G, e, Dict(:weight=>weight, :dir=>edge_dir))
-end
-
-function add_symmetric_edge!(G::AbstractMetaGraph, node1, node2, weights_dict, edge_rule, edge_merge_fun)
-
-    # if only one direction is present and "AND" rule is specified, skip this edge
-    if edge_rule == "AND" && !haskey(weights_dict[node2], node1)
-        return
-    else
-        weight = weights_dict[node1][node2]
-        rev_weight = get(weights_dict[node2], node1, NaN64)
-
-        edge_dir = '='
-        if edge_rule == "OR"
-            if haskey(weights_dict[node2], node1)
-                edge_dir = '='
-            elseif node1 < node2
-                edge_dir = '>'
-            else
-                edge_dir = '<'
-            end
-        end
-
-        add_symmetric_edge!(G, node1, node2, weight, rev_weight, edge_dir, edge_merge_fun)
-    end
-end
+order_pair(x1, x2) = x1 >= x2 ? (x1, x2) : (x2, x1)
 
 
 function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight, max_var::Int=-1)
@@ -326,16 +219,28 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
         max_var = max(max_key_key, max_val_key)
     end
 
-    G = MetaGraph(max_var)
+    srcs = Int[]
+    dsts = Int[]
+    ws = Float64[]
+
+    prev_edges = Set{Tuple{Int,Int}}()
     for node1 in keys(weights_dict)
         for node2 in keys(weights_dict[node1])
-            if !has_edge(G, node1, node2)
-                add_symmetric_edge!(G, node1, node2, weights_dict, edge_rule, edge_merge_fun)
+            e = order_pair(node1, node2)
+
+            if !(e in prev_edges)
+                weight = weights_dict[node1][node2]
+                rev_weight = get(weights_dict[node2], node1, NaN64)
+                sym_weight = edge_merge_fun(weight, rev_weight)
+                push!(srcs, e[1])
+                push!(dsts, e[2])
+                push!(ws, sym_weight)
+                push!(prev_edges, e)
             end
         end
     end
 
-    G
+    SimpleWeightedGraph(srcs, dsts, ws)
 end
 
 
@@ -358,88 +263,19 @@ function map_edge_keys(nbr_dict::Dict{Int,T}, key_map_dict::Dict{Int,Int}) where
     new_nbr_dict
 end
 
-function metagraph_to_adjmat(G::MetaGraph, header::AbstractVector{String})
+
+function weightedgraph_to_adjmat(G::SimpleWeightedGraph, header::AbstractVector{String})
     n_vars = length(header)
-    adj_mat = zeros(Float64, (n_vars, n_vars))
-    checked_nodes = Set{Int}()
-    for node_index in 1:n_vars
-        for nbr in neighbors(G, node_index)
-            if !(nbr in checked_nodes)
-                weight = get_prop(G, node_index, nbr, :weight)
-                adj_mat[node_index, nbr] = weight
-                adj_mat[nbr, node_index] = weight
-            end
-        end
-    end
+    adj_mat = full(G.weights)
     adj_mat_final = vcat(reshape(header, 1, size(adj_mat, 2)), adj_mat)
     adj_mat_final = hcat(reshape(["", header...], size(adj_mat_final, 2) + 1, 1), adj_mat_final)
     adj_mat_final
 end
 
-function dict_to_adjmat(graph_dict::Dict{Int,Dict{Int,Float64}}, header::AbstractVector{String})
-    #n_nodes = length(graph_dict)
-    n_vars = length(header)
-    adj_mat = zeros(Float64, (n_vars, n_vars))
-    #header = sort(collect(keys(graph_dict)))
-    #header_map = Dict(zip(header, 1:length(header)))
 
-    for node_index in keys(graph_dict)
-        #node_index = #header_map[node]
-        nbr_dict = graph_dict[node_index]
-
-        for nbr_index in keys(nbr_dict)
-            #nbr_index = header_map[nbr]
-            weight = nbr_dict[nbr_index]
-
-            adj_mat[node_index, nbr_index] = weight
-            adj_mat[nbr_index, node_index] = weight
-        end
-    end
-
-    adj_mat = vcat(reshape(header, 1, size(adj_mat, 2)), adj_mat)
-    adj_mat = hcat(reshape(["", header...], size(adj_mat, 2) + 1, 1), adj_mat)
-    adj_mat
-end
-
-
-function translate_hiton_state(state::HitonState{T1}, trans_dict::Dict{T1,T2}) where {T1,T2}
-    trans_state_results = OrderedDict{T2,Tuple{Float64,Float64}}([(trans_dict[key], val) for (key, val) in state.state_results])
-    trans_inter_results = OrderedDict{T2,Tuple{Float64,Float64}}([(trans_dict[key], val) for (key, val) in state.inter_results])
-    trans_unchecked_vars = T2[trans_dict[x] for x in state.unchecked_vars]
-    trans_state_rejections = Dict{String,Tuple{Tuple,TestResult}}([(trans_dict[key], (Tuple(map(x -> trans_dict[x], Zs)), test_res)) for (key, (Zs, test_res)) in state.state_rejections])
-    HitonState{T2}(state.phase, trans_state_results, trans_inter_results, trans_unchecked_vars, trans_state_rejections)
-end
-
-function translate_graph_dict(graph_dict::Dict{T1,Dict{T1,S}}, trans_dict::Dict{T1,T2}) where {T1,T2,S}
-    new_graph_dict = Dict{T2,Dict{T2,S}}()
-    for (key, nbr_dict) in graph_dict
-        new_graph_dict[trans_dict[key]] = Dict{T2,S}([(trans_dict[key], val) for (key, val) in nbr_dict])
-    end
-    new_graph_dict
-end
-
-function translate_results(results::LGLResult{T1}, trans_dict::Dict{T1,T2}) where {T1,T2}
-    trans_graph = translate_graph_dict(results.graph, trans_dict)
-    trans_rejections = translate_graph_dict(results.rejections, trans_dict)
-    for (key, nbr_dict) in trans_rejections
-        for (nbr, (Zs, test_res)) in nbr_dict
-            trans_rejections[key][nbr] = (Tuple(map(x -> trans_dict[x], Zs)), test_res)
-        end
-    end
-
-    trans_unfinished_states = Dict{T2,HitonState{T2}}([(trans_dict[key], translate_hiton_state(val, trans_dict)) for (key, val) in results.unfinished_states])
-    LGLResult{T2}(trans_graph, trans_rejections, trans_unfinished_states)
-end
-
-function translate_results(results::LGLResult{T1}, header::Vector{T2}) where {T1,T2}
-    trans_dict = Dict{T1,T2}(enumerate(header))
-    translate_results(results, trans_dict)
-end
-
-
-function write_edgelist(out_path::String, G::AbstractMetaGraph; attrs::Vector{Symbol}=Symbol[:weight], header=nothing)
+function write_edgelist(out_path::String, G::SimpleWeightedGraph; header=nothing)
     open(out_path, "w") do out_f
-        for (e, e_props) in G.eprops
+        for e in edges(G)
             if header == nothing
                 e1 = e.src
                 e2 = e.dst
@@ -447,96 +283,42 @@ function write_edgelist(out_path::String, G::AbstractMetaGraph; attrs::Vector{Sy
                 e1 = header[e.src]
                 e2 = header[e.dst]
             end
-            write(out_f, string(e1) * " " * string(e2) * " " * join([string(G.eprops[e][attr]) for attr in attrs], " "), "\n")
+            write(out_f, string(e1) * "\t" * string(e2) * "\t" * string(G.weights[e.src, e.dst]), "\n")
         end
     end
 end
 
 
-function read_edgelist(in_path; attrs::Vector{Symbol}=Symbol[:weight], attr_types::Dict{Symbol,DataType}=Dict(:weight=>Float64))
-    G = MetaGraph()
+function read_edgelist(in_path; header=nothing)
+    srcs = Int[]
+    dsts = Int[]
+    ws = Float64[]
+
+    #inv_header = header == nothing ?  Dict{eltype(header), Int}(zip(header))
+    if header != nothing
+        inv_header = Dict{eltype(header), Int}(zip(header, 1:length(header)))
+    end
 
     open(in_path, "r") do in_f
         for line in eachline(in_f)
-            line_items = split(chomp(line), ' ')
-            e1 = parse(Int, line_items[1])
-            e2 = parse(Int, line_items[2])
-            e_max = max(e1, e2)
+            #println(line)
+            line_items = split(chomp(line), '\t')
 
-            if e_max > nv(G)
-                add_vertices!(G, e_max - nv(G))
+            if header != nothing
+                src = inv_header[line_items[1]]
+                dst = inv_header[line_items[2]]
+            else
+                src = parse(Int, line_items[1])
+                dst = parse(Int, line_items[2])
             end
 
-            add_edge!(G, e1, e2)
-            raw_e_props = line_items[3:end]
-            e_props = attr_types == nothing ? raw_e_props : [haskey(attr_types, attr) ? parse(attr_types[attr], x) : x for (attr, x) in zip(attrs, raw_e_props)]
-            set_props!(G, e1, e2, Dict(zip(attrs, e_props)))
+            push!(srcs, src)
+            push!(dsts, dst)
+            push!(ws, parse(Float64, line_items[end]))
         end
     end
-    G
+    SimpleWeightedGraph(srcs, dsts, ws)
 end
-
-
-
-# # hacky/slow functions to get around JLD2 problems in saving/loading LGLResult objects
-# function save_lglresult(out_path::String, net_obj::LGLResult)
-#     weight_dict = Dict{Tuple{Int,Int},Float64}()
-#     for (e, props) in net_obj.graph.eprops
-#         e_tup = (e.src, e.dst)
-#         weight_dict[e_tup] = props[:weight]
-#     end
-#
-#     save(out_path, Dict("weight_dict"=>weight_dict, "rejections"=>Int,
-#             "unfinished_states"=>Int, "max_node"=>nv(net_obj.graph)))
-# end
-#
-# function load_lglresult(in_path)
-#     d = load(in_path)
-#     weight_dict = d["weight_dict"]
-#     G = MetaGraph(d["max_node"])
-#     eprop_dict = Dict{Edge, Dict{Symbol, Any}}()
-#
-#     for ((src, dst), weight) in weight_dict
-#         add_edge!(G, src, dst)
-#         set_prop!(G, src, dst, :weight, weight)
-#     end
-#     LGLResult(G, Dict{Int, Dict{Int, Tuple{Tuple,TestResult}}}(), Dict{Int, HitonState}())
-# end
-#
-#
-# function save_network(results::LGLResult, out_path::String; meta_dict::Dict=Dict(), fmt::String="auto",
-#         header::Vector{String}=String[])
-#     """Currently unmaintained"""
-#     if fmt == "auto"
-#         fmt = split(out_path, ".")[end]
-#     end
-#
-#     if fmt == "jld"
-#         save(out_path, "results", results, "meta_data", meta_dict)
-#     else
-#         base_path = splitext(out_path)[1]
-#         meta_path = join([base_path, "_meta_data.txt"])
-#
-#         if !isempty(meta_dict)
-#             open(meta_path, "w") do meta_f
-#                 for key in keys(meta_dict)
-#                     write(meta_f, string(key), " : ", string(meta_dict[key]))
-#                 end
-#             end
-#         end
-#
-#         if fmt == "adj"
-#             if isempty(header)
-#                 error("fmt \"adj\" can only be used if header is provided")
-#             end
-#             adj_mat = dict_to_adjmat(results.graph, header)
-#             writedlm(out_path, adj_mat, '\t')
-#         else
-#             error("fmt \"$fmt\" is not a valid output format.")
-#         end
-#     end
-# end
-
 
 
 function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},

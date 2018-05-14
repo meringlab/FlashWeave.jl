@@ -1,7 +1,7 @@
 using FlashWeave
 using JLD2, FileIO
 using Base.Test
-using MetaGraphs
+using SimpleWeightedGraphs
 using LightGraphs
 
 #cd("/Users/janko/.julia/v0.6/FlashWeave/test")
@@ -17,15 +17,16 @@ function make_network(data, test_name, make_sparse=false, prec=32, verbose=false
     graph_res.graph
 end
 
-function compare_graph_results(g1::Dict, g2::MetaGraph; verbose=false, rtol=0.0, atol=0.0)
-    if Set(keys(g1)) != Set(vertices(g2))
+function compare_graph_results(g1::Dict, g2::SimpleWeightedGraph; verbose=false, rtol=0.0, atol=0.0)
+    deg_nbrs = Set([node for node in keys(g1) if !isempty(g1[node])])
+    if deg_nbrs != Set(collect(vertices(g2))[degree(g2) .> 0])
         if verbose
             println("Upper level keys don't match")
         end
         return false
     end
 
-    for T in keys(g1)
+    for T in deg_nbrs
         nbr_dict1 = g1[T]
 
         if Set(keys(nbr_dict1)) != Set(neighbors(g2, T))
@@ -36,7 +37,7 @@ function compare_graph_results(g1::Dict, g2::MetaGraph; verbose=false, rtol=0.0,
         end
 
         for nbr in keys(nbr_dict1)
-            g2_weight = get_prop(g2, T, nbr, :weight)
+            g2_weight = g2.weights[T, nbr]#get_prop(g2, T, nbr, :weight)
             if !isapprox(nbr_dict1[nbr], g2_weight, rtol=rtol, atol=atol)
                 if verbose
                     println("Weights for node $T and neighbor $nbr dont fit: $(nbr_dict1[nbr]), $(g2_weight)")
@@ -49,11 +50,11 @@ function compare_graph_results(g1::Dict, g2::MetaGraph; verbose=false, rtol=0.0,
 end
 
 # For sanity checking
- # max_k = 3
- # make_sparse = false
- # parallel = "single"
- # test_name = "mi"
- # graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true, weight_type="cond_stat")
+# max_k = 3
+# make_sparse = false
+# parallel = "single_il"
+# test_name = "mi_nz"
+# graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true, weight_type="cond_stat")
 
 #graph2 = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=false, weight_type="uni_stat")
 
@@ -92,9 +93,6 @@ end
 
                                         atol = 1e-2
                                         rtol = 0.0
-
-                                        compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol)
-
 
                                         @testset "edge_identity" begin
                                             @test compare_graph_results(exp_graph_dict, graph, rtol=rtol, atol=atol)

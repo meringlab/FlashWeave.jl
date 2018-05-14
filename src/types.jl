@@ -1,7 +1,7 @@
 module Types
 
 using DataStructures
-using MetaGraphs
+using SimpleWeightedGraphs
 using Combinatorics
 
 export NbrStatDict, PairMeanObj, PairCorObj,
@@ -168,8 +168,8 @@ struct HitonState{T}
     state_rejections::RejDict{T}
 end
 
-struct LGLResult{T}
-    graph::MetaGraph{T,Float64}
+struct LGLResult{T<:Integer}
+    graph::SimpleWeightedGraph{T,Float64}
     rejections::Dict{T, RejDict{T}}
     unfinished_states::Dict{T, HitonState}
 end

@@ -1,7 +1,7 @@
 module Interleaved
 
 using LightGraphs
-using MetaGraphs
+using SimpleWeightedGraphs
 using DataStructures
 
 using FlashWeave.Misc
@@ -134,7 +134,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
     end
 
     if !isempty(output_folder)
-        output_graph = MetaGraph(n_vars)
+        output_graph = SimpleWeightedGraph(n_vars)
     end
 
     edge_set = Set{Tuple{Int,Int}}()
@@ -183,13 +183,13 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
                         if has_edge(G, target_var, nbr)
                             rev_weight = get_prop(G, target_var, nbr, :weight)
-                            edge_dir = '='
+                            #edge_dir = '='
                         else
                             rev_weight = NaN64
-                            edge_dir = target_var < nbr ? '>' : '<'
+                            #edge_dir = target_var < nbr ? '>' : '<'
                         end
 
-                        add_symmetric_edge!(output_graph, target_var, nbr, weight, rev_weight, edge_dir, edge_merge_fun)
+                        #add_symmetric_edge!(output_graph, target_var, nbr, weight, rev_weight, edge_dir, edge_merge_fun)
                     end
                 end
 

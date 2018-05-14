@@ -4,7 +4,7 @@ Distributions 0.15.0
 StatsBase 0.19.5
 Clustering 0.9.1
 LightGraphs 0.11 0.12-
-MetaGraphs 0.3.0
+SimpleWeightedGraphs 0.3.1
 DataStructures 0.7.4
 JLD2 0.0.5
 FileIO 0.6.1
