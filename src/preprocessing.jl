@@ -450,7 +450,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
     end
 
     if norm == "rows"
-        data = rownorm_data(data)
+        rownorm_data!(data)
     elseif startswith(norm, "clr")
         data = clrnorm_data(data, norm, clr_pseudo_count)
     elseif norm == "binary"

@@ -4,10 +4,7 @@ using Base.Test
 using SimpleWeightedGraphs
 using LightGraphs
 
-#cd("/Users/janko/.julia/v0.6/FlashWeave/test")
-#data = Array(readtable(joinpath("test", "data", "HMP_SRA_gut_small.tsv"))[:, 2:end])
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
-
 exp_dict = load(joinpath("data", "learning_expected.jld"))
 
 function make_network(data, test_name, make_sparse=false, prec=32, verbose=false; kwargs...)
