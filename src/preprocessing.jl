@@ -124,6 +124,38 @@ function discretize_nz!(X::SparseMatrixCSC{ElType}; bin_fun=median) where ElType
 end
 
 
+function rank_nz!(x::SparseVector{<:Real})
+    ranks = tiedrank(x.nzval)
+
+    for i in 1:length(x.nzval)
+        x.nzval[i] = ranks[i]
+    end
+end
+
+
+function rank_nz!(X::SparseMatrixCSC{<:Real})
+    for i in 1:size(X, 2)
+        js = nzrange(X, i)
+        ranks = tiedrank(X.nzval[js])
+
+        for (r, j) in zip(ranks, js)
+            X.nzval[j] = r
+        end
+    end
+end
+
+
+function rank!(X::Matrix{<:Real})
+    for i in 1:size(X, 2)
+        ranks = tiedrank(X[:, i])
+
+        for (r, j) in zip(ranks, 1:size(X, 1))
+            X[j, i] = r
+        end
+    end
+end
+
+
 function discretize{ElType <: AbstractFloat}(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
         rank_method::String="tied", disc_method::String="median")
     if nz
@@ -410,7 +442,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
 end
 
 
-function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
+function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied", rank_clr=false,
     disc_method::String="median", verbose::Bool=true, env_cols::Vector{Int}=Int[], make_sparse::Bool=issparse(data), factor_cols::Vector{Int}=Int[],
     prec::Integer=32, filter_data=true, header::Vector{String}=String[])
     if verbose
@@ -453,6 +485,16 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         rownorm_data!(data)
     elseif startswith(norm, "clr")
         data = clrnorm_data(data, norm, clr_pseudo_count)
+
+        if rank_clr
+            if contains(norm, "_nz")
+                !issparse(data) && warn("nz-ranking on dense data is currently slow")
+                rank_nz!(sparse(data))
+            else
+                issparse(data) && warn("ranking on sparse data is currently slow")
+                rank!(full(data))
+            end
+        end
     elseif norm == "binary"
         n_bins = 2
         if issparse(data)

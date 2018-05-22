@@ -94,8 +94,9 @@ function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, 
 
     data_prep = prepare_nzdata(candidate, data, test_obj)
 
-    test_result, lowest_sig_Zs, num_tests, frac_tests = test_subsets(T, candidate, accepted, data_prep, test_obj, max_k, alpha, hps=hps,
-                               n_obs_min=n_obs_min, max_tests=max_tests, debug=debug, z=z)
+    test_result, lowest_sig_Zs, num_tests, frac_tests = test_subsets(T, candidate, accepted, data_prep, test_obj,
+                                                                     max_k, alpha, hps=hps, n_obs_min=n_obs_min,
+                                                                     max_tests=max_tests, debug=debug, z=z)
 
     update_sig_result!(test_result, lowest_sig_Zs, candidate, accepted, accepted_dict, alpha, debug, rej_dict,
                              track_rejections, phase, fast_elim, (num_tests, frac_tests))

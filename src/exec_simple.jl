@@ -61,7 +61,14 @@ function main(input_args::Vector{String})
         if norm_type in ["clr", "binary", "binned_nz_clr", "clr_adapt", "clr_nz", "binned_nz_clr", "rows"]
             data_norm, header = FlashWeave.Preprocessing.preprocess_data(data, norm_type, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
         else
-            data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true")
+            if startswith(test_name, "fzr")
+                ranknorm = true
+                test_name = replace(test_name, "fzr", "fz")
+            else
+                ranknorm = false
+            end
+
+            data_norm, header = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, env_cols=skip_cols, header=header, make_sparse=make_sparse == "true", rank_clr=ranknorm)
         end
         toc()
     else

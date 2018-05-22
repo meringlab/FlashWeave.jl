@@ -33,13 +33,24 @@ end
 end
 
 @testset "norm per test type" begin
-    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
+    for test_name in ["mi", "mi_nz", "fz", "fzr", "fz_nz", "fzr_nz"]
         @testset "$test_name" begin
+            if startswith(test_name, "fzr")
+                test_name = replace(test_name, "fzr", "fz")
+                rank_clr = true
+            else
+                rank_clr = false
+            end
+
             data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name; make_sparse=false,
-             verbose=false)
-            @test all(data_norm .== exp_dict[test_name])
+             verbose=false, rank_clr=rank_clr)
+
+            if !rank_clr
+                @test all(data_norm .== exp_dict[test_name])
+            end
+            
             data_norm_sparse = FlashWeave.Preprocessing.preprocess_data_default(data, test_name; make_sparse=true,
-             verbose=false)
+             verbose=false, rank_clr=rank_clr)
             @test all(data_norm .== data_norm_sparse)
         end
     end
