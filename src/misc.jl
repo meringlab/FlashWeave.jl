@@ -212,6 +212,12 @@ end
 order_pair(x1, x2) = x1 >= x2 ? (x1, x2) : (x2, x1)
 
 
+function SimpleWeightedGraph_nodemax(i::AbstractVector{T}, j::AbstractVector{T}, v::AbstractVector{U}; combine = +, m=max(maximum(i), maximum(j))) where T<:Integer where U<:Real
+    s = sparse(vcat(i,j), vcat(j,i), vcat(v,v), m, m, combine)
+    SimpleWeightedGraph{T, U}(s)
+end
+
+
 function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight, max_var::Int=-1)
     if max_var < 0
         max_val_key = maximum(map(x -> !isempty(x) ? maximum(keys(x)) : 0, values(weights_dict)))
@@ -241,7 +247,7 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     end
 
     #SimpleWeightedGraph(srcs, dsts, ws)
-    SimpleWeightedGraph(srcs, dsts, ws; m=max_var)
+    SimpleWeightedGraph_nodemax(srcs, dsts, ws; m=max_var)
 end
 
 
