@@ -240,7 +240,8 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
         end
     end
 
-    SimpleWeightedGraph(srcs, dsts, ws)
+    #SimpleWeightedGraph(srcs, dsts, ws)
+    SimpleWeightedGraph(srcs, dsts, ws; m=max_var)
 end
 
 
