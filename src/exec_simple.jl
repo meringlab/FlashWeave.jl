@@ -96,11 +96,13 @@ function main(input_args::Vector{String})
     lgl_args = Dict{Symbol,Any}(:test_name => test_name, :parallel => parallel_mode, :verbose => false, :recursive_pcor => rec_mode == "true", :max_k => max_k, :FDR => FDR == "true", :weight_type => weight_type)
 
     if speed_mode == "fast"
-        lgl_args[:convergence_threshold] = 0.05
+        lgl_args[:convergence_threshold] = 0.01
         lgl_args[:fast_elim] = true
+        lgl_args[:feed_forward] = true
     elseif speed_mode == "precise"
         lgl_args[:convergence_threshold] = 0.0
         lgl_args[:fast_elim] = false
+        lgl_args[:feed_forward] = false
     else
         error("$speed_mode not a valid speed_mode")
     end
