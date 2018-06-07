@@ -245,12 +245,14 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         if curr_time - last_update_time > update_interval
             if verbose
                 println("\nTime passed: ", Int(round(curr_time - start_time)), ". Finished nodes: ", length(target_vars) - remaining_jobs, ". Remaining nodes: ", remaining_jobs)
+
+                if check_convergence
+                    println("Convergence times: $last_conv_time $(curr_time - last_conv_time - start_time) $((curr_time - last_conv_time - start_time) / last_conv_time) $(ne(graph) - last_conv_num_edges)")
+                end
+
+                print_network_stats(graph)
             end
 
-            if check_convergence && verbose
-                println("Convergence times: $last_conv_time $(curr_time - last_conv_time - start_time) $((curr_time - last_conv_time - start_time) / last_conv_time) $(ne(graph) - last_conv_num_edges)")
-            end
-            print_network_stats(graph)
             last_update_time = curr_time
         end
 
