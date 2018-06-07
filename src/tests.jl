@@ -284,9 +284,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
         if !isempty(test_obj.cor_mat)
             cor_subset!(data, test_obj.cor_mat, [X, Y, Z_total...])
 
-            if debug > 2
-                println(test_obj.cor_mat[[X, Y, Z_total...], [X, Y, Z_total...]])
-            end
+            debug > 2 && println(test_obj.cor_mat[[X, Y, Z_total...], [X, Y, Z_total...]])
         end
     end
 
@@ -304,9 +302,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
             end
             num_tests += 1
 
-            if debug > 2
-                println("\t subset ", Zs, " : ", test_result)
-            end
+            debug > 2 && println("\t subset ", Zs, " : ", test_result)
 
             if !issig(test_result, alpha) || num_tests >= max_tests
                 if subset_size > 1

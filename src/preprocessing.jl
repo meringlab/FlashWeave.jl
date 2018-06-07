@@ -335,9 +335,7 @@ end
 
 function drop_uninformative_rows_and_cols(data::AbstractMatrix{ElType}, env_data::AbstractMatrix{ElType}, norm::String, header::Vector{String}=String[],
     verbose::Bool=false) where ElType <: Real
-    if verbose
-        println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
-    end
+    verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
 
     unfilt_dims = size(data)
     col_mask = (var(data, 1)[:] .> 0.0)[:]
@@ -354,9 +352,7 @@ function drop_uninformative_rows_and_cols(data::AbstractMatrix{ElType}, env_data
         header = header[col_mask]
     end
 
-    if verbose
-        println("\tdiscarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
-    end
+    verbose && println("\tdiscarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
 
     data, env_data, header
 end
@@ -445,9 +441,8 @@ end
 function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied", rank_clr=false,
     disc_method::String="median", verbose::Bool=true, env_cols::Vector{Int}=Int[], make_sparse::Bool=issparse(data), factor_cols::Vector{Int}=Int[],
     prec::Integer=32, filter_data=true, header::Vector{String}=String[])
-    if verbose
-        println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
-    end
+
+    verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
 
     if !isempty(env_cols)
         env_data = data[:, env_cols]
@@ -512,9 +507,8 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         if !isempty(header)
             header = header[bin_mask]
         end
-        if verbose
-            println("\tremoved $(unreduced_vars - size(data, 2)) variables with not exactly 2 levels")
-        end
+
+        verbose && println("\tremoved $(unreduced_vars - size(data, 2)) variables with not exactly 2 levels")
 
     elseif startswith(norm, "binned")
         if startswith(norm, "binned_nz")
@@ -536,9 +530,8 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
             header = header[bin_mask]
         end
 
-        if verbose
-            println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
-        end
+        verbose && println("\tremoved $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
+
     else
         error("$norm is no valid normalization method.")
     end

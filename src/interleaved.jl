@@ -259,9 +259,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         if !isempty(output_folder) && curr_time - last_output_time > output_interval
             curr_out_path = joinpath(output_folder, "TempGraph_" * string(now())[1:end-4])
 
-            if verbose
-                println("Writing temporary graph to $curr_out_path")
-            end
+            verbose && println("Writing temporary graph to $curr_out_path")
 
             write_edgelist(curr_out_path, output_graph, attrs=[:weight, :dir])
             last_output_time = curr_time
@@ -274,9 +272,8 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                 last_conv_time = curr_time - start_time
                 last_conv_num_edges = ne(graph)
 
-                if verbose
-                    println("Starting convergence checks at $last_conv_num_edges edges.")
-                end
+                verbose && println("Starting convergence checks at $last_conv_num_edges edges.")
+
             elseif check_convergence
                 delta_time = (curr_time - start_time - last_conv_time) / last_conv_time
 
@@ -285,16 +282,11 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                     delta_num_edges = (new_num_edges - last_conv_num_edges) / last_conv_num_edges
                     conv_level = delta_num_edges / delta_time
 
-                    if verbose
-                        println("Current convergence level: $conv_level")
-                    end
+                    verbose && println("Current convergence level: $conv_level")
 
                     if conv_level < convergence_threshold
                         converged = true
-
-                        if verbose
-                            println("\tCONVERGED! Waiting for remaining processes to finish their current load.")
-                        end
+                        verbose && println("\tCONVERGED! Waiting for remaining processes to finish their current load.")
                     end
 
                     last_conv_time = curr_time - start_time

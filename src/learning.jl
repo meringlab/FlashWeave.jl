@@ -19,7 +19,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     if time_limit == -1.0
         if parallel == "multi_il"
             time_limit = round(log2(size(data, 2)))
-            println("Setting 'time_limit' to $time_limit s.")
+            verbose && println("Setting 'time_limit' to $time_limit s.")
         else
             time_limit = 0.0
         end
@@ -64,9 +64,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
             n_obs_min = 20
         end
 
-        if verbose
-            println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
-        end
+        verbose && println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
     end
 
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type
@@ -350,9 +348,8 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true, hetero
 
     time_taken = time() - start_time()
 
-    if verbose
-        println("Finished inference. Time taken: ", time_taken, "s")
-    end
+    verbose && println("Finished inference. Time taken: ", time_taken, "s")
+
 
     stats_dict = Dict(:time_taken=>time_taken, :converged=>!isempty(lgl_results.unfinished_states))
     meta_dict = Dict("params"=>params_dict, "stats"=>stats_dict)

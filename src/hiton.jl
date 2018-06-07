@@ -34,16 +34,12 @@ function candidate_in_blackwhite_lists!(candidate::Int, accepted::Vector{Int}, a
         push!(accepted, candidate)
         accepted_dict[candidate] = (NaN64, NaN64)
 
-        if debug > 0
-            println("\tin whitelist")
-        end
+        debug > 0 && println("\tin whitelist")
         candidate_in_list = true
     end
 
     if !isempty(blacklist) && candidate in blacklist
-        if debug > 0
-            println("\tin blacklist")
-        end
+        debug > 0 && println("\tin blacklist")
         candidate_in_list = true
     end
 
@@ -71,9 +67,8 @@ function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg
          push!(accepted, candidate)
          accepted_dict[candidate] = (test_result.stat, test_result.pval)
 
-         if debug > 0
-             println("\taccepted: ", test_result)
-         end
+         debug > 0 && println("\taccepted: ", test_result)
+
      else
          if phase == 'E' && !fast_elim
             push!(accepted, candidate)
@@ -82,9 +77,8 @@ function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg
          if track_rejections
              rej_dict[candidate] = (Tuple(lowest_sig_Zs), test_result, num_test_pair)
          end
-         if debug > 0
-             println("\trejected: ", test_result, " through Z ", lowest_sig_Zs)
-         end
+
+         debug > 0 && println("\trejected: ", test_result, " through Z ", lowest_sig_Zs)
      end
  end
 
@@ -119,9 +113,8 @@ function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMa
     accepted = phase == 'E' ? copy(candidates) : Int[]
 
     for (cand_index, candidate) in enumerate(candidates)
-        if debug > 0
-            println("\tTesting candidate $candidate ($cand_index out of $(length(candidates))) conditioned on $accepted, current set size: $(length(accepted))")
-        end
+
+        debug > 0 && println("\tTesting candidate $candidate ($cand_index out of $(length(candidates))) conditioned on $accepted, current set size: $(length(accepted))")
 
         candidate_in_list = candidate_in_blackwhite_lists!(candidate, accepted, accepted_dict, whitelist, blacklist, debug)
 
@@ -285,9 +278,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
         debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false,
          cache_pcor::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
-    if debug > 0
-        println("Finding neighbors for $T")
-    end
+    debug > 0 && println("Finding neighbors for $T")
 
     rej_dict = RejDict{Int}()
 
@@ -340,9 +331,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
                 if !isempty(candidates_unchecked)
 
-                    if debug > 0
-                        println("Time limit exceeded, reporting incomplete results")
-                    end
+                    debug > 0 && println("Time limit exceeded, reporting incomplete results")
 
                     return HitonState('I', TPC_dict, NbrStatDict(), candidates_unchecked, rej_dict)
                 end
@@ -371,10 +360,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
                                                          no_red_tests=no_red_tests)
 
             if !isempty(TPC_unchecked)
-
-                if debug > 0
-                    println("Time limit exceeded, reporting incomplete results")
-                end
+                debug > 0 && println("Time limit exceeded, reporting incomplete results")
 
                 return HitonState('E', PC_dict, TPC_dict, TPC_unchecked, rej_dict)
             end
@@ -386,9 +372,8 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
             update_PC_dict!(PC_dict, TPC_dict)
         end
 
-        if debug > 1
-            println(PC_dict)
-        end
+        debug > 1 && println(PC_dict)
+
     else
         PC_dict = univar_nbrs
     end
