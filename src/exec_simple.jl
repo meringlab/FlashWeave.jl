@@ -103,6 +103,10 @@ function main(input_args::Vector{String})
         lgl_args[:convergence_threshold] = 0.0
         lgl_args[:fast_elim] = false
         lgl_args[:feed_forward] = false
+    elseif speed_mode == "fast_nz"
+        lgl_args[:convergence_threshold] = 0.01
+        lgl_args[:fast_elim] = true
+        lgl_args[:feed_forward] = false
     else
         error("$speed_mode not a valid speed_mode")
     end
