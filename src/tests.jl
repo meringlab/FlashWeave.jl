@@ -407,7 +407,7 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
         test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
         levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
-        chunk_size::Int=500, correct_reliable_only::Bool=true)
+        chunk_size::Int=500, correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true)
 
 
     target_vars = collect(1:size(data, 2))
@@ -427,8 +427,8 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
     effective_chunk_size = min(chunk_size, Int(ceil(n_vars / 3)))
     work_items = collect(work_chunker(n_vars, effective_chunk_size))
 
-    pvals = fill(NaN64, n_pairs)#ones(Float64, n_pairs)
-    stats = fill(NaN64, n_pairs)#zeros(Float64, n_pairs)
+    pvals = fill(NaN64, n_pairs)
+    stats = fill(NaN64, n_pairs)
 
     if startswith(parallel, "single")
         for (X, Ys_slice) in work_items
@@ -436,28 +436,40 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
         end
 
     else
-        #shuffle!(work_items)
+
+        if shuffle_jobs
+            shuffle!(work_items)
+        end
+
         if startswith(parallel, "multi")
             # if worker processes are on the same machine, use local memory sharing via shared arrays
             if workers_local
                 shared_pvals = SharedArray{Float64}(pvals)
                 shared_stats = SharedArray{Float64}(stats)
-                #@sync @parallel for work_item in work_items
-                #    pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_obj, hps,
-                #                      n_obs_min, correct_reliable_only)
-                #end
-                pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats, shared_pvals, test_obj, hps,
-                                  n_obs_min, correct_reliable_only), work_items)
+
+                if use_pmap
+                    pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats, shared_pvals, test_obj, hps,
+                                      n_obs_min, correct_reliable_only), work_items)
+                else
+                    @sync @parallel for work_item in work_items
+                        pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_obj, hps,
+                                          n_obs_min, correct_reliable_only)
+                    end
+                end
+
                 stats = shared_stats.s
                 pvals = shared_pvals.s
 
             # otherwise make workers store test results remotely and gather them in the end via network
             else
-                #all_test_results = @parallel (vcat) for work_item in work_items
-                #    pw_univar_kernel(work_item[1], work_item[2], data, test_obj, hps, n_obs_min)
-                #end
-                all_test_results = pmap(work_item -> pw_univar_kernel(work_item..., data, test_obj, hps, n_obs_min),
-                                        work_items)
+                if use_pmap
+                    all_test_results = pmap(work_item -> pw_univar_kernel(work_item..., data, test_obj, hps, n_obs_min),
+                                            work_items)
+                else
+                    all_test_results = @parallel (vcat) for work_item in work_items
+                        pw_univar_kernel(work_item[1], work_item[2], data, test_obj, hps, n_obs_min)
+                    end
+                end
 
                 i = 0
                 for (X, Ys_slice) in work_items
@@ -480,9 +492,8 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
             end
 
         elseif startswith(parallel, "threads")
-            shuffle!(work_items)
-            pvals = fill(NaN64, n_pairs)#ones(Float64, n_pairs)
-            stats = fill(NaN64, n_pairs)#zeros(Float64, n_pairs)
+            pvals = fill(NaN64, n_pairs)
+            stats = fill(NaN64, n_pairs)
             Threads.@threads for work_item in work_items
                 pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_obj, hps, n_obs_min,
                                   correct_reliable_only)
