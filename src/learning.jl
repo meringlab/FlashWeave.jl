@@ -350,7 +350,6 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true, hetero
 
     verbose && println("Finished inference. Time taken: ", time_taken, "s")
 
-
     stats_dict = Dict(:time_taken=>time_taken, :converged=>!isempty(lgl_results.unfinished_states))
     meta_dict = Dict("params"=>params_dict, "stats"=>stats_dict)
     lgl_results, meta_dict

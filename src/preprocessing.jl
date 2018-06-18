@@ -579,8 +579,8 @@ function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String
 end
 
 
-function normalize(data::AbstractMatrix{ElType}, test_name::AbstractString; env_cols::Vector{Int}=Int[], header::Vector{String}=String[],
-    verbose::Bool=false, prec::Integer=32) where ElType <: Real
+function normalize(data::AbstractMatrix{ElType}, test_name::AbstractString; env_cols::Vector{Int}=Int[],
+     header::Vector{String}=String[], verbose::Bool=false, prec::Integer=32) where ElType <: Real
     T = eval(Symbol("Float$prec"))
     MatType = issparse(data) ? SparseMatrixCSC{T, eval(Symbol("Int$prec"))} : Matrix{T}
     data = convert(MatType, data)
