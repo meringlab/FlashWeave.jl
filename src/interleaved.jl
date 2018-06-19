@@ -185,7 +185,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                     for nbr in keys(curr_state.state_results)
                         weight = make_single_weight(curr_state.state_results[nbr]..., all_univar_nbrs[target_var][nbr]..., weight_type, test_name)
 
-                        rev_weight = has_edge(output_graph, target_var, nbr) ? output_graph.weight[target_var, nbr] : NaN64
+                        rev_weight = has_edge(output_graph, target_var, nbr) ? output_graph.weights[target_var, nbr] : NaN64
                         add_edge!(output_graph, target_var, nbr, edge_merge_fun(weight, rev_weight))
                     end
                 end
@@ -258,7 +258,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
             verbose && println("Writing temporary graph to $temp_out_path")
 
-            write_edgelist(temp_out_path, output_graph, attrs=[:weight, :dir])
+            write_edgelist(temp_out_path, output_graph)
             last_output_time = curr_time
         end
 

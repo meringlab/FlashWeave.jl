@@ -34,7 +34,7 @@ function compare_graph_results(g1::Dict, g2::SimpleWeightedGraph; verbose=false,
         end
 
         for nbr in keys(nbr_dict1)
-            g2_weight = g2.weights[T, nbr]#get_prop(g2, T, nbr, :weight)
+            g2_weight = g2.weights[T, nbr]
             if !isapprox(nbr_dict1[nbr], g2_weight, rtol=rtol, atol=atol)
                 if verbose
                     println("Weights for node $T and neighbor $nbr dont fit: $(nbr_dict1[nbr]), $(g2_weight)")
@@ -47,12 +47,18 @@ function compare_graph_results(g1::Dict, g2::SimpleWeightedGraph; verbose=false,
 end
 
 # For sanity checking
-# max_k = 3
-# make_sparse = false
-# parallel = "single_il"
-# test_name = "mi_nz"
-# graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true, weight_type="cond_stat")
+ max_k = 3
+ make_sparse = false
+ parallel = "single_il"
+ test_name = "fz"
+ graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0,
+                      correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true,
+                      weight_type="cond_stat", output_folder="/Users/janko/Desktop/tests/temp_graph_test",
+                      output_interval=1.0)
 
+graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0,
+                                           correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true,
+                                           weight_type="cond_stat")
 #graph2 = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=false, weight_type="uni_stat")
 
 #wanted_vars = Set([1,2,3])
