@@ -257,7 +257,8 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         end
 
         if !isempty(output_folder) && curr_time - last_output_time > output_interval
-            curr_out_path = joinpath(output_folder, "TempGraph_" * string(now())[1:end-4])
+            #curr_out_path = joinpath(output_folder, "TempGraph_" * string(now())[1:end-4])
+            curr_out_path = joinpath(output_folder, "latest_network.edgelist")
 
             verbose && println("Writing temporary graph to $curr_out_path")
 
