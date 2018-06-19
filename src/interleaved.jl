@@ -114,6 +114,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         println("Starting workers and sending data..")
         tic()
     end
+
     worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, nonsparse_cond,
                                                 shared_job_q, shared_result_q, GLL_args) for x in 1:n_workers]
 
@@ -184,15 +185,8 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                     for nbr in keys(curr_state.state_results)
                         weight = make_single_weight(curr_state.state_results[nbr]..., all_univar_nbrs[target_var][nbr]..., weight_type, test_name)
 
-                        if has_edge(G, target_var, nbr)
-                            rev_weight = get_prop(G, target_var, nbr, :weight)
-                            #edge_dir = '='
-                        else
-                            rev_weight = NaN64
-                            #edge_dir = target_var < nbr ? '>' : '<'
-                        end
-
-                        #add_symmetric_edge!(output_graph, target_var, nbr, weight, rev_weight, edge_dir, edge_merge_fun)
+                        rev_weight = has_edge(output_graph, target_var, nbr) ? output_graph.weight[target_var, nbr] : NaN64
+                        add_edge!(output_graph, target_var, nbr, edge_merge_fun(weight, rev_weight))
                     end
                 end
 

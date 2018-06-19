@@ -11,7 +11,7 @@ using FlashWeave.Types
 
 export make_test_object, get_levels, stop_reached, needs_nz_view, signed_weight,
        workers_all_local, make_cum_levels!, make_cum_levels, level_map!,
-       print_network_stats, maxweight, add_symmetric_edge!, make_symmetric_graph, map_edge_keys,
+       print_network_stats, maxweight, make_symmetric_graph, map_edge_keys,
        make_single_weight, make_weights, write_edgelist, read_edgelist, iter_apply_sparse_rows!,
        make_chunks, work_chunker
 
