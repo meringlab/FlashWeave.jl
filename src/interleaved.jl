@@ -134,7 +134,10 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
     end
 
     if !isempty(output_folder)
+        temp_out_path = joinpath(output_folder, "latest_network.edgelist")
         output_graph = SimpleWeightedGraph(n_vars)
+
+        !isdir(output_folder) && mkdir(output_folder)
     end
 
     edge_set = Set{Tuple{Int,Int}}()
@@ -258,11 +261,10 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
         if !isempty(output_folder) && curr_time - last_output_time > output_interval
             #curr_out_path = joinpath(output_folder, "TempGraph_" * string(now())[1:end-4])
-            curr_out_path = joinpath(output_folder, "latest_network.edgelist")
 
-            verbose && println("Writing temporary graph to $curr_out_path")
+            verbose && println("Writing temporary graph to $temp_out_path")
 
-            write_edgelist(curr_out_path, output_graph, attrs=[:weight, :dir])
+            write_edgelist(temp_out_path, output_graph, attrs=[:weight, :dir])
             last_output_time = curr_time
         end
 
