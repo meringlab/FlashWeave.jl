@@ -71,7 +71,9 @@ end
 
 function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType},
         all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, levels::Vector{DiscType}, cor_mat::Matrix{ContType}, GLL_args::Dict{Symbol,Any};
-        update_interval::Real=30.0, output_folder::String="", output_interval::Real=update_interval*10, convergence_threshold::AbstractFloat=0.01,
+        update_interval::Real=30.0, output_folder::String="", output_interval::Real=update_interval*10,
+        temp_output_type::String="single",
+        convergence_threshold::AbstractFloat=0.01,
         conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi_il",
         edge_rule::String="OR", edge_merge_fun=maxweight, nonsparse_cond::Bool=false, verbose::Bool=true, workers_local::Bool=true,
         feed_forward::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
@@ -135,7 +137,9 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
     end
 
     if !isempty(output_folder)
-        temp_out_path = joinpath(output_folder, "latest_network.edgelist")
+        if temp_output_type == "single"
+            temp_out_path = joinpath(output_folder, "latest_network.edgelist")
+        end
         output_graph = SimpleWeightedGraph(n_vars)
 
         !isdir(output_folder) && mkdir(output_folder)
@@ -257,11 +261,15 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         end
 
         if !isempty(output_folder) && curr_time - last_output_time > output_interval
-            #curr_out_path = joinpath(output_folder, "TempGraph_" * string(now())[1:end-4])
+            if temp_output_type == "single"
+                curr_out_path = temp_out_path
+            else
+                curr_out_path = joinpath(output_folder, "tmp_network_" * string(now())[1:end-4] * ".edgelist")
+            end
 
-            verbose && println("Writing temporary graph to $temp_out_path")
+            verbose && println("Writing temporary graph to $curr_out_path")
 
-            write_edgelist(temp_out_path, output_graph)
+            write_edgelist(curr_out_path, output_graph)
             last_output_time = curr_time
         end
 
