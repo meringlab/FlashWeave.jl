@@ -32,20 +32,24 @@ function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool
 end
 
 
-function get_levels{ElType <: Integer}(col_vec::SparseVector{ElType,Int})
-    levels = length(unique(nonzeros(col_vec)))
-    add_zero = col_vec.n > length(col_vec.nzind) ? one(ElType) : zero(ElType)
-    levels + add_zero
+function get_levels{ElType <: Integer}(x::Int, data::SparseMatrixCSC{ElType})
+    unique_vals = IntSet()
+    for j in nzrange(data, x)
+        push!(unique_vals, data.nzval[j])
+    end
+
+    add_zero = size(data, 1) > length(nzrange(data, x)) ? 1 : 0
+    length(unique_vals) + add_zero
 end
 
 
-function get_levels{ElType <: Integer}(col_vec::AbstractVector{ElType})
-    length(unique(col_vec))
+function get_levels{ElType <: Integer}(x::Int, data::Matrix{ElType})
+    length(unique(@view data[:, x]))
 end
 
 
 function get_levels{ElType <: Integer}(data::AbstractMatrix{ElType})
-    map(x -> get_levels(data[:, x]), 1:size(data, 2))
+    map(x -> get_levels(x, data), 1:size(data, 2))
 end
 
 

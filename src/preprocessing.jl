@@ -378,7 +378,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
     # binarization (presence/absence)
     elseif norm == "binary"
         binnorm_data!(data)
-        bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]
+        bin_mask =  (get_levels(data) .== 2)[:]#(map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]
         data = data[:, bin_mask]
 
         if !isempty(header)
@@ -387,7 +387,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
 
         if !isempty(env_cols)
             binnorm_data!(env_data)
-            env_bin_mask =  (map(x -> get_levels(env_data[:, x]), 1:size(env_data, 2)) .== 2)[:]
+            env_bin_mask =  (get_levels(env_data) .== 2)[:]#(map(x -> get_levels(env_data[:, x]), 1:size(env_data, 2)) .== 2)[:]
             env_data = env_data[:, env_bin_mask]
             if !isempty(header)
                 env_header = env_header[env_bin_mask]
@@ -405,7 +405,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
 
         # discretize
         data = discretize(data, nz=true, bin_fun=bin_fun)
-        bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .> 1)[:]
+        bin_mask =  (get_levels(data) .== 2)[:]#(map(x -> get_levels(data[:, x]), 1:size(data, 2)) .> 1)[:]
         data = data[:, bin_mask]
 
         if !isempty(header)
@@ -413,7 +413,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
         end
 
         if !isempty(env_cols)
-            env_bin_mask =  (map(x -> get_levels(env_data[:, x]), 1:size(env_data, 2)) .== 2)[:]
+            env_bin_mask =  (get_levels(env_data) .== 2)[:]#(map(x -> get_levels(env_data[:, x]), 1:size(env_data, 2)) .== 2)[:]
             env_data = env_data[:, env_bin_mask]
             if !isempty(header)
                 env_header = env_header[env_bin_mask]
@@ -501,7 +501,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         end
 
         unreduced_vars = size(data, 2)
-        bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]
+        bin_mask =  (get_levels(data) .== 2)[:]
         data = data[:, bin_mask]
 
         if !isempty(header)
@@ -523,7 +523,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
         end
 
         unreduced_vars = size(data, 2)
-        bin_mask =  (map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== n_bins)[:]
+        bin_mask =  (get_levels(data) .== n_bins)[:]
         data = data[:, bin_mask]
 
         if !isempty(header)
