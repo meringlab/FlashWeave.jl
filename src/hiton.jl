@@ -168,7 +168,7 @@ function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, 
 
     if isdiscrete(test_name)
         if isempty(levels)
-            levels = map(x -> get_levels(data[:, x]), 1:size(data, 2))::Vector{DiscType}
+            levels = get_levels(data)::Vector{DiscType}#map(x -> get_levels(data[:, x]), 1:size(data, 2))::Vector{DiscType}
         end
 
         if levels[T] < 2

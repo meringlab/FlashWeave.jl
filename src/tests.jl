@@ -85,7 +85,7 @@ end
 function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Integer},
         test_name::String, hps::Integer=5, n_obs_min::Int=0, levels::Vector{<:Integer}=Int[])
     if isempty(levels)
-        levels = get_levels(data)#map(x -> length(unique(data[:, x])), 1:size(data, 2))
+        levels = get_levels(data)
     end
     test_obj = make_test_object(test_name, false, max_k=0, levels=levels, cor_mat=zeros(Float64, 0, 0))
     test(X, Ys, data, test_obj, hps, n_obs_min)
@@ -413,7 +413,7 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
     target_vars = collect(1:size(data, 2))
 
     if startswith(test_name, "mi") && isempty(levels)
-        levels = map(x -> get_levels(data[:, x]), target_vars)
+        levels = get_levels(data)#map(x -> get_levels(data[:, x]), target_vars)
     end
 
     test_obj = make_test_object(test_name, false, levels=levels, cor_mat=cor_mat)
