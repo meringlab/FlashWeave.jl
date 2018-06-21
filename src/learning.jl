@@ -15,7 +15,17 @@ using FlashWeave.Preclustering
 
 function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit::AbstractFloat, parallel::String,
     feed_forward::Bool, max_k::Integer, n_obs_min::Integer, hps::Integer, fast_elim::Bool,
-     recursive_pcor::Bool, verbose::Bool)  where {ElType<:Real}
+    recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
+    output_folder::AbstractString)  where {ElType<:Real}
+
+    if !workers_all_local() && isempty(tmp_folder)
+        if !isempty(output_folder)
+            tmp_folder = output_folder
+        else
+            warn("For faster distributed data sharing provide 'tmp_folder' or 'output_folder'")
+        end
+    end
+
     if time_limit == -1.0
         if parallel == "multi_il"
             time_limit = round(log2(size(data, 2)))
@@ -67,13 +77,14 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         verbose && println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
     end
 
-    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type
+    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder
 end
 
 
 function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String, alpha::AbstractFloat, hps::Integer,
     n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
-    correct_reliable_only::Bool, verbose::Bool, chunk_size::Union{Int,Void}=nothing) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+    correct_reliable_only::Bool, verbose::Bool, chunk_size::Union{Int,Void}=nothing,
+    tmp_folder::AbstractString="") where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
     if verbose
@@ -83,7 +94,8 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                           levels=levels, parallel=parallel, workers_local=workers_all_local(),
-                                          cor_mat=cor_mat, correct_reliable_only=correct_reliable_only, chunk_size=chunk_size)
+                                          cor_mat=cor_mat, correct_reliable_only=correct_reliable_only,
+                                          chunk_size=chunk_size, tmp_folder=tmp_folder)
     var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
     target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
 
@@ -254,6 +266,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
     verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="", output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Void}=nothing,
+    tmp_folder::AbstractString="",
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true, cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
     track_rejections::Bool=false, cluster_mode::AbstractString="greedy") where {ElType<:Real}
@@ -262,9 +275,11 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
     fast_elim: currently always on
     """
-    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type = prepare_lgl(data, test_name, time_limit, parallel,
+    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder = prepare_lgl(data, test_name,
+                                                                                          time_limit, parallel,
                                                                                           feed_forward, max_k, n_obs_min, hps, fast_elim,
-                                                                                          recursive_pcor, verbose)
+                                                                                          recursive_pcor, verbose,
+                                                                                          tmp_folder, output_folder)
 
     hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min, :max_tests => max_tests,
                   :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
@@ -272,14 +287,16 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                   :time_limit => time_limit, :track_rejections => track_rejections, :cache_pcor => cache_pcor)
 
     target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min, FDR, levels,
-                                                          parallel, cor_mat, correct_reliable_only, verbose)
+                                                          parallel, cor_mat, correct_reliable_only, verbose, chunk_size,
+                                                          tmp_folder)
 
     target_vars, all_univar_nbrs, clust_dict, clust_var_dict, levels = make_preclustering(precluster_sim, data, target_vars, cor_mat,
                                                                                           levels, test_name, all_univar_nbrs, cluster_mode, verbose)
 
     interleaved_kwargs = Dict(:update_interval => update_interval, :convergence_threshold => convergence_threshold,
                                   :feed_forward => feed_forward, :edge_rule => edge_rule, :edge_merge_fun => edge_merge_fun,
-                                  :workers_local => workers_all_local(), :output_folder => output_folder, :output_interval => output_interval)
+                                  :workers_local => workers_all_local(), :output_folder => output_folder,
+                                  :output_interval => output_interval)
 
     nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data, all_univar_nbrs, levels, cor_mat, parallel,
                                                                       recursive_pcor,
