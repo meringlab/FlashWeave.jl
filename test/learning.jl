@@ -47,18 +47,18 @@ function compare_graph_results(g1::Dict, g2::SimpleWeightedGraph; verbose=false,
 end
 
 # For sanity checking
- max_k = 3
- make_sparse = false
- parallel = "single_il"
- test_name = "fz"
- graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0,
-                      correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true,
-                      weight_type="cond_stat", output_folder="/Users/janko/Desktop/tests/temp_graph_test",
-                      output_interval=1.0)
-
-graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0,
-                                           correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true,
-                                           weight_type="cond_stat")
+# max_k = 3
+# make_sparse = false
+# parallel = "single_il"
+# test_name = "fz"
+# graph = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0,
+#                   correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true,
+#                   weight_type="cond_stat", output_folder="/Users/janko/Desktop/tests/temp_graph_test",
+#                   output_interval=1.0)
+#
+# graph2 = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0,
+#                                           correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=true,
+#                                           weight_type="cond_stat")
 #graph2 = make_network(data, test_name, make_sparse, 64, true, max_k=max_k, parallel=parallel, time_limit=30.0, correct_reliable_only=false, n_obs_min=0, debug=0, verbose=true, FDR=false, weight_type="uni_stat")
 
 #wanted_vars = Set([1,2,3])

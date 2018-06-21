@@ -407,13 +407,13 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
         test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
         levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
-        chunk_size::Int=500, correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true)
-
+        chunk_size::Union{Int,Void}=max(500, Int(ceil(length(combinations(1:size(data, 2), 2)) / 1e5))),
+        correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true)
 
     target_vars = collect(1:size(data, 2))
 
     if startswith(test_name, "mi") && isempty(levels)
-        levels = get_levels(data)#map(x -> get_levels(data[:, x]), target_vars)
+        levels = get_levels(data)
     end
 
     test_obj = make_test_object(test_name, false, levels=levels, cor_mat=cor_mat)
@@ -422,10 +422,7 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
 
     nz = is_zero_adjusted(test_obj)
-
-
-    effective_chunk_size = min(chunk_size, Int(ceil(n_vars / 3)))
-    work_items = collect(work_chunker(n_vars, effective_chunk_size))
+    work_items = collect(work_chunker(n_vars, chunk_size))
 
     pvals = fill(NaN64, n_pairs)
     stats = fill(NaN64, n_pairs)
@@ -436,7 +433,6 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
         end
 
     else
-
         if shuffle_jobs
             shuffle!(work_items)
         end
