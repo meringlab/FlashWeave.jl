@@ -73,7 +73,7 @@ end
 
 function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String, alpha::AbstractFloat, hps::Integer,
     n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
-    correct_reliable_only::Bool, verbose::Bool) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+    correct_reliable_only::Bool, verbose::Bool, chunk_size::Union{Int,Void}=nothing) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
     if verbose
@@ -83,7 +83,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                           levels=levels, parallel=parallel, workers_local=workers_all_local(),
-                                          cor_mat=cor_mat, correct_reliable_only=correct_reliable_only)
+                                          cor_mat=cor_mat, correct_reliable_only=correct_reliable_only, chunk_size=chunk_size)
     var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
     target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
 
@@ -253,7 +253,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(10e6), convergence_threshold::AbstractFloat=0.01, FDR::Bool=true,
     parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
-    verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="", output_interval::Real=update_interval*10, edge_merge_fun=maxweight,
+    verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="", output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Void}=nothing,
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true, cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
     track_rejections::Bool=false, cluster_mode::AbstractString="greedy") where {ElType<:Real}
