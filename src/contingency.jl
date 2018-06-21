@@ -75,9 +75,9 @@ end
 
 # SPARSE DATA
 
-function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer,<:Integer},
+function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer},
         test_obj::ContTest2D)
-        
+
     @inbounds if is_zero_adjusted(test_obj)
         X_nz = test_obj.levels[X] > 2
         Y_nz = test_obj.levels[Y] > 2
@@ -88,7 +88,7 @@ function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer,<:In
     sparse_ctab_backend!((X, Y), data, test_obj, X_nz, Y_nz)
 end
 
-function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::SparseMatrixCSC{<:Integer,Int},
+function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::SparseMatrixCSC{<:Integer},
         test_obj::ContTest3D)
     @inbounds if is_zero_adjusted(test_obj)
         X_nz = test_obj.levels[X] > 2
@@ -126,7 +126,7 @@ function make_zmap_expression(col_type::Type{NTuple{N,Int}}) where N
     end
 end
 
-@generated function sparse_ctab_backend!(cols::NTuple{N,Int}, data::SparseMatrixCSC{ElType,Int},
+@generated function sparse_ctab_backend!(cols::NTuple{N,Int}, data::SparseMatrixCSC{ElType},
         test_obj::TestType, X_nz::Bool, Y_nz::Bool) where {N, ElType<:Integer, S<:Integer, T<:AbstractNz, TestType<:AbstractContTest{S,T}}
 
     # general init
