@@ -467,40 +467,6 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
                     all_test_results = pmap(work_item -> pw_univar_kernel(work_item..., data, test_obj, hps, n_obs_min),
                                             work_items)
                 else
-                    if !isempty(tmp_folder)
-                        @everywhere function deser(path)
-                            open(path) do in_f
-                                deserialize(in_f)
-                            end
-                        end
-
-                        for (remote_obj, obj_name) in zip([data, test_obj], ["data", "cor_mat", "levels"])
-                            tmp_file = joinpath(tmp_folder, "remote_$(obj_name).jsr")
-
-                            open(tmp_file, "w") do ser_f
-                                serialize(ser_f, remote_obj)
-                            end
-
-                            for wid in workers()
-                                if obj_name == "data"
-                                    @spawnat wid global remote_data = deser(tmp_file)
-                                elseif obj_name == "cor_mat"
-                                    @spawnat wid global remote_cor_mat = deser(tmp_file)
-                                else
-                                    @spawnat wid global remote_levels = deser(tmp_file)
-                                end
-                            end
-                        end
-                    else
-                        remote_data = data
-                        remote_test_obj = test_obj
-                        remote_levels = levels
-                    end
-
-                    for wid in workers()
-                        @spawnat wid global remote_test_obj = make_test_object(test_name, false, levels=remote_levels, cor_mat=remote_cor_mat)
-                    end
-
                     all_test_results = @parallel (vcat) for work_item in work_items
                         pw_univar_kernel(work_item[1], work_item[2], remote_data, remote_test_obj, hps, n_obs_min)
                     end
