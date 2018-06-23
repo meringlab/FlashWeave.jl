@@ -360,25 +360,6 @@ function nz_adjust_cont_tab(levels_x::Integer, levels_y::Integer, ctab::Abstract
 end
 
 
-function benjamini_hochberg_old{T <: AbstractFloat}(pvals::AbstractVector{T})
-    """Accelerated version of the one found in MultipleTesting.jl"""
-    m = length(pvals)
-
-    sorted_pval_tuples::Vector{Tuple{Int,T}} = collect(zip(1:length(pvals), pvals))
-    sort!(sorted_pval_tuples, by=x->x[2])
-
-    @inbounds for i in reverse(1:m-1)
-        next_adj = sorted_pval_tuples[i+1][2]
-        new_adj = sorted_pval_tuples[i][2] * m / i
-        min_adj = min(next_adj, new_adj)
-        sorted_pval_tuples[i] = (sorted_pval_tuples[i][1], min_adj)
-    end
-
-    sort!(sorted_pval_tuples, by=x->x[1])
-    @inbounds return [x[2] for x in sorted_pval_tuples]
-end
-
-
 function benjamini_hochberg!{T <: AbstractFloat}(pvals::AbstractVector{T};
     alpha::AbstractFloat=0.01, m=length(pvals))
     """Accelerated version of that found in MultipleTesting.jl"""
