@@ -117,14 +117,8 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         tic()
     end
 
-    if !all([fetch(@spawnat workers()[1] isdefined(remote_obj)) for remote_obj in [:remote_data, :remote_test_obj]])
-        remote_data = data
-        remote_cor_mat = cor_mat
-        remote_levels = levels
-    end
-
-    worker_returns = [@spawn interleaved_worker(remote_data, remote_levels, remote_cor_mat, edge_rule, nonsparse_cond,
-                                                shared_job_q, shared_result_q, GLL_args) for x in 1:n_workers]
+    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, nonsparse_cond,
+                                                shared_job_q, shared_result_q, GLL_args) for x in workers()]
 
     if verbose
         println("Done. Starting inference..")

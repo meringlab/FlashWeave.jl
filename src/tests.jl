@@ -210,7 +210,7 @@ function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Abs
         mi_stat *= mi_sign
     end
 
-    Misc.TestResult(mi_stat, pval, df, suff_power)
+    TestResult(mi_stat, pval, df, suff_power)
 end
 
 
@@ -403,6 +403,43 @@ function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::AbstractVector{Int},
 end
 
 
+function pw_univar_worker(data::AbstractMatrix{ElType}, test_obj::AbstractTest,
+                          hps::Integer, n_obs_min::Integer, shared_job_q::RemoteChannel,
+                          shared_result_q::RemoteChannel) where ElType <: Real
+    while true
+        try
+            X, i, Ys_slice = take!(shared_job_q)
+            
+            # if kill signal
+            if X == -1
+                #put!(shared_result_q, (0, myid()))
+                return
+            end
+            
+            if needs_nz_view(X, data, test_obj)
+                sub_data = @view data[data[:, X] .!= 0, :]
+            else
+                sub_data = data
+            end
+
+            Ys = collect(Ys_slice)
+            
+            if isdiscrete(test_obj)
+                test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
+            else
+                test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
+            end
+            
+            put!(shared_result_q, (i, test_results))
+            
+        catch exc
+            println("Exception occurred! ", exc)
+            println(catch_stacktrace())
+        end
+    end
+end
+
+
 function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(data::AbstractMatrix{ElType};
         test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
         levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
@@ -467,9 +504,31 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
                     all_test_results = pmap(work_item -> pw_univar_kernel(work_item..., data, test_obj, hps, n_obs_min),
                                             work_items)
                 else
-                    all_test_results = @parallel (vcat) for work_item in work_items
-                        pw_univar_kernel(work_item[1], work_item[2], remote_data, remote_test_obj, hps, n_obs_min)
+                    shared_job_q = RemoteChannel(() -> Channel{Tuple{Int,Int,UnitRange{Int}}}(length(work_items)), 1)
+                    shared_result_q = RemoteChannel(() -> Channel{Tuple{Int,Vector{TestResult}}}(length(work_items)), 1)
+
+                    worker_returns = [@spawn pw_univar_worker(data, test_obj, hps, n_obs_min, shared_job_q, shared_result_q) for wid in workers()]
+                    
+                    for (i, (X, Y_slice)) in enumerate(work_items)
+                        put!(shared_job_q, (X, i, Y_slice))
                     end
+                    
+                    remaining_jobs = queued_jobs = length(work_items)
+                    n_workers = length(workers())
+                    
+                    test_result_chunks = Array{Vector{TestResult}}(remaining_jobs)
+                    while remaining_jobs > 0
+                        work_i, job_result = take!(shared_result_q)
+                        test_result_chunks[work_i] = job_result
+                        
+                        remaining_jobs -= 1
+                        queued_jobs -= 1
+                        
+                        if remaining_jobs < n_workers
+                            put!(shared_job_q, (-1, 0, 0:1))
+                        end
+                    end
+                    all_test_results = vcat(test_result_chunks...)
                 end
 
                 i = 0
