@@ -3,7 +3,7 @@ module Statfuns
 export cor_nz, pcor, pcor_rec, cor_subset!,
        fz_pval, mutual_information, mi_pval,
        adjust_df, oddsratio, nz_adjust_cont_tab,
-       benjamini_hochberg
+       benjamini_hochberg!
 
 import Base:cor
 
@@ -360,8 +360,8 @@ function nz_adjust_cont_tab(levels_x::Integer, levels_y::Integer, ctab::Abstract
 end
 
 
-function benjamini_hochberg{T <: AbstractFloat}(pvals::AbstractVector{T})
-    """Accelerated version of that found in MultipleTesting.jl"""
+function benjamini_hochberg_old{T <: AbstractFloat}(pvals::AbstractVector{T})
+    """Accelerated version of the one found in MultipleTesting.jl"""
     m = length(pvals)
 
     sorted_pval_tuples::Vector{Tuple{Int,T}} = collect(zip(1:length(pvals), pvals))
@@ -377,5 +377,31 @@ function benjamini_hochberg{T <: AbstractFloat}(pvals::AbstractVector{T})
     sort!(sorted_pval_tuples, by=x->x[1])
     @inbounds return [x[2] for x in sorted_pval_tuples]
 end
+
+
+function benjamini_hochberg!{T <: AbstractFloat}(pvals::AbstractVector{T};
+    alpha::AbstractFloat=0.01, m=length(pvals))
+    """Accelerated version of that found in MultipleTesting.jl"""
+
+    sorted_pval_pairs = filter(x -> x[2] < alpha, collect(enumerate(pvals)))
+    sort!(sorted_pval_pairs, by=x->x[2])
+
+    n_filt = length(sorted_pval_pairs)
+    last_index, last_pval = sorted_pval_pairs[end]
+    sorted_pval_pairs[end] = (last_index, last_pval * m / n_filt)
+
+    @inbounds for i in reverse(1:n_filt-1)
+        next_adj = sorted_pval_pairs[i+1][2]
+        new_adj = sorted_pval_pairs[i][2] * m / i
+        min_adj = min(next_adj, new_adj)
+        sorted_pval_pairs[i] = (sorted_pval_pairs[i][1], min_adj)
+    end
+
+    fill!(pvals, NaN)
+    for (i, pval) in sorted_pval_pairs
+        pvals[i] = pval
+    end
+end
+
 
 end

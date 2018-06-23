@@ -424,7 +424,7 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
     nz = is_zero_adjusted(test_obj)
 
     if chunk_size == nothing
-        chunk_size = max(500, Int(ceil(length(combinations(1:size(data, 2), 2)) / 1e5)))
+        chunk_size = max(500, Int(ceil(length(combinations(1:n_vars, 2)) / 1e5)))
     end
 
     work_items = collect(work_chunker(n_vars, chunk_size))
@@ -493,8 +493,8 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
             end
 
         elseif startswith(parallel, "threads")
-            pvals = fill(NaN64, n_pairs)
-            stats = fill(NaN64, n_pairs)
+            #pvals = fill(NaN64, n_pairs)
+            #stats = fill(NaN64, n_pairs)
             Threads.@threads for work_item in work_items
                 pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_obj, hps, n_obs_min,
                                   correct_reliable_only)
@@ -503,23 +503,30 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
     end
 
     if FDR
-        if correct_reliable_only && any(isnan(x) for x in pvals)
-            reliable_mask = .!isnan.(pvals)
-            reliable_pvals = pvals[reliable_mask]
-            reliable_pvals = benjamini_hochberg(reliable_pvals)
+        m = length(pvals)
 
-            rel_pval_i = 1
-            for (i, is_reliable_elem) in enumerate(reliable_mask)
-                if is_reliable_elem
-                    pvals[i] = reliable_pvals[rel_pval_i]
-                    rel_pval_i += 1
-                else
-                    pvals[i] = NaN64
-                end
-            end
-        else
-            pvals = benjamini_hochberg(pvals)
+        if correct_reliable_only
+            m -= sum(isnan.(pvals))
         end
+
+        benjamini_hochberg!(pvals, alpha=alpha, m=m)
+        #if correct_reliable_only && any(isnan(x) for x in pvals)
+        #    reliable_mask = .!isnan.(pvals)
+        #    reliable_pvals = pvals[reliable_mask]
+        #    reliable_pvals = benjamini_hochberg(reliable_pvals)
+
+        #    rel_pval_i = 1
+        #    for (i, is_reliable_elem) in enumerate(reliable_mask)
+        #        if is_reliable_elem
+        #            pvals[i] = reliable_pvals[rel_pval_i]
+        #            rel_pval_i += 1
+        #        else
+        #            pvals[i] = NaN64
+        #        end
+        #    end
+        #else
+        #    pvals = benjamini_hochberg(pvals)
+        #end
     end
 
     condensed_stats_to_dict(n_vars, pvals, stats, alpha)
