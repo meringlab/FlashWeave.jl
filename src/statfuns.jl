@@ -369,7 +369,7 @@ function benjamini_hochberg!{T <: AbstractFloat}(pvals::AbstractVector{T};
 
     n_filt = length(sorted_pval_pairs)
     last_index, last_pval = sorted_pval_pairs[end]
-    sorted_pval_pairs[end] = (last_index, last_pval * m / n_filt)
+    sorted_pval_pairs[end] = (last_index, min(last_pval * m / n_filt, 1.0))
 
     @inbounds for i in reverse(1:n_filt-1)
         next_adj = sorted_pval_pairs[i+1][2]
