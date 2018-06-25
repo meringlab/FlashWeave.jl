@@ -37,16 +37,16 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         end
     end
 
-    if time_limit != 0.0 && parallel != "multi_il"
+    if time_limit != 0.0 && !endswith(parallel, "_il")
         warn("Using time_limit without interleaved parallelism is not advised.")
     elseif parallel == "multi_il" && time_limit == 0.0 && feed_forward
-        warn("Specify 'time_limit' when using interleaved parallelism to increase speed.")
+        warn("Specify 'time_limit' when using interleaved parallelism to potentially increase speed.")
     end
 
-    if time_limit != 0.0 && !fast_elim
-        warn("Setting fast_elim to true because time_limit has been specified")
-        fast_elim = true
-    end
+    #if time_limit != 0.0 && !fast_elim
+    #    warn("Setting fast_elim to true because time_limit has been specified")
+    #    fast_elim = true
+    #end
 
     disc_type = Int32
     cont_type = Float32
@@ -167,7 +167,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
       interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # pre-allocate correlation matrix
-    if recursive_pcor && is_zero_adjusted(hiton_kwargs[:test_name])
+    if recursive_pcor && is_zero_adjusted(hiton_kwargs[:test_name]) && iscontinuous(hiton_kwargs[:test_name])
         cor_mat = zeros(cont_type, size(data, 2), size(data, 2))
     end
 
@@ -177,7 +177,8 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     end
 
     if nonsparse_cond && !endswith(parallel, "il")
-        data = full(data)
+        #data = full(data)
+        warn("nonsparse_cond currently not implemented")
     end
 
     if parallel == "single"
@@ -271,7 +272,8 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     tmp_folder::AbstractString="",
     debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
     recursive_pcor::Bool=true, cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, cluster_mode::AbstractString="greedy") where {ElType<:Real}
+    track_rejections::Bool=false, cluster_mode::AbstractString="greedy",
+    all_univar_nbrs=nothing) where {ElType<:Real}
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
@@ -279,7 +281,8 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     """
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder = prepare_lgl(data, test_name,
                                                                                           time_limit, parallel,
-                                                                                          feed_forward, max_k, n_obs_min, hps, fast_elim,
+                                                                                          feed_forward, max_k, n_obs_min, hps, 
+                                                                                          fast_elim,
                                                                                           recursive_pcor, verbose,
                                                                                           tmp_folder, output_folder)
 
@@ -287,20 +290,35 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                   :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
                   :weight_type => weight_type, :debug => debug,
                   :time_limit => time_limit, :track_rejections => track_rejections, :cache_pcor => cache_pcor)
+<<<<<<< HEAD
 
     target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min, FDR, levels,
                                                           parallel, cor_mat, correct_reliable_only, verbose, chunk_size,
                                                           tmp_folder)
+=======
+    
+    if all_univar_nbrs == nothing
+        target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min,
+                                                              FDR, levels, parallel, cor_mat,
+                                                              correct_reliable_only, verbose,
+                                                              chunk_size, tmp_folder)
+    else
+        target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
+    end
+>>>>>>> d94bd1b25eb72a700b274810267569b0b3d9d90d
 
     target_vars, all_univar_nbrs, clust_dict, clust_var_dict, levels = make_preclustering(precluster_sim, data, target_vars, cor_mat,
-                                                                                          levels, test_name, all_univar_nbrs, cluster_mode, verbose)
+                                                                                          levels, test_name, all_univar_nbrs,
+                                                                                          cluster_mode, verbose)
 
     interleaved_kwargs = Dict(:update_interval => update_interval, :convergence_threshold => convergence_threshold,
                                   :feed_forward => feed_forward, :edge_rule => edge_rule, :edge_merge_fun => edge_merge_fun,
                                   :workers_local => workers_all_local(), :output_folder => output_folder,
                                   :output_interval => output_interval)
 
-    nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data, all_univar_nbrs, levels, cor_mat, parallel,
+    nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data, 
+                                                                      all_univar_nbrs, levels,
+                                                                      cor_mat, parallel,
                                                                       recursive_pcor,
                                                                       cont_type, time_limit, nonsparse_cond,
                                                                       verbose, track_rejections, hiton_kwargs,
@@ -312,7 +330,8 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     end
 
     if precluster_sim != 0.0
-        nbr_dict, all_univar_nbrs, rej_dict = map_clusters_to_variables(nbr_dict, all_univar_nbrs, rej_dict, clust_var_dict, track_rejections)
+        nbr_dict, all_univar_nbrs, rej_dict = map_clusters_to_variables(nbr_dict, all_univar_nbrs, rej_dict, clust_var_dict, 
+                                                                        track_rejections)
     end
 
     weights_dict = Dict{Int,Dict{Int,Float64}}()
