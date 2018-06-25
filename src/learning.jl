@@ -19,7 +19,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     output_folder::AbstractString)  where {ElType<:Real}
 
     !isempty(tmp_folder) && warn("tmp_folder currently not implemented")
-    
+
     #if !workers_all_local() && isempty(tmp_folder)
     #    if !isempty(output_folder)
     #        tmp_folder = output_folder
@@ -172,7 +172,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     end
 
     if verbose
-        println("Running si_HITON_PC for each variable..")
+        println("Starting conditioning search..")
         tic()
     end
 
@@ -260,7 +260,7 @@ function map_clusters_to_variables(nbr_dict::Dict{Int,NbrStatDict},
     end
 
     nbr_dict, all_univar_nbrs, rej_dict
-end  
+end
 
 
 function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
@@ -287,7 +287,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                   :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
                   :weight_type => weight_type, :debug => debug,
                   :time_limit => time_limit, :track_rejections => track_rejections, :cache_pcor => cache_pcor)
-    
+
     target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min, FDR, levels,
                                                           parallel, cor_mat, correct_reliable_only, verbose, chunk_size,
                                                           tmp_folder)

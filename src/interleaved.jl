@@ -15,7 +15,8 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
      shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
 
     if nonsparse_cond
-        data = full(data)
+        #data = full(data)
+        warn("nonsparse_cond currently not implemented")
     end
 
     const converged = false
