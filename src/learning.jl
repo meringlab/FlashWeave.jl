@@ -290,12 +290,6 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                   :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
                   :weight_type => weight_type, :debug => debug,
                   :time_limit => time_limit, :track_rejections => track_rejections, :cache_pcor => cache_pcor)
-<<<<<<< HEAD
-
-    target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min, FDR, levels,
-                                                          parallel, cor_mat, correct_reliable_only, verbose, chunk_size,
-                                                          tmp_folder)
-=======
     
     if all_univar_nbrs == nothing
         target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min,
@@ -305,7 +299,6 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     else
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
     end
->>>>>>> d94bd1b25eb72a700b274810267569b0b3d9d90d
 
     target_vars, all_univar_nbrs, clust_dict, clust_var_dict, levels = make_preclustering(precluster_sim, data, target_vars, cor_mat,
                                                                                           levels, test_name, all_univar_nbrs,
