@@ -15,11 +15,12 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
      shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
 
     if nonsparse_cond
-        data = full(data)
+        #data = full(data)
+        warn("nonsparse_cond currently not implemented")
     end
 
     const converged = false
-
+    #println("data structures: ", map(x -> (size(x), typeof(x)), [data, levels, cor_mat]))
     while true
         try
             target_var, univar_nbrs, prev_state, skip_nbrs = take!(shared_job_q)
@@ -43,7 +44,7 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
                 blacklist = Set{Int}()
                 whitelist = skip_nbrs
             end
-            #println("computing neighbors")
+            #println("computing neighbors of $target_var")
             #@code_warntype si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs, prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
             #println(length(univar_nbrs), " ", size(data), " ", length(levels))
             #println(typeof(levels), " ", typeof(cor_mat))
@@ -56,7 +57,7 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
             #nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs,
             #                        prev_state=prev_state, GLL_args...)
             #nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs, GLL_args...)
-            #println("delivering neighbors")
+            #println("delivering neighbors for $target_var")
             put!(shared_result_q, (target_var, nbr_state))
         catch exc
             println("Exception occurred! ", exc)
@@ -84,11 +85,13 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
     if startswith(parallel, "multi") || startswith(parallel, "threads")
         n_workers = nprocs() - 1
-        job_q_buff_size = n_workers * 2
+        job_q_buff_size = n_workers * 5
+        worker_ids = workers()
         @assert n_workers > 0 "Need to add workers for parallel processing."
     elseif startswith(parallel, "single")
         n_workers = 1
         job_q_buff_size = 1
+        worker_ids = [1]
     else
         error("$parallel not a valid execution mode.")
     end
@@ -103,7 +106,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         job = (target_var, all_univar_nbrs[target_var], HitonState{Int}('S', OrderedDict(), OrderedDict(),
                                                                         [], Dict()), Set{Int}())
 
-        if i < jobs_total - n_workers
+        if i < jobs_total - job_q_buff_size
             push!(waiting_vars, target_var)
         else
             put!(shared_job_q, job)
@@ -117,8 +120,11 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         tic()
     end
 
-    worker_returns = [@spawn interleaved_worker(data, levels, cor_mat, edge_rule, nonsparse_cond,
-                                                shared_job_q, shared_result_q, GLL_args) for x in workers()]
+    
+    worker_returns = [@spawnat wid interleaved_worker(data, levels, cor_mat, edge_rule, 
+                                                      nonsparse_cond,
+                                                      shared_job_q, shared_result_q, GLL_args)
+                      for wid in worker_ids]
 
     if verbose
         println("Done. Starting inference..")

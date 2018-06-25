@@ -507,7 +507,7 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
                     shared_job_q = RemoteChannel(() -> Channel{Tuple{Int,Int,UnitRange{Int}}}(length(work_items)), 1)
                     shared_result_q = RemoteChannel(() -> Channel{Tuple{Int,Vector{TestResult}}}(length(work_items)), 1)
 
-                    worker_returns = [@spawn pw_univar_worker(data, test_obj, hps, n_obs_min, shared_job_q, shared_result_q) for wid in workers()]
+                    worker_returns = [@spawnat wid pw_univar_worker(data, test_obj, hps, n_obs_min, shared_job_q, shared_result_q) for wid in workers()]
                     
                     for (i, (X, Y_slice)) in enumerate(work_items)
                         put!(shared_job_q, (X, i, Y_slice))
