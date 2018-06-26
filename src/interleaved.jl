@@ -11,11 +11,24 @@ using FlashWeave.StackChannels
 
 export interleaved_backend
 
+
+function save_latest_graph(output_graph, output_folder, temp_output_type, verbose)
+    if temp_output_type == "single"
+        curr_out_path = joinpath(output_folder, "latest_network.edgelist")
+    else
+        curr_out_path = joinpath(output_folder, "tmp_network_" * string(now())[1:end-4] * ".edgelist")
+    end
+
+    verbose && println("Writing temporary graph to $curr_out_path")
+
+    write_edgelist(curr_out_path, output_graph)
+end
+
+
 function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_rule::String, nonsparse_cond::Bool,
      shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
 
     if nonsparse_cond
-        #data = full(data)
         warn("nonsparse_cond currently not implemented")
     end
 
@@ -44,26 +57,14 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
                 blacklist = Set{Int}()
                 whitelist = skip_nbrs
             end
-            #println("computing neighbors of $target_var")
-            #@code_warntype si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs, prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
-            #println(length(univar_nbrs), " ", size(data), " ", length(levels))
-            #println(typeof(levels), " ", typeof(cor_mat))
-            #println("worker: whiteblack: ", length(whitelist), " ", length(blacklist))
-            #println("worker: whitelist pre: ", whitelist)
-            #println("worker: target_var: ", target_var)
+
             nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs,
                                     prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
 
-            #nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs,
-            #                        prev_state=prev_state, GLL_args...)
-            #nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs, GLL_args...)
-            #println("delivering neighbors for $target_var")
             put!(shared_result_q, (target_var, nbr_state))
         catch exc
             println("Exception occurred! ", exc)
             println(catch_stacktrace())
-            #put!(shared_result_q, (target_var, exc))
-            #throw(exc)
         end
 
     end
@@ -120,8 +121,8 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         tic()
     end
 
-    
-    worker_returns = [@spawnat wid interleaved_worker(data, levels, cor_mat, edge_rule, 
+
+    worker_returns = [@spawnat wid interleaved_worker(data, levels, cor_mat, edge_rule,
                                                       nonsparse_cond,
                                                       shared_job_q, shared_result_q, GLL_args)
                       for wid in worker_ids]
@@ -143,11 +144,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
     end
 
     if !isempty(output_folder)
-        if temp_output_type == "single"
-            temp_out_path = joinpath(output_folder, "latest_network.edgelist")
-        end
         output_graph = SimpleWeightedGraph(n_vars)
-
         !isdir(output_folder) && mkdir(output_folder)
     end
 
@@ -267,15 +264,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         end
 
         if !isempty(output_folder) && curr_time - last_output_time > output_interval
-            if temp_output_type == "single"
-                curr_out_path = temp_out_path
-            else
-                curr_out_path = joinpath(output_folder, "tmp_network_" * string(now())[1:end-4] * ".edgelist")
-            end
-
-            verbose && println("Writing temporary graph to $curr_out_path")
-
-            write_edgelist(curr_out_path, output_graph)
+            save_latest_graph(output_graph, output_folder, temp_output_type, verbose)
             last_output_time = curr_time
         end
 
@@ -301,6 +290,10 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                     if conv_level < convergence_threshold
                         converged = true
                         verbose && println("\tCONVERGED! Waiting for remaining processes to finish their current load.")
+                        if !isempty(output_folder)
+                            save_latest_graph(output_graph, output_folder, temp_output_type, verbose)
+                            last_output_time = curr_time
+                        end
                     end
 
                     last_conv_time = curr_time - start_time
