@@ -16,7 +16,7 @@ Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
 
 ## Basic usage ##
 
-OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), HDF5 (".h5") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statiscal and machine-learning applications, but in contrast to several other microbiome analysis frameworks!
+OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), Julia-specific JLD (".jld") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statiscal and machine-learning applications, but in contrast to several other microbiome analysis frameworks.
 
 To learn an interaction network, you can do
 
@@ -31,16 +31,16 @@ julia> # for HDF5, provide keys:
 julia> # data_path = "/my/example/data.h5"
 julia> # netw_results = learn_network(data_path, data_key="otu_table", meta_key="meta_data_table", sensitive=true, heterogeneous=false)
 ```
-Results can currently be saved in Julia-specific JLD (".jld") or as edgelist (".edgelist") format:
+Results can currently be saved in JLD (".jld") or as edgelist (".edgelist") format:
 
 ```julia
-julia> save("/my/example/network_output.jld", netw_results)
-julia> ## or: save("/my/example/network_output.edgelist", netw_results)
+julia> save_network("/my/example/network_output.jld", netw_results)
+julia> ## or: save_network("/my/example/network_output.edgelist", netw_results)
 ```
-For output of additional information (if available), such as discarding sets, you can specify the "detailed" flag:
+For output of additional information (if available), such as discarding sets, in separate files you can specify the "detailed" flag:
 
 ```julia
-julia> save("/my/example/network_output.jld", netw_results, detailed=true)
+julia> save_network("/my/example/network_output.jld", netw_results, detailed=true)
 ```
 
 ## Parallel computing ##
@@ -58,9 +58,9 @@ julia> addprocs(4)
 julia> using FlashWeave
 julia> learn_network(...
 ```
-and network learning will be parallelized in a shared-memory, multi-process fashion. 
+and network learning will be parallelized in a shared-memory, multi-process fashion.
 
-If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` should be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package). Details differ depending on the setup (queueing system, resource requirements, ...), but a simple example for a Sun Grid Engine (SGE) system would be:
+If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` can be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package). Details differ depending on the setup (queueing system, resource requirements, ...), but a simple example for a Sun Grid Engine (SGE) system would be:
 
 ```julia
 julia> using ClusterManagers

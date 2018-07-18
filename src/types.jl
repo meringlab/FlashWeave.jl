@@ -171,8 +171,11 @@ end
 struct LGLResult{T<:Integer}
     graph::SimpleWeightedGraph{T,Float64}
     rejections::Dict{T, RejDict{T}}
-    unfinished_states::Dict{T, HitonState}
+    unfinished_states::Dict{T, HitonState{T}}
 end
+
+LGLResult(graph::SimpleWeightedGraph{T,Float64}) where T<:Integer = LGLResult(graph, Dict{T, RejDict{T}}(),
+                                                                        Dict{T, HitonState{T}}())
 
 
 #################################

@@ -12,7 +12,7 @@ exp_dict = Dict(key=>SimpleWeightedGraph(adj_mat) for (key, adj_mat) in adj_exp_
 function make_network(data, test_name, make_sparse=false, prec=64, verbose=false; kwargs...)
     data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
     kwargs_dict = Dict(kwargs)
-    graph_res = LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
+    graph_res = FlashWeave.Learning.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
     graph_res.graph
 end
 
@@ -144,14 +144,14 @@ end
 
 # to create expected output
 
-#exp_dict = Dict()
-#for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
-#    for max_k in [0, 3]
-#        graph = make_network(data, test_name, false, 64, max_k=max_k, parallel="single", time_limit=0.0)
-#        exp_dict["exp_$(test_name)_maxk$(max_k)"] = graph.weights
-#     end
-#end
-
-#out_path = joinpath("data", "learning_expected.jld")
-#rm(out_path)
-#save(out_path, exp_dict)
+# exp_dict = Dict()
+# for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
+#     for max_k in [0, 3]
+#         graph = make_network(data, test_name, false, 64, max_k=max_k, parallel="single", time_limit=0.0)
+#         exp_dict["exp_$(test_name)_maxk$(max_k)"] = graph.weights
+#      end
+# end
+#
+# out_path = joinpath("data", "learning_expected.jld")
+# rm(out_path)
+# save(out_path, exp_dict)

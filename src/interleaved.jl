@@ -5,6 +5,7 @@ using SimpleWeightedGraphs
 using DataStructures
 
 using FlashWeave.Misc
+using FlashWeave.Io
 using FlashWeave.Types
 using FlashWeave.Hiton
 using FlashWeave.StackChannels
@@ -21,7 +22,7 @@ function save_latest_graph(output_graph, output_folder, temp_output_type, verbos
 
     verbose && println("Writing temporary graph to $curr_out_path")
 
-    write_edgelist(curr_out_path, output_graph)
+    FlashWeave.Io.write_edgelist(curr_out_path, output_graph)
 end
 
 

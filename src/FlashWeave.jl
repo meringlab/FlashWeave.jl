@@ -5,6 +5,7 @@ module FlashWeave
 using Iterators
 
 include("types.jl")
+include("io.jl")
 include("misc.jl")
 include("statfuns.jl")
 include("contingency.jl")
@@ -19,6 +20,6 @@ include("preprocessing.jl")
 using FlashWeave.Learning
 using FlashWeave.Preprocessing
 
-export LGL, si_HITON_PC, preprocess_data, preprocess_data_default
+export learn_network, normalize, save_network, load_network, load_data
 
 end

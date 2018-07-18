@@ -68,7 +68,6 @@ end
 
 # data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 #
-#
 # exp_dict = Dict{String,Any}()
 # for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
 #     exp_dict[test_name] = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, make_sparse=false)

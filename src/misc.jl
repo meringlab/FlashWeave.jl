@@ -283,53 +283,6 @@ function weightedgraph_to_adjmat(G::SimpleWeightedGraph, header::AbstractVector{
 end
 
 
-function write_edgelist(out_path::String, G::SimpleWeightedGraph; header=nothing)
-    open(out_path, "w") do out_f
-        for e in edges(G)
-            if header == nothing
-                e1 = e.src
-                e2 = e.dst
-            else
-                e1 = header[e.src]
-                e2 = header[e.dst]
-            end
-            write(out_f, string(e1) * "\t" * string(e2) * "\t" * string(G.weights[e.src, e.dst]), "\n")
-        end
-    end
-end
-
-
-function read_edgelist(in_path; header=nothing)
-    srcs = Int[]
-    dsts = Int[]
-    ws = Float64[]
-
-    if header != nothing
-        inv_header = Dict{eltype(header), Int}(zip(header, 1:length(header)))
-    end
-
-    open(in_path, "r") do in_f
-        for line in eachline(in_f)
-            #println(line)
-            line_items = split(chomp(line), '\t')
-
-            if header != nothing
-                src = inv_header[line_items[1]]
-                dst = inv_header[line_items[2]]
-            else
-                src = parse(Int, line_items[1])
-                dst = parse(Int, line_items[2])
-            end
-
-            push!(srcs, src)
-            push!(dsts, dst)
-            push!(ws, parse(Float64, line_items[end]))
-        end
-    end
-    SimpleWeightedGraph(srcs, dsts, ws)
-end
-
-
 function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
         red_fun, red_obj, x_nzadj=false, y_nzadj=false)
     n_rows, n_cols = size(data)
