@@ -250,7 +250,6 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
         end
     end
 
-    #SimpleWeightedGraph(srcs, dsts, ws)
     SimpleWeightedGraph_nodemax(srcs, dsts, ws; m=max_var)
 end
 
@@ -305,7 +304,6 @@ function read_edgelist(in_path; header=nothing)
     dsts = Int[]
     ws = Float64[]
 
-    #inv_header = header == nothing ?  Dict{eltype(header), Int}(zip(header))
     if header != nothing
         inv_header = Dict{eltype(header), Int}(zip(header, 1:length(header)))
     end

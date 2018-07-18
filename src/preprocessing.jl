@@ -32,7 +32,6 @@ function adaptive_pseudocount_nolog{ElType <: AbstractFloat}(x1::ElType, s1::Vec
     k, Nprod1 = pseudocount_vars_from_sample(s1)
     n, Nprod2 = pseudocount_vars_from_sample(s2)
     p = length(s1)
-    #x2 = nthroot(n-p, (x1^(k-p) * Nprod1) / Nprod2)
     @assert n < p && k < p "samples with all zero abundances are not allowed"
     x2 = ((x1^(k-p) * Nprod1) / Nprod2)^(1/(n-p))
     return x2
@@ -51,9 +50,7 @@ function adaptive_pseudocount{ElType <: AbstractFloat}(x1::ElType, s1::Vector{El
     k, Nprod1_log = pseudocount_vars_from_sample(s1)
     n, Nprod2_log = pseudocount_vars_from_sample(s2)
     p = length(s1)
-    #x2 = nthroot(n-p, (x1^(k-p) * Nprod1) / Nprod2)
     @assert n < p && k < p "samples with all zero abundances are not allowed"
-    #x2_log = (1 / (n-p)) * (log(x1^(k-p)) + Nprod1_log - Nprod2_log)
     x2_log = (1 / (n-p)) * ((k-p)*log(x1) + Nprod1_log - Nprod2_log)
     return exp(x2_log)
 end
@@ -62,12 +59,9 @@ end
 function adaptive_pseudocount!{ElType <: AbstractFloat}(X::Matrix{ElType})
     max_depth_index = findmax(sum(X, 2))[2]
     max_depth_sample::Vector{ElType} = X[max_depth_index, :]
-    #pseudo_counts = mapslices(x -> adaptive_pseudocount(1.0, max_depth_sample, x), X, 2)
     min_abund = minimum(X[X .!= 0])
     base_pcount = min_abund >= 1 ? 1.0 : min_abund / 10
     pseudo_counts = [adaptive_pseudocount(base_pcount, max_depth_sample, X[x, :]) for x in 1:size(X, 1)]
-
-    #X_pcount = copy(X)
 
     for i in 1:size(X, 1)
         s_vec = @view X[i, :]
@@ -378,7 +372,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
     # binarization (presence/absence)
     elseif norm == "binary"
         binnorm_data!(data)
-        bin_mask =  (get_levels(data) .== 2)[:]#(map(x -> get_levels(data[:, x]), 1:size(data, 2)) .== 2)[:]
+        bin_mask =  (get_levels(data) .== 2)[:]
         data = data[:, bin_mask]
 
         if !isempty(header)
@@ -387,7 +381,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
 
         if !isempty(env_cols)
             binnorm_data!(env_data)
-            env_bin_mask =  (get_levels(env_data) .== 2)[:]#(map(x -> get_levels(env_data[:, x]), 1:size(env_data, 2)) .== 2)[:]
+            env_bin_mask =  (get_levels(env_data) .== 2)[:]
             env_data = env_data[:, env_bin_mask]
             if !isempty(header)
                 env_header = env_header[env_bin_mask]
@@ -405,7 +399,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
 
         # discretize
         data = discretize(data, nz=true, bin_fun=bin_fun)
-        bin_mask =  (get_levels(data) .== 2)[:]#(map(x -> get_levels(data[:, x]), 1:size(data, 2)) .> 1)[:]
+        bin_mask =  (get_levels(data) .== 2)[:]
         data = data[:, bin_mask]
 
         if !isempty(header)
@@ -413,7 +407,7 @@ function preprocess_data_new(data::AbstractMatrix{ElType}, norm::String; pseudo_
         end
 
         if !isempty(env_cols)
-            env_bin_mask =  (get_levels(env_data) .== 2)[:]#(map(x -> get_levels(env_data[:, x]), 1:size(env_data, 2)) .== 2)[:]
+            env_bin_mask =  (get_levels(env_data) .== 2)[:]
             env_data = env_data[:, env_bin_mask]
             if !isempty(header)
                 env_header = env_header[env_bin_mask]

@@ -9,7 +9,9 @@ using FlashWeave.Misc
 using FlashWeave.Statfuns
 
 
-# Backend functions for Hiton-PC
+####################################
+## Backend functions for Hiton-PC ##
+####################################
 
 function init_candidates(prev_accepted_dict::NbrStatDict, candidates::Vector{Int},
     candidates_unchecked::Vector{Int})
@@ -168,7 +170,7 @@ function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, 
 
     if isdiscrete(test_name)
         if isempty(levels)
-            levels = get_levels(data)::Vector{DiscType}#map(x -> get_levels(data[:, x]), 1:size(data, 2))::Vector{DiscType}
+            levels = get_levels(data)::Vector{DiscType}
         end
 
         if levels[T] < 2
@@ -267,7 +269,9 @@ function make_final_HitonState(prev_state::HitonState{Int}, PC_dict::NbrStatDict
     HitonState(phase, PC_dict, TPC_dict, unchecked_vars, state_rejections)
 end
 
-# Main function for Hiton-PC
+################################
+## Main function for Hiton-PC ##
+################################
 
 function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscType}=DiscType[], cor_mat::Matrix{ContType}=zeros(ContType);
         test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, max_tests::Int=Int(1.5e9),

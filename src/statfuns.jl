@@ -53,7 +53,6 @@ function pcor(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Abs
 
     @inbounds p = try
         cov_mat = cov(sub_data)
-        #println("$X, $Y, $Zs, $cov_mat")
         inv_mat = pinv(cov_mat)
 
         var_x = inv_mat[1, 1]
@@ -196,12 +195,6 @@ function cor_subset!(data::AbstractMatrix{<:Real}, cor_mat::AbstractMatrix{<:Abs
     n_vars = length(vars)
     """CRITICAL: expects zeros to be trimmed from X and Y in zero-ignoring mode!
     """
-    #if nz
-    #    sub_data = @view data[data[:, vars[2]] .!= 0.0, vars]
-    #else
-    #    sub_data = @view data[:, vars]
-    #end
-    #sub_cors = cor(sub_data)
     sub_data = @view data[:, vars]
     sub_cors = cor(sub_data)
 
@@ -209,7 +202,6 @@ function cor_subset!(data::AbstractMatrix{<:Real}, cor_mat::AbstractMatrix{<:Abs
         X = vars[i]
         for j in i+1:n_vars
             Y = vars[j]
-            #cor_xy = cor(X, Y, data, nz)
             cor_xy = sub_cors[i, j]
             cor_val = isnan(cor_xy) ? 0.0 : cor_xy
             cor_mat[X, Y] = cor_val
@@ -254,7 +246,6 @@ end
 function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer, levels_y::Integer,
         levels_z::Integer, marg_i::AbstractMatrix{<:Integer}, marg_j::AbstractMatrix{<:Integer}, marg_k::AbstractVector{<:Integer})
     """Note: returns mutual information * number of observations!"""
-    #if reset_marginals
     fill!(marg_i, 0)
     fill!(marg_j, 0)
     fill!(marg_k, 0)

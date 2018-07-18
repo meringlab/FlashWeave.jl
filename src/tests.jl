@@ -290,7 +290,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
 
     num_tests_total = 0
     for subset_size in max_k:-1:1
-        Z_combos = combinations(Z_total, subset_size)#isempty(Z_wanted) ? combinations(Z_total, subset_size) : combinations_with_whitelist(Z_total, Z_wanted, subset_size)
+        Z_combos = combinations(Z_total, subset_size)
         num_tests_total += length(Z_combos)
 
         for Zs_arr in Z_combos
@@ -409,13 +409,12 @@ function pw_univar_worker(data::AbstractMatrix{ElType}, test_obj::AbstractTest,
     while true
         try
             X, i, Ys_slice = take!(shared_job_q)
-            
+
             # if kill signal
             if X == -1
-                #put!(shared_result_q, (0, myid()))
                 return
             end
-            
+
             if needs_nz_view(X, data, test_obj)
                 sub_data = @view data[data[:, X] .!= 0, :]
             else
@@ -423,15 +422,15 @@ function pw_univar_worker(data::AbstractMatrix{ElType}, test_obj::AbstractTest,
             end
 
             Ys = collect(Ys_slice)
-            
+
             if isdiscrete(test_obj)
                 test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
             else
                 test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
             end
-            
+
             put!(shared_result_q, (i, test_results))
-            
+
         catch exc
             println("Exception occurred! ", exc)
             println(catch_stacktrace())
@@ -508,22 +507,22 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
                     shared_result_q = RemoteChannel(() -> Channel{Tuple{Int,Vector{TestResult}}}(length(work_items)), 1)
 
                     worker_returns = [@spawnat wid pw_univar_worker(data, test_obj, hps, n_obs_min, shared_job_q, shared_result_q) for wid in workers()]
-                    
+
                     for (i, (X, Y_slice)) in enumerate(work_items)
                         put!(shared_job_q, (X, i, Y_slice))
                     end
-                    
+
                     remaining_jobs = queued_jobs = length(work_items)
                     n_workers = length(workers())
-                    
+
                     test_result_chunks = Array{Vector{TestResult}}(remaining_jobs)
                     while remaining_jobs > 0
                         work_i, job_result = take!(shared_result_q)
                         test_result_chunks[work_i] = job_result
-                        
+
                         remaining_jobs -= 1
                         queued_jobs -= 1
-                        
+
                         if remaining_jobs < n_workers
                             put!(shared_job_q, (-1, 0, 0:1))
                         end
@@ -552,8 +551,6 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
             end
 
         elseif startswith(parallel, "threads")
-            #pvals = fill(NaN64, n_pairs)
-            #stats = fill(NaN64, n_pairs)
             Threads.@threads for work_item in work_items
                 pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_obj, hps, n_obs_min,
                                   correct_reliable_only)
@@ -569,23 +566,6 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
         end
 
         benjamini_hochberg!(pvals, alpha=alpha, m=m)
-        #if correct_reliable_only && any(isnan(x) for x in pvals)
-        #    reliable_mask = .!isnan.(pvals)
-        #    reliable_pvals = pvals[reliable_mask]
-        #    reliable_pvals = benjamini_hochberg(reliable_pvals)
-
-        #    rel_pval_i = 1
-        #    for (i, is_reliable_elem) in enumerate(reliable_mask)
-        #        if is_reliable_elem
-        #            pvals[i] = reliable_pvals[rel_pval_i]
-        #            rel_pval_i += 1
-        #        else
-        #            pvals[i] = NaN64
-        #        end
-        #    end
-        #else
-        #    pvals = benjamini_hochberg(pvals)
-        #end
     end
 
     condensed_stats_to_dict(n_vars, pvals, stats, alpha)

@@ -77,31 +77,6 @@ function compare_graph_results(g1::SimpleWeightedGraph, g2::SimpleWeightedGraph;
 end
 
 
-# For sanity checking
-#max_k = 3
-#parallel = "multi_il"
-#test_name = "fz_nz"
-#make_sparse = true
-
-#time_limit = endswith(parallel, "il") ? 30.0 : 0.0
-#exp_graph = exp_dict["exp_$(test_name)_maxk$(max_k)"]
-
-#graph = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel="single",
-#                     time_limit=0.0)
-
-#graph2 = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel="single_il",
-#                     time_limit=time_limit)
-
-#graph3 = make_network(data, test_name, make_sparse, 64, max_k=max_k, parallel="multi_il",
-#                     time_limit=time_limit)
-
-
-#compare_graph_results(exp_graph, graph, verbose=true)
-#compare_graph_results(exp_graph, graph2, verbose=true, approx=true, approx_nbr_diff=11)
-#compare_graph_results(graph2, graph3, approx=true, verbose=true)
-
-
-
 @testset "main_test_modes" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
         @testset "$test_name" begin
@@ -128,7 +103,7 @@ end
                                     rtol = 1e-2
                                     atol = 0.0
 
-                                    # special case for weird conditional mi behaviour
+                                    # special case for conditional mi
                                     if is_il && test_name == "mi" && max_k == 3
                                         approx_nbr_diff = 22
                                         approx_weight_meandiff = 0.16

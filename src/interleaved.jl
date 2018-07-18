@@ -33,7 +33,6 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
     end
 
     const converged = false
-    #println("data structures: ", map(x -> (size(x), typeof(x)), [data, levels, cor_mat]))
     while true
         try
             target_var, univar_nbrs, prev_state, skip_nbrs = take!(shared_job_q)
@@ -180,7 +179,6 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
             # node is complete
             else
-                #println("MASTER: node complete, updating graph")
                 graph_dict[target_var] = curr_state
 
                 for nbr in keys(curr_state.state_results)
@@ -193,7 +191,6 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                         weight = make_single_weight(curr_state.state_results[nbr]..., all_univar_nbrs[target_var][nbr]..., weight_type, test_name)
 
                         rev_weight = has_edge(output_graph, target_var, nbr) ? output_graph.weights[target_var, nbr] : NaN64
-                        #add_edge!(output_graph, target_var, nbr, edge_merge_fun(weight, rev_weight))
                         sym_weight = edge_merge_fun(weight, rev_weight)
                         output_graph.weights[target_var, nbr] = sym_weight
                         output_graph.weights[nbr, target_var] = sym_weight

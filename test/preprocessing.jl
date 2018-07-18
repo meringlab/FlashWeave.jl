@@ -64,7 +64,8 @@ end
     @test all([compare_nz_vecs(data_norm_fznz[:, i], data_norm_minz[:, i]) for i in size(data_norm_fznz, 2)])
 end
 
-### Gold-standard generation part
+# to create expected output
+
 # data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 #
 #

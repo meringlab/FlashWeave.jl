@@ -48,7 +48,6 @@ end
     @testset "twoway" begin
         @test isapprox(FlashWeave.Statfuns.mutual_information(ctab12), exp_mi_twoway, rtol=1e-6)
     end
-    # threeway tests should be improved to incorporate non-zero mi
     @testset "threeway_Z1" begin
         @test isapprox(FlashWeave.Statfuns.mutual_information(ctab12_3), 0.0, rtol=1e-6)
     end

@@ -16,17 +16,24 @@ using FlashWeave.Preclustering
 function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit::AbstractFloat, parallel::String,
     feed_forward::Bool, max_k::Integer, n_obs_min::Integer, hps::Integer, fast_elim::Bool,
     recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
-    output_folder::AbstractString)  where {ElType<:Real}
+    output_folder::AbstractString, precluster_sim::AbstractFloat, edge_rule::AbstractString)  where {ElType<:Real}
 
     !isempty(tmp_folder) && warn("tmp_folder currently not implemented")
+    if precluster_sim != 0.0
+        warn("preclustering currently disabled (insufficiently tested)")
+        precluster_sim = 0.0
+    end
 
-    #if !workers_all_local() && isempty(tmp_folder)
-    #    if !isempty(output_folder)
-    #        tmp_folder = output_folder
-    #    else
-    #        warn("For faster distributed data sharing provide 'tmp_folder' or 'output_folder'")
-    #    end
-    #end
+    if edge_rule != "OR"
+        if edge_rule == "AND"
+            warn("AND rule currently disabled (insufficiently tested)")
+        else
+            warn("edge_rule $(edge_rule) not a valid option, setting it to OR")
+        end
+
+        edge_rule = "OR"
+    end
+
 
     if time_limit == -1.0
         if parallel == "multi_il"
@@ -42,11 +49,6 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     elseif parallel == "multi_il" && time_limit == 0.0 && feed_forward
         warn("Specify 'time_limit' when using interleaved parallelism to potentially increase speed.")
     end
-
-    #if time_limit != 0.0 && !fast_elim
-    #    warn("Setting fast_elim to true because time_limit has been specified")
-    #    fast_elim = true
-    #end
 
     disc_type = Int32
     cont_type = Float32
@@ -79,7 +81,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         verbose && println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
     end
 
-    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder
+    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, precluster_sim, edge_rule
 end
 
 
@@ -177,7 +179,6 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     end
 
     if nonsparse_cond && !endswith(parallel, "il")
-        #data = full(data)
         warn("nonsparse_cond currently not implemented")
     end
 
@@ -265,32 +266,35 @@ end
 
 
 function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
-    hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(10e6), convergence_threshold::AbstractFloat=0.01, FDR::Bool=true,
-    parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true, precluster_sim::AbstractFloat=0.0,
+    hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(10e6), convergence_threshold::AbstractFloat=0.01,
+    FDR::Bool=true, parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true,
+    precluster_sim::AbstractFloat=0.0,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
-    verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="", output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Void}=nothing,
-    tmp_folder::AbstractString="",
-    debug::Integer=0, time_limit::AbstractFloat=-1.0, header::AbstractVector{String}=String[],
-    recursive_pcor::Bool=true, cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, cluster_mode::AbstractString="greedy",
-    all_univar_nbrs=nothing) where {ElType<:Real}
+    verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="",
+    output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Void}=nothing,
+    tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
+    header::AbstractVector{String}=String[], recursive_pcor::Bool=true, cache_pcor::Bool=false,
+    correct_reliable_only::Bool=true, feed_forward::Bool=true, track_rejections::Bool=false,
+    cluster_mode::AbstractString="greedy", all_univar_nbrs=nothing) where {ElType<:Real}
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
     fast_elim: currently always on
     """
-    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder = prepare_lgl(data, test_name,
+    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, precluster_sim, edge_rule =
+                                                                              prepare_lgl(data, test_name,
                                                                                           time_limit, parallel,
-                                                                                          feed_forward, max_k, n_obs_min, hps, 
+                                                                                          feed_forward, max_k, n_obs_min, hps,
                                                                                           fast_elim,
                                                                                           recursive_pcor, verbose,
-                                                                                          tmp_folder, output_folder)
+                                                                                          tmp_folder, output_folder,
+                                                                                          precluster_sim, edge_rule)
 
-    hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min, :max_tests => max_tests,
-                  :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
-                  :weight_type => weight_type, :debug => debug,
-                  :time_limit => time_limit, :track_rejections => track_rejections, :cache_pcor => cache_pcor)
-    
+    hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min,
+                        :max_tests => max_tests, :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
+                        :weight_type => weight_type, :debug => debug, :time_limit => time_limit,
+                        :track_rejections => track_rejections, :cache_pcor => cache_pcor)
+
     if all_univar_nbrs == nothing
         target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min,
                                                               FDR, levels, parallel, cor_mat,
@@ -300,16 +304,12 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
     end
 
-    target_vars, all_univar_nbrs, clust_dict, clust_var_dict, levels = make_preclustering(precluster_sim, data, target_vars, cor_mat,
-                                                                                          levels, test_name, all_univar_nbrs,
-                                                                                          cluster_mode, verbose)
-
     interleaved_kwargs = Dict(:update_interval => update_interval, :convergence_threshold => convergence_threshold,
                                   :feed_forward => feed_forward, :edge_rule => edge_rule, :edge_merge_fun => edge_merge_fun,
                                   :workers_local => workers_all_local(), :output_folder => output_folder,
                                   :output_interval => output_interval)
 
-    nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data, 
+    nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data,
                                                                       all_univar_nbrs, levels,
                                                                       cor_mat, parallel,
                                                                       recursive_pcor,
@@ -320,11 +320,6 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     if verbose
         println("Postprocessing..")
         tic()
-    end
-
-    if precluster_sim != 0.0
-        nbr_dict, all_univar_nbrs, rej_dict = map_clusters_to_variables(nbr_dict, all_univar_nbrs, rej_dict, clust_var_dict, 
-                                                                        track_rejections)
     end
 
     weights_dict = Dict{Int,Dict{Int,Float64}}()
