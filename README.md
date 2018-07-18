@@ -27,11 +27,21 @@ julia> data_path = "/my/example/data.tsv"
 julia> meta_data_path = "/my/example/meta_data.tsv"
 julia> netw_results = learn_network(data_path, meta_data=meta_data_path, sensitive=true, heterogeneous=false, max_k=3)
 ```
+Results can currently be saved in Julia-specific JLD (".jld") or as edgelist (".edgelist") format:
 
+```julia
+julia> save("/my/example/network_output.jld", netw_results)
+julia> ## or: save("/my/example/network_output.edgelist", netw_results)
+```
+For detailed output of additional information, such as discarding sets, you can specify the "detailed" flag:
+
+```julia
+julia> save("/my/example/network_output.jld", netw_results, detailed=true)
+```
 
 ## Parallel computing ##
 
-FlashWeave leverages Julia's built-in parallel infrastructure (https://docs.julialang.org/en/stable/manual/parallel-computing/). In the most simple case, you can just start julia with several workers
+FlashWeave leverages Julia's built-in [parallel infrastructure](https://docs.julialang.org/en/stable/manual/parallel-computing/). In the most simple case, you can start julia with several workers
 
 ```bash
 julia -p 4 # for 4 workers
@@ -50,7 +60,7 @@ If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManag
 
 ```julia
 julia> using ClusterManagers
-julia> addprocs_qrsh(20)
+julia> addprocs_qrsh(20) # 20 remote workers
 julia> ## for more fine-grained control: addprocs(QRSHManager(20, "<your queue>"), qsub_env="<your environment>", params=Dict(:res_list=>"<requested resources>"))
 
 julia> # or
