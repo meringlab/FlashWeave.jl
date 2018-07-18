@@ -16,16 +16,20 @@ Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
 
 ## Basic usage ##
 
-OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), HDF5 (".h5") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statiscal and machine-learning applications, but in contrast to some other microbiome analysis frameworks!
+OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), HDF5 (".h5") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statiscal and machine-learning applications, but in contrast to several other microbiome analysis frameworks!
 
-To learn an interaction network, you can then do
+To learn an interaction network, you can do
 
 ```julia
 julia> using FlashWeave # this has some pre-compilation delay the first time it's called, subsequent imports are fast
 
 julia> data_path = "/my/example/data.tsv"
 julia> meta_data_path = "/my/example/meta_data.tsv"
-julia> netw_results = learn_network(data_path, meta_data=meta_data_path, sensitive=true, heterogeneous=false, max_k=3)
+julia> netw_results = learn_network(data_path, meta_data=meta_data_path, sensitive=true, heterogeneous=false)
+
+julia> # for HDF5, provide keys:
+julia> # data_path = "/my/example/data.h5"
+julia> # netw_results = learn_network(data_path, data_key="otu_table", meta_key="meta_data_table", sensitive=true, heterogeneous=false)
 ```
 Results can currently be saved in Julia-specific JLD (".jld") or as edgelist (".edgelist") format:
 
@@ -33,7 +37,7 @@ Results can currently be saved in Julia-specific JLD (".jld") or as edgelist (".
 julia> save("/my/example/network_output.jld", netw_results)
 julia> ## or: save("/my/example/network_output.edgelist", netw_results)
 ```
-For detailed output of additional information, such as discarding sets, you can specify the "detailed" flag:
+For output of additional information (if available), such as discarding sets, you can specify the "detailed" flag:
 
 ```julia
 julia> save("/my/example/network_output.jld", netw_results, detailed=true)
@@ -68,4 +72,4 @@ julia> # or
 julia> addprocs_sge(20)
 julia> ## addprocs_sge(5, queue="<your queue>", qsub_env="<your environment>", res_list="<requested resources>")
 ```
-Please refer to the *ClusterManagers.jl* documentation for further details.
+Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaParallel/ClusterManagers.jl) for further details.
