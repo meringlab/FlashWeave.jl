@@ -1,18 +1,3 @@
-module Interleaved
-
-using LightGraphs
-using SimpleWeightedGraphs
-using DataStructures
-
-using FlashWeave.Misc
-using FlashWeave.Io
-using FlashWeave.Types
-using FlashWeave.Hiton
-using FlashWeave.StackChannels
-
-export interleaved_backend
-
-
 function save_latest_graph(output_graph, output_folder, temp_output_type, verbose)
     if temp_output_type == "single"
         curr_out_path = joinpath(output_folder, "latest_network.edgelist")
@@ -308,6 +293,4 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
     end
 
     graph_dict
-end
-
 end

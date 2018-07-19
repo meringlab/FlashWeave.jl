@@ -1,20 +1,6 @@
-module Tests
-
-export test, test_subsets, issig, pw_univar_neighbors
-
-using Combinatorics
-using DataStructures
-
-using FlashWeave.Types
-using FlashWeave.Misc
-using FlashWeave.Statfuns
-using FlashWeave.Contingency
-
-
 function issig(test_res::TestResult, alpha::AbstractFloat)
     test_res.pval < alpha && test_res.suff_power == true
 end
-
 
 sufficient_power(levels_x::Integer, levels_y::Integer, n_obs::Integer, hps::Integer) = (n_obs / (levels_x * levels_y)) > hps
 sufficient_power(levels_x::Integer, levels_y::Integer, levels_z::Integer, n_obs::Integer, hps::Integer) = (n_obs / (levels_x * levels_y * levels_z)) > hps
@@ -244,7 +230,7 @@ function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Abs
 
     df = 0
 
-    Misc.TestResult(p_stat, pval, df, n_obs >= n_obs_min)
+    TestResult(p_stat, pval, df, n_obs >= n_obs_min)
 end
 
 # convenience function for module tests
@@ -569,7 +555,4 @@ function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:Abstract
     end
 
     condensed_stats_to_dict(n_vars, pvals, stats, alpha)
-end
-
-
 end

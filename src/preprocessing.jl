@@ -1,12 +1,3 @@
-module Preprocessing
-
-export preprocess_data, preprocess_data_default
-
-using StatsBase
-using FlashWeave.Misc
-using FlashWeave.Learning
-
-
 function mapslices_sparse_nz(f, A::SparseMatrixCSC, dim::Integer=1)
     if dim == 1
         A = A'
@@ -573,12 +564,10 @@ function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String
 end
 
 
-function normalize(data::AbstractMatrix{ElType}, test_name::AbstractString; env_cols::Vector{Int}=Int[],
+function normalize_data(data::AbstractMatrix{ElType}, test_name::AbstractString; env_cols::Vector{Int}=Int[],
      header::Vector{String}=String[], verbose::Bool=false, prec::Integer=32) where ElType <: Real
     T = eval(Symbol("Float$prec"))
     MatType = issparse(data) ? SparseMatrixCSC{T, eval(Symbol("Int$prec"))} : Matrix{T}
     data = convert(MatType, data)
     preprocess_data_default(data, test_name; env_cols=env_cols, header=header, verbose=verbose)
-end
-
 end

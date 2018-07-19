@@ -2,7 +2,17 @@ __precompile__()
 
 module FlashWeave
 
-using Iterators
+# data structures
+using DataStructures
+using LightGraphs, SimpleWeightedGraphs
+
+# statistics
+using StatsBase, Distributions, Combinatorics
+using Clustering
+
+# IO
+#using JLD2, FileIO, JSON, HDF5
+
 
 include("types.jl")
 include("io.jl")
@@ -17,9 +27,10 @@ include("interleaved.jl")
 include("learning.jl")
 include("preprocessing.jl")
 
-using FlashWeave.Learning
-using FlashWeave.Preprocessing
-
-export learn_network, normalize, save_network, load_network, load_data
+export learn_network,
+       normalize_data,
+       save_network,
+       load_network,
+       load_data
 
 end

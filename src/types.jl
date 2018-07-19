@@ -1,16 +1,3 @@
-module Types
-
-using DataStructures
-using SimpleWeightedGraphs
-using Combinatorics
-
-export NbrStatDict, PairMeanObj, PairCorObj,
-       AbstractTest, AbstractContTest, AbstractCorTest, ContTest2D, ContTest3D, AbstractNz, Nz, NoNz,
-       MiTest, MiTestCond, FzTest, FzTestCond, TestResult,
-       reset!, is_zero_adjusted, isdiscrete, iscontinuous,
-       RejDict, HitonState, LGLResult, combinations_with_whitelist
-
-
 #####################
 ## AUXILLARY TYPES ##
 #####################
@@ -212,6 +199,4 @@ function combinations_with_whitelist(a::AbstractVector{T}, wl::AbstractVector{T}
         end
     end
     CombinationsWL(combinations(a_wl, t), wl_set)
-end
-
 end

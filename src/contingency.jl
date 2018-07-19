@@ -1,11 +1,3 @@
-module Contingency
-
-export contingency_table!, contingency_table
-
-using FlashWeave.Misc
-using FlashWeave.Types
-
-
 function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, cont_tab::Matrix{<:Integer})
     """2x2"""
     fill!(cont_tab, 0)
@@ -100,7 +92,6 @@ function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:I
     sparse_ctab_backend!((X, Y, Zs...), data, test_obj, X_nz, Y_nz)
 end
 
-using FlashWeave.Types
 
 function make_zmap_expression(col_type::Type{NTuple{N,Int}}) where N
     map_expr = quote
@@ -312,7 +303,4 @@ end
     end
 
     expr
-end
-
-
 end

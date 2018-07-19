@@ -9,10 +9,11 @@ adj_exp_dict = load(joinpath("data", "learning_expected.jld2"))
 
 exp_dict = Dict(key=>SimpleWeightedGraph(adj_mat) for (key, adj_mat) in adj_exp_dict)
 
+
 function make_network(data, test_name, make_sparse=false, prec=64, verbose=false; kwargs...)
-    data_norm = FlashWeave.Preprocessing.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
+    data_norm = FlashWeave.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
     kwargs_dict = Dict(kwargs)
-    graph_res = FlashWeave.Learning.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
+    graph_res = FlashWeave.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
     graph_res.graph
 end
 
@@ -128,6 +129,7 @@ end
         end
     end
 end
+
 
 @testset "precision_32" begin
     for (test_name, make_sparse) in [("mi_nz", true), ("fz", false)]

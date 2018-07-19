@@ -1,5 +1,4 @@
 using FlashWeave
-#using DataFrames
 using Base.Test
 
 ctab12 = [4 2; 2 4]
@@ -23,22 +22,22 @@ data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[
 
 
 @testset "correlation" begin
-    data_clr = FlashWeave.Preprocessing.preprocess_data_default(data, "fz", verbose=false,
+    data_clr = FlashWeave.preprocess_data_default(data, "fz", verbose=false,
     prec=64)
     exp_pcor_Z1 = -0.16393307352649364
     cor_mat = cor(data_clr)
     @testset "pcor_Z1" begin
-        @test isapprox(FlashWeave.Statfuns.pcor(1, 16, (41,), data_clr), exp_pcor_Z1, rtol=1e-6)
-        @test isapprox(FlashWeave.Statfuns.pcor_rec(1, 16, (41,), cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z1, rtol=1e-6)
+        @test isapprox(FlashWeave.pcor(1, 16, (41,), data_clr), exp_pcor_Z1, rtol=1e-6)
+        @test isapprox(FlashWeave.pcor_rec(1, 16, (41,), cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z1, rtol=1e-6)
     end
     exp_pcor_Z3 = -0.07643814205965811
     @testset "pcor_Z3" begin
-        @test isapprox(FlashWeave.Statfuns.pcor(31, 21, (7, 14, 18), data_clr), exp_pcor_Z3, rtol=1e-6)
-        @test isapprox(FlashWeave.Statfuns.pcor_rec(31, 21, (7, 14, 18), cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z3, rtol=1e-6)
+        @test isapprox(FlashWeave.pcor(31, 21, (7, 14, 18), data_clr), exp_pcor_Z3, rtol=1e-6)
+        @test isapprox(FlashWeave.pcor_rec(31, 21, (7, 14, 18), cor_mat, Dict{String,Dict{String,Float64}}()), exp_pcor_Z3, rtol=1e-6)
     end
     @testset "pval_fz" begin
-        @test isapprox(FlashWeave.Statfuns.fz_pval(exp_pcor_Z1, 351, 1), 0.0020593283914246987, rtol=1e-6)
-        @test isapprox(FlashWeave.Statfuns.fz_pval(exp_pcor_Z3, 351, 3), 0.1548665431407692, rtol=1e-6)
+        @test isapprox(FlashWeave.fz_pval(exp_pcor_Z1, 351, 1), 0.0020593283914246987, rtol=1e-6)
+        @test isapprox(FlashWeave.fz_pval(exp_pcor_Z3, 351, 3), 0.1548665431407692, rtol=1e-6)
     end
 end
 
@@ -46,16 +45,16 @@ end
 @testset "mutual information" begin
     exp_mi_twoway = 0.05663301226513242
     @testset "twoway" begin
-        @test isapprox(FlashWeave.Statfuns.mutual_information(ctab12), exp_mi_twoway, rtol=1e-6)
+        @test isapprox(FlashWeave.mutual_information(ctab12), exp_mi_twoway, rtol=1e-6)
     end
     @testset "threeway_Z1" begin
-        @test isapprox(FlashWeave.Statfuns.mutual_information(ctab12_3), 0.0, rtol=1e-6)
+        @test isapprox(FlashWeave.mutual_information(ctab12_3), 0.0, rtol=1e-6)
     end
     @testset "threeway_Z2" begin
-        @test isapprox(FlashWeave.Statfuns.mutual_information(ctab12_34), 0.0, rtol=1e-6)
+        @test isapprox(FlashWeave.mutual_information(ctab12_34), 0.0, rtol=1e-6)
     end
     @testset "pval_mi" begin
-        @test isapprox(FlashWeave.Statfuns.mi_pval(exp_mi_twoway, 1, 351), 2.8770005665168745e-10, rtol=1e-6)
+        @test isapprox(FlashWeave.mi_pval(exp_mi_twoway, 1, 351), 2.8770005665168745e-10, rtol=1e-6)
     end
 end
 
@@ -64,7 +63,7 @@ end
     pvals_fdr = [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.786488, 1.0, 0.005, 0.113231]
 
     pvals_fdr_pred = copy(pvals)
-    FlashWeave.Statfuns.benjamini_hochberg!(pvals_fdr_pred)
+    FlashWeave.benjamini_hochberg!(pvals_fdr_pred)
     @test all((pvals_fdr_pred .< 0.01) .== (pvals_fdr .< 0.01))
     sig_mask = pvals_fdr_pred .< 0.01
     @test isapprox(pvals_fdr_pred[sig_mask], pvals_fdr[sig_mask], rtol=1e-6)

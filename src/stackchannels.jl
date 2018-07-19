@@ -1,10 +1,6 @@
 # modified from standard queue Channel definition provided by Julia
 
-module StackChannels
-
-export StackChannel, put!, take!, wait, fetch, close, isready
-
-import Base: put!, take!, push!, fetch, shift!, show, isready, wait
+import Base: put!, take!, push!, fetch, shift!, show, isready, wait, eltype, close, next
 
 const DEF_CHANNEL_SZ=32
 
@@ -121,5 +117,3 @@ end
 next{T}(c::StackChannel{T}, state) = (v=get(state[]); state[]=nothing; (v, state))
 
 iteratorsize{C<:StackChannel}(::Type{C}) = SizeUnknown()
-
-end

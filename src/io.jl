@@ -1,12 +1,5 @@
-module Io
-
-using LightGraphs, SimpleWeightedGraphs
-using JLD2, FileIO
-using JSON, HDF5
-
-using FlashWeave.Types
-
-export load_data, save_network, load_network
+# note: needed lots of @eval and Base.invokelatest hacks for conditional
+# module loading
 
 const valid_net_formats = (".edgelist", ".jld2")
 const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2")
@@ -35,7 +28,8 @@ function save_network(out_path::AbstractString, net_result::LGLResult; detailed=
     if file_ext == ".edgelist"
         write_edgelist(out_path, net_result.graph)
     elseif file_ext == ".jld2"
-        save(out_path, "results", net_result)
+        isdefined(:FileIO) || @eval using FileIO: save, load
+        Base.invokelatest(save, out_path, "results", net_result)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_net_formats)")
     end
@@ -53,7 +47,9 @@ function load_network(net_path::AbstractString)
         G = read_edgelist(net_path)
         net_result = LGLResult(G)
     elseif file_ext == ".jld2"
-        net_result = load(net_path)["results"]
+        isdefined(:FileIO) || @eval using FileIO: save, load
+        d = Base.invokelatest(load, net_path)
+        net_result = d["results"]
     else
         error("$(file_ext) not a valid network format. Valid formats are $(valid_net_formats)")
     end
@@ -66,7 +62,8 @@ end
 
 function load_jld(data_path::AbstractString, data_key::AbstractString, header_key::AbstractString,
      meta_key=nothing, meta_header_key=nothing)
-     d = load(data_path)
+     isdefined(:FileIO) || @eval using FileIO: save, load
+     d = Base.invokelatest(load, data_path)
 
      data = d[data_key]
      header = d[header_key]
@@ -127,10 +124,12 @@ end
 
 function load_biom(data_path, meta_path=nothing)
     data, header = try
-        load_biom_hdf5(data_path)
+        isdefined(:HDF5) || @eval using HDF5
+        Base.invokelatest(load_biom_hdf5, data_path)
     catch
         try
-            load_biom_json(data_path)
+            isdefined(:JSON) || @eval using JSON
+            Base.invokelatest(load_biom_json, data_path)
         catch
             error("file $data_path is not valid .biom")
         end
@@ -231,6 +230,4 @@ function read_edgelist(in_path::AbstractString; header=nothing)
         end
     end
     SimpleWeightedGraph(srcs, dsts, ws)
-end
-
 end

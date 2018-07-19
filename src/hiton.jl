@@ -1,14 +1,3 @@
-module Hiton
-
-export si_HITON_PC
-
-using DataStructures
-using FlashWeave.Tests
-using FlashWeave.Types
-using FlashWeave.Misc
-using FlashWeave.Statfuns
-
-
 ####################################
 ## Backend functions for Hiton-PC ##
 ####################################
@@ -385,5 +374,4 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
     end
 
     return make_final_HitonState(prev_state, PC_dict, TPC_dict, rej_dict)
-end
 end

@@ -21,13 +21,13 @@ To learn an interaction network, you can do
 ```julia
 julia> using FlashWeave # this has some pre-compilation delay the first time it's called, subsequent imports are fast
 
-julia> data_path = "/my/example/data.tsv"
+julia> data_path = "/my/example/data.tsv" # or .csv, .biom
 julia> meta_data_path = "/my/example/meta_data.tsv"
 julia> netw_results = learn_network(data_path, meta_data=meta_data_path, sensitive=true, heterogeneous=false)
 
 julia> # for JLD2, you can provide keys:
 julia> # data_path = "/my/example/data.jld2"
-julia> # netw_results = learn_network(data_path, data_key="otu_table", meta_key="meta_data_table", sensitive=true, heterogeneous=false)
+julia> # netw_results = learn_network(data_path, data_key="data", data_header_key="header" meta_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
 
 Results can currently be saved in fast JLD2 (".jld2") or as traditional edgelist (".edgelist") format:
@@ -80,3 +80,6 @@ julia> ## addprocs_sge(5, queue="<your queue>", qsub_env="<your environment>", r
 ```
 
 Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaParallel/ClusterManagers.jl) for further details.
+
+## Versioning and API ##
+FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered subject to sudden change.

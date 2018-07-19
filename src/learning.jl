@@ -1,18 +1,3 @@
-module Learning
-
-export LGL, learn_network
-
-using DataStructures
-using StatsBase
-
-using FlashWeave.Tests
-using FlashWeave.Types
-using FlashWeave.Misc
-using FlashWeave.Hiton
-using FlashWeave.Interleaved
-using FlashWeave.Preclustering
-
-
 function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit::AbstractFloat, parallel::String,
     feed_forward::Bool, max_k::Integer, n_obs_min::Integer, hps::Integer, fast_elim::Bool,
     recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
@@ -342,7 +327,7 @@ end
 
 function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true, heterogeneous::Bool=false,
                        maxk::Integer=3, alpha::AbstractFloat=0.01, hps::Integer=5,
-                       normalize_data::Bool=true, verbose::Bool=true, lgl_kwargs...) where {ElType<:Real}
+                       normalize::Bool=true, verbose::Bool=true, lgl_kwargs...) where {ElType<:Real}
 
     start_time = time()
 
@@ -372,7 +357,8 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true, hetero
                      :parallel=>parallel_mode)
     merge!(params_dict, lgl_kwargs)
 
-    lgl_results = LGL(data; params_dict...)
+    input_data = normalize ? normalize_data(data, test_name) : data
+    lgl_results = LGL(input_data; params_dict...)
 
     time_taken = time() - start_time()
 
@@ -381,6 +367,4 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true, hetero
     stats_dict = Dict(:time_taken=>time_taken, :converged=>!isempty(lgl_results.unfinished_states))
     meta_dict = Dict("params"=>params_dict, "stats"=>stats_dict)
     lgl_results, meta_dict
-end
-
 end

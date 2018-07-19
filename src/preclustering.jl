@@ -1,13 +1,3 @@
-module Preclustering
-
-using StatsBase
-using Clustering
-using DataStructures
-
-using FlashWeave.Tests
-
-export pw_unistat_matrix, cluster_data
-
 function pw_unistat_matrix{T,ElType<:Real}(data::AbstractMatrix{ElType}, test_name::String; parallel::String="single",
         pw_stat_dict::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}=Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}(),
     pw_uni_args::Dict{Symbol,T}=Dict{Symbol,Any}(), unsig_is_na::Bool=true)
@@ -31,14 +21,34 @@ function pw_unistat_matrix{T,ElType<:Real}(data::AbstractMatrix{ElType}, test_na
     stat_mat
 end
 
+
+function cluster_hierarchical(dist_mat, data, cluster_sim_threshold)
+    clust_dict = Dict{Int,Set{Int}}()
+    clust_obj = hclust(dist_mat, :average)
+    clusts = cutree(clust_obj, h=1.0 - cluster_sim_threshold)
+
+    var_sizes = sum(data, 1)
+
+    for clust_id in unique(clusts)
+        clust_members = findn(clusts .== clust_id)
+        if length(clust_members) > 1
+            clust_sizes = @view var_sizes[clust_members]
+            clust_repres = clust_members[findmax(clust_sizes)[2]]
+        else
+            clust_repres = clust_members[1]
+        end
+        clust_dict[clust_repres] = Set(clust_members)
+    end
+    clust_dict
+end
+
+
 function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::String="fz";
         cluster_sim_threshold::AbstractFloat=0.8, parallel="single",
     ordering="size", sim_mat::Matrix{Float64}=zeros(Float64, 0, 0), verbose::Bool=false, greedy::Bool=true,
     pw_uni_args::Dict{Symbol,T}=Dict{Symbol,Any}(), unsig_is_na::Bool=true)
 
-    if verbose
-        println("Computing pairwise similarities")
-    end
+    verbose && println("Computing pairwise similarities")
 
     if !greedy && unsig_is_na
         warn("Hierarchical clustering currently doesn't support NA values, assuming them to be max distance.")
@@ -50,14 +60,14 @@ function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::S
     end
 
     if stat_type == "mi"
-        if verbose
-            println("Computing entropies")
-        end
+        verbose && println("Computing entropies")
 
         # can potentially be improved by pre-allocation
         entrs = mapslices(x -> entropy(counts(x) ./ length(x)), data, 1)
+
     elseif stat_type == "mi_nz"
         nz_mask = data .!= 0
+
     elseif startswith(stat_type, "fz")
         sim_mat = abs.(sim_mat)
     end
@@ -76,14 +86,10 @@ function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::S
         var_order = 1:size(data, 2)
     end
 
-    if verbose
-        println("Clustering")
-    end
+    verbose && println("Clustering")
 
     if !greedy
-        if verbose
-            println("\tConverting similarities to normalized distances")
-        end
+        verbose && println("\tConverting similarities to normalized distances")
         dist_mat = similar(sim_mat)
     end
 
@@ -144,28 +150,10 @@ function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::S
     end
 
     if !greedy
-        if verbose
-            println("\tComputing hierarchical clusters")
-        end
-
-        clust_obj = hclust(dist_mat, :average)
-        clusts = cutree(clust_obj, h=1.0 - cluster_sim_threshold)
-
-        var_sizes = sum(data, 1)
-
-        for clust_id in unique(clusts)
-            clust_members = findn(clusts .== clust_id)
-            if length(clust_members) > 1
-                clust_sizes = @view var_sizes[clust_members]
-                clust_repres = clust_members[findmax(clust_sizes)[2]]
-            else
-                clust_repres = clust_members[1]
-            end
-            clust_dict[clust_repres] = Set(clust_members)
-        end
+        verbose && println("\tComputing hierarchical clusters")
+        isdefined(:Clustering) || @eval using Clustering
+        clust_dict = cluster_hierarchical(dist_mat, data, cluster_sim_threshold)
     end
 
     (sort(collect(keys(clust_dict))), clust_dict)
-end
-
 end

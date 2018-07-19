@@ -1,17 +1,4 @@
-module Statfuns
-
-export cor_nz, pcor, pcor_rec, cor_subset!,
-       fz_pval, mutual_information, mi_pval,
-       adjust_df, oddsratio, nz_adjust_cont_tab,
-       benjamini_hochberg!
-
 import Base:cor
-
-using Distributions
-
-using FlashWeave.Types
-using FlashWeave.Misc
-
 
 function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
     sample_factor = n - len_z - 3
@@ -373,7 +360,4 @@ function benjamini_hochberg!{T <: AbstractFloat}(pvals::AbstractVector{T};
     for (i, pval) in sorted_pval_pairs
         pvals[i] = pval
     end
-end
-
-
 end

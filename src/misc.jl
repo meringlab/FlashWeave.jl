@@ -1,22 +1,4 @@
-module Misc
-
-using LightGraphs
-using SimpleWeightedGraphs
-using StatsBase
-using Combinatorics
-using DataStructures
-
-
-using FlashWeave.Types
-
-export make_test_object, get_levels, stop_reached, needs_nz_view, signed_weight,
-       workers_all_local, make_cum_levels!, make_cum_levels, level_map!,
-       print_network_stats, maxweight, make_symmetric_graph, map_edge_keys,
-       make_single_weight, make_weights, write_edgelist, read_edgelist, iter_apply_sparse_rows!,
-       make_chunks, work_chunker
-
 const inf_weight = 708.3964185322641
-
 
 function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool; max_k::Integer=0,
         levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), cache_pcor::Bool=true)
@@ -342,7 +324,7 @@ function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMat
                 x_row_ind = n_rows + 1
             end
         else
-            x_entry = zero(eltype(data))
+            x_entry = zero(ElType)
             skip_row = x_nzadj
         end
 
@@ -358,7 +340,7 @@ function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMat
                 y_row_ind = n_rows + 1
             end
         else
-            y_entry = zero(eltype(data))
+            y_entry = zero(ElType)
             skip_row = y_nzadj
         end
 
@@ -376,5 +358,3 @@ end
 
 make_chunks(a::AbstractVector, chunk_size, offset) = (i:min(maximum(a), i + chunk_size - 1) for i in offset+1:chunk_size:maximum(a))
 work_chunker(n_vars, chunk_size=1000) = ((X, Y_slice) for X in 1:n_vars-1 for Y_slice in make_chunks(X+1:n_vars, chunk_size, X))
-
-end
