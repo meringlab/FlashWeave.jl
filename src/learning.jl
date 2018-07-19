@@ -237,7 +237,9 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
 
         if track_rejections
             for (target_var, nbr_state) in nbr_results_dict
-                rej_dict[target_var] = nbr_state.state_rejections
+                if !isempty(nbr_state.state_rejections)
+                    rej_dict[target_var] = nbr_state.state_rejections
+                end
             end
         end
 

@@ -61,7 +61,8 @@ function prepare_nzdata(T::Int, data::AbstractMatrix{ElType}, test_obj::Abstract
 end
 
 
-function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg{Int64,N} where N<:Int}, candidate::Int, accepted::Vector{Int},
+function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg{Int64,N} where N<:Int}, candidate::Int,
+     accepted::Vector{Int},
      accepted_dict::NbrStatDict, alpha::AbstractFloat, debug::Integer, rej_dict::RejDict{Int}, track_rejections::Bool,
      phase::Char, fast_elim::Bool, num_test_pair::Tuple{Int, Float64})
 
@@ -84,7 +85,8 @@ function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg
      end
  end
 
-function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, accepted::Vector{Int}, accepted_dict::NbrStatDict,
+function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, accepted::Vector{Int},
+     accepted_dict::NbrStatDict,
     test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer, n_obs_min::Integer, max_tests::Integer, debug::Integer, rej_dict::RejDict{Int},
     track_rejections::Bool, z::Vector{DiscType}, phase::Char, fast_elim::Bool)  where {ElType<:Real, DiscType<:Integer}
 

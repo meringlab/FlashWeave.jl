@@ -1,7 +1,6 @@
 # FlashWeave
 
-FlashWeave predicts ecological interactions between microbes from large-scale abundance data (i.e. OTU tables constructed from sequencing data) through statistical co-occurrence. It reports direct associations, corrected for bystander effects and other confounders, and can furthermore integrate environmental or technical factors into the analysis of microbial systems.
-
+FlashWeave predicts ecological interactions between microbes from large-scale compositional abundance data (i.e. OTU tables constructed from sequencing data) through statistical co-occurrence. It reports direct associations, corrected for bystander effects and other confounders, and can furthermore integrate environmental or technical factors into the analysis of microbial systems.
 
 ## Installation ##
 
@@ -13,10 +12,9 @@ In an interactive Julia session, you can then install FlashWeave via
 Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
 ```
 
-
 ## Basic usage ##
 
-OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), Julia-specific JLD2 (".jld2") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables) for delimited and JLD2 formats, consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks.
+OTU tables can be provided in several formats: delimited formats (".csv", ".tsv") or the high-performance formats [BIOM](http://biom-format.org/documentation/format_versions/biom-2.0.html) (".biom") and [JLD2](https://github.com/simonster/JLD2.jl) (".jld2"). Meta data should be provided as delimited format. IMPORTANT NOTE: For delimited and JLD2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks.
 
 To learn an interaction network, you can do
 
@@ -31,17 +29,24 @@ julia> # for JLD2, you can provide keys:
 julia> # data_path = "/my/example/data.jld2"
 julia> # netw_results = learn_network(data_path, data_key="otu_table", meta_key="meta_data_table", sensitive=true, heterogeneous=false)
 ```
-Results can currently be saved in JLD (".jld2") or as edgelist (".edgelist") format:
+
+Results can currently be saved in fast JLD2 (".jld2") or as traditional edgelist (".edgelist") format:
 
 ```julia
 julia> save_network("/my/example/network_output.jld2", netw_results)
 julia> ## or: save_network("/my/example/network_output.edgelist", netw_results)
 ```
-For output of additional information (if available), such as discarding sets, in separate files you can specify the "detailed" flag:
+
+For output of additional information (such as discarding sets, if available) in separate files you can specify the "detailed" flag:
 
 ```julia
 julia> save_network("/my/example/network_output.jld2", netw_results, detailed=true)
 ```
+
+A convenient loading function is available:
+ ```julia
+ julia> load_network("/my/example/network_output.jld2")
+ ```
 
 ## Parallel computing ##
 
@@ -58,6 +63,7 @@ julia> addprocs(4)
 julia> using FlashWeave
 julia> learn_network(...
 ```
+
 and network learning will be parallelized in a shared-memory, multi-process fashion.
 
 If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` can be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package). Details differ depending on the setup (queueing system, resource requirements, ...), but a simple example for a Sun Grid Engine (SGE) system would be:
@@ -72,4 +78,5 @@ julia> # or
 julia> addprocs_sge(20)
 julia> ## addprocs_sge(5, queue="<your queue>", qsub_env="<your environment>", res_list="<requested resources>")
 ```
+
 Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaParallel/ClusterManagers.jl) for further details.
