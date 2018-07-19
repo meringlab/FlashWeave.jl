@@ -16,7 +16,7 @@ Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
 
 ## Basic usage ##
 
-OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), Julia-specific JLD2 (".jld2") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statiscal and machine-learning applications, but in contrast to several other microbiome analysis frameworks.
+OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), Julia-specific JLD2 (".jld2") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables) for delimited and JLD2 formats, consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks.
 
 To learn an interaction network, you can do
 
@@ -27,9 +27,9 @@ julia> data_path = "/my/example/data.tsv"
 julia> meta_data_path = "/my/example/meta_data.tsv"
 julia> netw_results = learn_network(data_path, meta_data=meta_data_path, sensitive=true, heterogeneous=false)
 
-julia> # for HDF5, provide keys:
-julia> # data_path = "/my/example/data.h5"
-julia> # netw_results = learn_network(data_path, data_key="otu_table", meta_key="meta_data_table", sensitive=true, heterogeneous=false)
+julia> # for biom, provide the format (JSON or HDF5):
+julia> # data_path = "/my/example/data.biom"
+julia> # netw_results = learn_network(data_path, biom_format="hdf5", sensitive=true, heterogeneous=false)
 ```
 Results can currently be saved in JLD (".jld") or as edgelist (".edgelist") format:
 
