@@ -4,13 +4,13 @@ using FlashWeave.Types: LGLResult, RejDict, HitonState
 using JLD2, FileIO
 using SimpleWeightedGraphs
 
-G = load(joinpath("data", "io_expected.jld"))["graph"]
+G = load(joinpath("data", "io_expected.jld2"))["graph"]
 net_result = LGLResult(G)
 
 @testset "networks" begin
     tmp_path = tempname()
 
-    for net_format in ["edgelist", "jld"]
+    for net_format in ["edgelist", "jld2"]
         @testset "$net_format" begin
             tmp_net_path = tmp_path * "." * net_format
             FlashWeave.Io.save_network(tmp_net_path, net_result)
@@ -31,8 +31,8 @@ meta_header = Vector{String}(meta_header[:])
 @testset "input data" begin
     tmp_path = tempname()
 
-    for (data_format, data_suff, meta_suff) in zip(["tsv", "csv", "biom", "jld"],
-                                                   [".tsv", ".csv", ".biom", "_plus_meta.jld"],
+    for (data_format, data_suff, meta_suff) in zip(["tsv", "csv", "biom", "jld2"],
+                                                   [".tsv", ".csv", ".biom", "_plus_meta.jld2"],
                                                    ["_meta.tsv", "_meta.csv", "", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]

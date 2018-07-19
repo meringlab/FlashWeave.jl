@@ -7,7 +7,7 @@ using FlashWeave.Types
 
 export load_data, save_network, load_network
 
-const valid_net_formats = (".edgelist", ".jld")
+const valid_net_formats = (".edgelist", ".jld2")
 const valid_data_formats = (".tsv", ".csv", ".biom")
 
 function load_data(data_path::AbstractString, meta_path=nothing; data_key="data",
@@ -20,7 +20,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; data_key="data"
         ld_results = load_dlm(data_path, meta_path)
     elseif file_ext == ".biom"
         ld_results = (nothing, nothing, nothing, nothing)
-    elseif file_ext == ".jld"
+    elseif file_ext == ".jld2"
         ld_results = load_jld(data_path, data_key, header_key, meta_key, meta_header_key)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_data_formats)")
@@ -33,7 +33,7 @@ function save_network(out_path::AbstractString, net_result::LGLResult; detailed=
     file_ext = splitext(out_path)[2]
     if file_ext == ".edgelist"
         write_edgelist(out_path, net_result.graph)
-    elseif file_ext == ".jld"
+    elseif file_ext == ".jld2"
         save(out_path, "results", net_result)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_net_formats)")
@@ -45,7 +45,7 @@ function load_network(net_path::AbstractString)
     if file_ext == ".edgelist"
         G = read_edgelist(net_path)
         net_result = LGLResult(G)
-    elseif file_ext == ".jld"
+    elseif file_ext == ".jld2"
         net_result = load(net_path)["results"]
     else
         error("$(file_ext) not a valid network format. Valid formats are $(valid_net_formats)")

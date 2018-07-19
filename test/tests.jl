@@ -8,7 +8,7 @@ data_clr_nz = FlashWeave.Preprocessing.preprocess_data_default(data, "fz_nz", ve
 data_bin = FlashWeave.Preprocessing.preprocess_data_default(data, "mi", verbose=false, prec=64)
 data_mi_nz = FlashWeave.Preprocessing.preprocess_data_default(data, "mi_nz", verbose=false, prec=64)
 
-exp_dict = load(joinpath("data", "tests_expected.jld"))
+exp_dict = load(joinpath("data", "tests_expected.jld2"))
 
 function compare_test_results(r1::FlashWeave.Types.TestResult, r2::FlashWeave.Types.TestResult)
     isapprox(r1.stat, r2.stat, rtol=1e-2) && isapprox(r1.pval, r2.pval, rtol=1e-2) && r1.df == r2.df && r1.suff_power == r2.suff_power

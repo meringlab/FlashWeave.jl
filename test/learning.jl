@@ -5,7 +5,7 @@ using LightGraphs
 using FlashWeave
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
-adj_exp_dict = load(joinpath("data", "learning_expected.jld"))
+adj_exp_dict = load(joinpath("data", "learning_expected.jld2"))
 
 exp_dict = Dict(key=>SimpleWeightedGraph(adj_mat) for (key, adj_mat) in adj_exp_dict)
 

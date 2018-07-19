@@ -16,7 +16,7 @@ Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
 
 ## Basic usage ##
 
-OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), Julia-specific JLD (".jld") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statiscal and machine-learning applications, but in contrast to several other microbiome analysis frameworks.
+OTU tables can be provided in several formats, such as delimited formats (".csv", ".tsv"), Julia-specific JLD2 (".jld2") and BIOM (".biom"). Meta data should be provided as delimited format. IMPORTANT NOTE: FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statiscal and machine-learning applications, but in contrast to several other microbiome analysis frameworks.
 
 To learn an interaction network, you can do
 
@@ -34,13 +34,13 @@ julia> # netw_results = learn_network(data_path, data_key="otu_table", meta_key=
 Results can currently be saved in JLD (".jld") or as edgelist (".edgelist") format:
 
 ```julia
-julia> save_network("/my/example/network_output.jld", netw_results)
+julia> save_network("/my/example/network_output.jld2", netw_results)
 julia> ## or: save_network("/my/example/network_output.edgelist", netw_results)
 ```
 For output of additional information (if available), such as discarding sets, in separate files you can specify the "detailed" flag:
 
 ```julia
-julia> save_network("/my/example/network_output.jld", netw_results, detailed=true)
+julia> save_network("/my/example/network_output.jld2", netw_results, detailed=true)
 ```
 
 ## Parallel computing ##

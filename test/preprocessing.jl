@@ -5,7 +5,7 @@ using Base.Test
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 
-exp_dict = load(joinpath("data", "preprocessing_expected.jld"))["exp_dict"]
+exp_dict = load(joinpath("data", "preprocessing_expected.jld2"))
 
 function compare_nz_vecs(fznz_vec, minz_vec, verbose=false)
     fznz_vec_red = fznz_vec[fznz_vec .!= 0]
