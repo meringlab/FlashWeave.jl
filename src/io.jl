@@ -11,7 +11,7 @@ export load_data, save_network, load_network
 const valid_net_formats = (".edgelist", ".jld2")
 const valid_data_formats = (".tsv", ".csv", ".biom")
 
-function load_data(data_path::AbstractString, meta_path=nothing; biom_format="hdf5", data_key="data",
+function load_data(data_path::AbstractString, meta_path=nothing; data_key="data",
      meta_key="meta_data", header_key="header", meta_header_key="meta_header")
      """Load OTU tables and meta data from various formats.
      -- Set jld keys you don't want to use to 'nothing'"""
@@ -20,7 +20,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; biom_format="hd
     if file_ext in [".tsv", ".csv"]
         ld_results = load_dlm(data_path, meta_path)
     elseif file_ext == ".biom"
-        ld_results = load_biom(data_path, meta_path, format=biom_format)
+        ld_results = load_biom(data_path, meta_path)
     elseif file_ext == ".jld2"
         ld_results = load_jld(data_path, data_key, header_key, meta_key, meta_header_key)
     else
@@ -92,6 +92,7 @@ function load_dlm(data_path::AbstractString, meta_path=nothing)
 end
 
 
+
 function load_biom_json(data_path)
     json_struc = JSON.parsefile(data_path)
     otu_table = Matrix{Int}(hcat(json_struc["data"]...))
@@ -118,10 +119,16 @@ function load_biom_hdf5(data_path)
 end
 
 
-function load_biom(data_path, meta_path=nothing; format="hdf5")
-    valid_formats = ["hdf5", "json"]
-    @assert format in valid_formats "$format not supported by .biom, choose one of $valid_formats"
-    data, header = format == "hdf5" ? load_biom_hdf5(data_path) : load_biom_json(data_path)
+function load_biom(data_path, meta_path=nothing)
+    data, header = try
+        load_biom_hdf5(data_path)
+    catch
+        try
+            load_biom_json(data_path)
+        catch
+            error("file $data_path is not valid .biom")
+        end
+    end
 
     if meta_path != nothing
         meta_data, meta_header = load_dlm(meta_path)
@@ -131,6 +138,7 @@ function load_biom(data_path, meta_path=nothing; format="hdf5")
 
     data, header, meta_data, meta_header
 end
+
 
 
 

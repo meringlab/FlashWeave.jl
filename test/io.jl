@@ -36,8 +36,7 @@ meta_header = Vector{String}(meta_header[:])
                                                    ["_meta.tsv", "_meta.csv", "_meta.tsv", "_meta.tsv", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
-            biom_format = data_suff == "_json.biom" ? "json" : data_suff == "_hdf5.biom" ? "hdf5" : ""
-            data_ld = FlashWeave.Io.load_data(data_path, meta_path, biom_format=biom_format)
+            data_ld = FlashWeave.Io.load_data(data_path, meta_path)
             @test all(data_ld[1] .== data)
             @test all(data_ld[2] .== header)
             @test all(data_ld[3] .== meta_data)

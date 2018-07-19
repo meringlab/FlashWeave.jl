@@ -27,11 +27,11 @@ julia> data_path = "/my/example/data.tsv"
 julia> meta_data_path = "/my/example/meta_data.tsv"
 julia> netw_results = learn_network(data_path, meta_data=meta_data_path, sensitive=true, heterogeneous=false)
 
-julia> # for biom, provide the format (JSON or HDF5):
-julia> # data_path = "/my/example/data.biom"
-julia> # netw_results = learn_network(data_path, biom_format="hdf5", sensitive=true, heterogeneous=false)
+julia> # for JLD2, you can provide keys:
+julia> # data_path = "/my/example/data.jld2"
+julia> # netw_results = learn_network(data_path, data_key="otu_table", meta_key="meta_data_table", sensitive=true, heterogeneous=false)
 ```
-Results can currently be saved in JLD (".jld") or as edgelist (".edgelist") format:
+Results can currently be saved in JLD (".jld2") or as edgelist (".edgelist") format:
 
 ```julia
 julia> save_network("/my/example/network_output.jld2", netw_results)
