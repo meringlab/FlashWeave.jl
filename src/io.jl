@@ -2,6 +2,7 @@ module Io
 
 using LightGraphs, SimpleWeightedGraphs
 using JLD2, FileIO
+using JSON, HDF5
 
 using FlashWeave.Types
 
@@ -10,7 +11,7 @@ export load_data, save_network, load_network
 const valid_net_formats = (".edgelist", ".jld2")
 const valid_data_formats = (".tsv", ".csv", ".biom")
 
-function load_data(data_path::AbstractString, meta_path=nothing; data_key="data",
+function load_data(data_path::AbstractString, meta_path=nothing; biom_format="hdf5", data_key="data",
      meta_key="meta_data", header_key="header", meta_header_key="meta_header")
      """Load OTU tables and meta data from various formats.
      -- Set jld keys you don't want to use to 'nothing'"""
@@ -19,7 +20,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; data_key="data"
     if file_ext in [".tsv", ".csv"]
         ld_results = load_dlm(data_path, meta_path)
     elseif file_ext == ".biom"
-        ld_results = (nothing, nothing, nothing, nothing)
+        ld_results = load_biom(data_path, meta_path, format=biom_format)
     elseif file_ext == ".jld2"
         ld_results = load_jld(data_path, data_key, header_key, meta_key, meta_header_key)
     else
@@ -82,14 +83,56 @@ function load_dlm(data_path::AbstractString, meta_path=nothing)
     header = header[:]
 
     if meta_path != nothing
-        meta_data, meta_header = readdlm(meta_path, sep, header=true)
-        meta_header = meta_header[:]
+        meta_data, meta_header = load_dlm(meta_path)
     else
         meta_data = meta_header = nothing
     end
 
     data, header, meta_data, meta_header
 end
+
+
+function load_biom_json(data_path)
+    json_struc = JSON.parsefile(data_path)
+    otu_table = Matrix{Int}(hcat(json_struc["data"]...))
+
+    if json_struc["matrix_type"] == "sparse"
+        otu_table = otu_table'
+        otu_table = sparse(otu_table[:, 1] + 1, otu_table[:, 2] + 1, otu_table[:, 3])'
+    end
+
+    header = [x["id"] for x in json_struc["rows"]]
+    otu_table, header
+end
+
+
+function load_biom_hdf5(data_path)
+    f = h5open(data_path, "r")
+    m, n = read(attrs(f)["shape"])
+    colptr, rowval, nzval = [read(f, "sample/matrix/$key") for key in ["indptr", "indices", "data"]]
+    otu_table = SparseMatrixCSC(m, n, colptr + 1, rowval + 1, Vector{Int}(nzval))'
+    header = read(f, "observation/ids")
+    close(f)
+
+    otu_table, header
+end
+
+
+function load_biom(data_path, meta_path=nothing; format="hdf5")
+    valid_formats = ["hdf5", "json"]
+    @assert format in valid_formats "$format not supported by .biom, choose one of $valid_formats"
+    data, header = format == "hdf5" ? load_biom_hdf5(data_path) : load_biom_json(data_path)
+
+    if meta_path != nothing
+        meta_data, meta_header = load_dlm(meta_path)
+    else
+        meta_data = meta_header = nothing
+    end
+
+    data, header, meta_data, meta_header
+end
+
+
 
 
 function write_edgelist(out_path::AbstractString, G::SimpleWeightedGraph; header=nothing)

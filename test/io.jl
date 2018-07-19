@@ -31,21 +31,17 @@ meta_header = Vector{String}(meta_header[:])
 @testset "input data" begin
     tmp_path = tempname()
 
-    for (data_format, data_suff, meta_suff) in zip(["tsv", "csv", "biom", "jld2"],
-                                                   [".tsv", ".csv", ".biom", "_plus_meta.jld2"],
-                                                   ["_meta.tsv", "_meta.csv", "", ""])
+    for (data_format, data_suff, meta_suff) in zip(["tsv", "csv", "biom_json", "biom_hdf5", "jld2"],
+                                                   [".tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2"],
+                                                   ["_meta.tsv", "_meta.csv", "_meta.tsv", "_meta.tsv", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
-            data_ld = FlashWeave.Io.load_data(data_path, meta_path)
-
-            if data_format == "biom"
-                @test_broken 1 == 2
-            else
-                @test all(data_ld[1] .== data)
-                @test all(data_ld[2] .== header)
-                @test all(data_ld[3] .== meta_data)
-                @test all(data_ld[4] .== meta_header)
-            end
+            biom_format = data_suff == "_json.biom" ? "json" : data_suff == "_hdf5.biom" ? "hdf5" : ""
+            data_ld = FlashWeave.Io.load_data(data_path, meta_path, biom_format=biom_format)
+            @test all(data_ld[1] .== data)
+            @test all(data_ld[2] .== header)
+            @test all(data_ld[3] .== meta_data)
+            @test all(data_ld[4] .== meta_header)
         end
     end
 end
