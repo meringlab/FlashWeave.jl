@@ -1,11 +1,12 @@
 using FlashWeave
 using StatsBase
-using JLD2, FileIO
+using FileIO
 using Base.Test
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
+data_sparse = sparse(data)
 
-exp_dict = load(joinpath("data", "preprocessing_expected.jld2"))
+exp_dict = load(joinpath("data", "preprocessing_expected.jld2"))["exp_dict"]
 
 function compare_nz_vecs(fznz_vec, minz_vec, verbose=false)
     fznz_vec_red = fznz_vec[fznz_vec .!= 0]
@@ -33,25 +34,18 @@ end
 end
 
 @testset "norm per test type" begin
-    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]#, "fzr", "fzr_nz"] ## if you want to test ranked fz
+    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
         @testset "$test_name" begin
-            if startswith(test_name, "fzr")
-                test_name = replace(test_name, "fzr", "fz")
-                rank_clr = true
-            else
-                rank_clr = false
-            end
+            data_norm = normalize_data(data, test_name, verbose=false)
 
-            data_norm = FlashWeave.preprocess_data_default(data, test_name; make_sparse=false,
-             verbose=false, rank_clr=rank_clr)
-
-            if !rank_clr
+            @testset "dense" begin
                 @test all(data_norm .== exp_dict[test_name])
             end
 
-            data_norm_sparse = FlashWeave.preprocess_data_default(data, test_name; make_sparse=true,
-             verbose=false, rank_clr=rank_clr)
-            @test all(data_norm .== data_norm_sparse)
+            data_norm_sparse = normalize_data(data_sparse, test_name, verbose=false)
+            @testset "sparse" begin
+                @test all(data_norm_sparse .== exp_dict[test_name])
+            end
         end
     end
 end
@@ -70,7 +64,7 @@ end
 #
 # exp_dict = Dict{String,Any}()
 # for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
-#     exp_dict[test_name] = FlashWeave.preprocess_data_default(data, test_name, make_sparse=false)
+#     exp_dict[test_name] = normalize_data(data, test_name, verbose=false)
 # end
 #
-# save(joinpath("data", "preprocessing_expected.jld"), "exp_dict", exp_dict)
+# save(joinpath("data", "preprocessing_expected.jld2"), "exp_dict", exp_dict)

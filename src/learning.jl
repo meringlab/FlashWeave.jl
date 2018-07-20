@@ -325,45 +325,38 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
 end
 
 
-function learn_network(data_path::AbstractString, meta_data_path=nothing; data_key::AbstractString="data",
-     data_header_key::AbstractString="header", meta_key::AbstractString="meta_data",
-     meta_header_key::AbstractString="meta_header", kwargs...)
-    data, header, meta_data, meta_header = load_data(data_path, meta_data_path, data_key=data_key,
-                                                      data_header_key=data_header_key, meta_key=meta_key,
-                                                      meta_header_key=meta_header_key)
+function learn_network(data_path::AbstractString, meta_data_path=nothing;  data_key::AbstractString="data",
+    header_key::AbstractString="header", meta_key::AbstractString="meta_data",
+    meta_header_key::AbstractString="meta_header", make_sparse::Bool=true, verbose::Bool=true,
+    transposed::Bool=false, kwargs...)
 
-    @assert size(data, 2) == size(header) "header does not fit data"
+    verbose && println("\n### Loading data ###\n")
+    data, header, meta_data, meta_header = load_data(data_path, meta_data_path, data_key=data_key,
+                                                     header_key=header_key, meta_key=meta_key,
+                                                     meta_header_key=meta_header_key, transposed=transposed)
+
 
     if meta_data == nothing
         meta_mask = falses(length(header))
+        check_data(data, header, meta_mask=meta_mask)
     else
-        @assert size(data, 1) == size(meta_data, 1) "observations of data do not fit meta_data"
-        @assert size(meta_data, 2) == size(meta_header) "meta_header does not fit meta_data"
-
+        check_data(data, meta_data, header=header, meta_header=meta_header)
         data = hcat(data, meta_data)
         header = hcat(header, meta_header)
         meta_mask = hcat(falses(length(header)), trues(length(meta_header)))
     end
 
-    learn_network(data; header=header, meta_mask=meta_mask, kwargs...)
+    learn_network(data; header=header, meta_mask=meta_mask, verbose=verbose, kwargs...)
 end
 
-# LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
-#     hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(10e6), convergence_threshold::AbstractFloat=0.01,
-#     FDR::Bool=true, parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true,
-#     precluster_sim::AbstractFloat=0.0,
-#     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
-#     verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="",
-#     output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Void}=nothing,
-#     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
-#     header::AbstractVector{String}=String[], recursive_pcor::Bool=true, cache_pcor::Bool=false,
-#     correct_reliable_only::Bool=true, feed_forward::Bool=true, track_rejections::Bool=false,
-#     cluster_mode::AbstractString="greedy", all_univar_nbrs=nothing)
 
-function learn_network(data::AbstractArray{ElType};
-     sensitive::Bool=true, heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
-     hps::Integer=5, normalize::Bool=true, verbose::Bool=true,
-     transposed::Bool=false, header=nothing, meta_mask=nothing) where {ElType<:Real}
+function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
+    heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
+    conv::AbstractFloat=0.01, header=nothing, meta_mask=nothing, filter_data::Bool=true,
+    feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
+    transposed::Bool=false, output_folder::AbstractString="", prec::Integer=32, make_sparse::Bool=true,
+    max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1, cache_pcor::Bool=false,
+    time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0) where {ElType<:Real}
 
     start_time = time()
 
@@ -373,42 +366,63 @@ function learn_network(data::AbstractArray{ElType};
     test_name = cont_mode * het_mode
     parallel_mode = nprocs() > 1 ? "multi_il" : "single_il"
 
-
-    if normalize
-        normalize_data(data)
+    if transposed
+        data = data'
     end
 
+    check_data(data, header, meta_mask=meta_mask)
+
+    if !issparse(data) && make_sparse
+        verbose && println("\n### Converting data to sparse matrix ###\n")
+        data = sparse(data)
+    end
+
+    if header != nothing && meta_mask == nothing
+        meta_mask = falses(length(header))
+    end
+
+    n_mvs = sum(meta_mask)
     if verbose
         println("""Inferring network\n
-        \tSettings:
-        \t\tsensitive - $sensitive
-        \t\theterogeneous - $heterogeneous
-        \t\tmax_k - $(max_k)
-        \t\talpha - $alpha
-        \t\tsparse - $(issparse(data))
-        \t\tworkers - $(nprocs())""")
+        \tRun information:
+        \tsensitive - $sensitive
+        \theterogeneous - $heterogeneous
+        \tmax_k - $(max_k)
+        \talpha - $alpha
+        \tsparse - $(issparse(data))
+        \tworkers - $(nprocs())
+        \tOTUs - $(size(data, 2) - n_mvs)
+        \tMVs - $(n_mvs)""")
     end
 
-    params_dict = Dict(:test_name=>test_name, :max_k=>max_k, :alpha=>alpha, :hps=>hps,
-                     :parallel=>parallel_mode)
 
-    input_data = normalize ? normalize_data(data, test_name) : data
-    lgl_results = LGL(input_data; params_dict...)
-    result = FWResult(lgl_results, header, meta_mask, params_dict)
+    params_dict = Dict(:test_name=>test_name, :parallel=>parallel_mode, :max_k=>max_k,
+                       :alpha=>alpha, :convergence_threshold=>conv, :feed_forward=>feed_forward,
+                       :track_rejections=>track_rejections, :verbose=>verbose,
+                       :header=>header, :output_folder=>output_folder,
+                       :max_tests=>max_tests, :hps=>hps, :FDR=>FDR, :n_obs_min=>n_obs_min,
+                       :cache_pcor=>cache_pcor, :time_limit=>time_limit,
+                       :update_interval=>update_interval)
 
-    time_taken = time() - start_time()
+    if normalize
+       verbose && println("\n### Normalizing ###\n")
+       input_data, header, meta_mask = normalize_data(data, test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose)
+    else
+       warn("Skipping normalization, only experts should choose this option.")
+       input_data = data
+    end
+
+
+    verbose && println("\n### Learning interactions ###\n")
+    lgl_results, time_taken = @timed LGL(input_data; params_dict...)
+
+    # insert final parameters
+    params_dict[:heterogeneous] = heterogeneous
+    params_dict[:sensitive] = sensitive
+
+    net_result = FWResult(lgl_results, header, meta_mask, params_dict)
 
     verbose && println("Finished inference. Time taken: ", time_taken, "s")
 
-    stats_dict = Dict(:time_taken=>time_taken, :converged=>!isempty(lgl_results.unfinished_states))
-    meta_dict = Dict("params"=>params_dict, "stats"=>stats_dict)
-    lgl_results, meta_dict
+    net_result
 end
-
-
-# struct FWResult{T<:Integer}
-#     inference_results::LGLResult{T}
-#     variable_ids::Vector{String}
-#     meta_variable_mask::BitVector
-#     parameters::Dict{Symbol,Any}
-# end

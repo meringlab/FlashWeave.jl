@@ -191,8 +191,9 @@ end
 graph(result::FWResult{T}) where T<:Integer = result.inference_results.graph
 rejections(result::FWResult{T}) where T<:Integer = result.inference_results.rejections
 unfinished_states(result::FWResult{T}) where T<:Integer = result.inference_results.unfinished_states
-parameters(result::FWResult{T}) where T<:Integer = result.params
+parameters(result::FWResult{T}) where T<:Integer = result.parameters
 variable_ids(result::FWResult{T}) where T<:Integer = result.variable_ids
+converged(result::FWResult{T}) where T<:Integer = !isempty(result.inference_results.unfinished_states)
 
 function unchecked_statistics(result::FWResult)
     unf_states_dict = unfinished_states(result)
@@ -213,7 +214,7 @@ function show(io::IO, result::FWResult{T}) where T<:Integer
     het_str = params[:heterogeneous] ? "HE" : ""
     sens_str = params[:sensitive] ? "sensitive" : "fast"
     cond_str = params[:max_k] == 0 ? "univariate" : "conditional (max_k $(params[:max_k]))"
-    println(io, "Mode:")
+    println(io, "\nMode:")
     println(io, "FlashWeave$het_str, $cond_str, $sens_str\n")
 
     println(io, "Network:")

@@ -31,7 +31,8 @@ export learn_network,
        save_network,
        load_network,
        load_data,
-       show
+       show,
+       graph
 
 function __init__()
    warn_pairs = [(:FileIO, "JLD2"), (:JSON, "BIOM 1.0"), (:HDF5, "BIOM 2.0")]

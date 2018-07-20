@@ -1,6 +1,6 @@
-using FileIO
 using FlashWeave
 using FlashWeave: TestResult
+using FileIO
 using Base.Test
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
@@ -20,7 +20,9 @@ for (test_name, data_norm) in [("mi", data_bin), ("mi_nz", data_mi_nz),
                                ("fz", data_clr), ("fz_nz", data_clr_nz)]
     @testset "$test_name" begin
         for cond_mode in ["uni", "condZ1", "condZ3"]
+
             @testset "$cond_mode" begin
+
                 exp_res = exp_dict["exp_$(cond_mode)_$(test_name)"]
 
                 if test_name == "fz_nz"
@@ -47,3 +49,30 @@ for (test_name, data_norm) in [("mi", data_bin), ("mi_nz", data_mi_nz),
         end
     end
 end
+
+# reproduce test results
+# exp_dict = Dict{String, Any}()
+# for (test_name, data_norm) in [("mi", data_bin), ("mi_nz", data_mi_nz),
+#                                ("fz", data_clr), ("fz_nz", data_clr_nz)]
+#     for cond_mode in ["uni", "condZ1", "condZ3"]
+#         if test_name == "fz_nz"
+#             if cond_mode == "uni"
+#                 sub_data = @view data_norm[data_norm[:, 1] .!= 0, :]
+#             else
+#                 sub_data = @view data_norm[(data_norm[:, 31] .!= 0) .& (data_norm[:, 21] .!= 0), :]
+#             end
+#         else
+#             sub_data = data_norm
+#         end
+#
+#         if cond_mode == "uni"
+#             test_res = FlashWeave.test(1, collect(2:50), sub_data, test_name)
+#         elseif cond_mode == "condZ1"
+#             test_res = FlashWeave.test(31, 21, (7,), sub_data, test_name)
+#         elseif cond_mode == "condZ3"
+#             test_res = FlashWeave.test(31, 21, (7, 14, 18,), sub_data, test_name)
+#         end
+#         exp_dict["exp_$(cond_mode)_$(test_name)"] = test_res
+#     end
+# end
+# save(joinpath("data", "tests_expected.jld2"), exp_dict)

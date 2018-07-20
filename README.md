@@ -29,7 +29,7 @@ julia> netw_results.graph # weighted graph representing interactions
 
 julia> # for JLD2, you can provide keys:
 julia> # data_path = "/my/example/data.jld2"
-julia> # netw_results = learn_network(data_path, data_key="data", data_header_key="header", meta_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
+julia> # netw_results = learn_network(data_path, data_key="data", header_key="header", meta_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
 
 Results can currently be saved in JLD2 (".jld2"), fast for large networks, or as traditional edgelist (".edgelist") format:
@@ -49,6 +49,12 @@ A convenient loading function is available:
  ```julia
  julia> netw_results = load_network("/my/example/network_output.jld2")
  ```
+
+## Performance tips ##
+
+Depending on your data, make sure to chose the appropriate flags (```heterogeneous=true``` for multi-habitat or -protocol data sets, ```sensitive=false``` when sensible) for optimal runtimes. If FlashWeave gets stuck on a small fraction of nodes with large neighborhoods, try increasing the convergence criterion (```conv```). To run FlashWeave in parallel, see the section below.
+
+Note, that FlashWeave is optimized for large-scale data sets. On small data (hundreds of samples and OTUs) its speed advantages can be negated by JIT-compilation overhead.
 
 ## Parallel computing ##
 
@@ -84,4 +90,5 @@ julia> ## addprocs_sge(5, queue="<your queue>", qsub_env="<your environment>", r
 Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaParallel/ClusterManagers.jl) for further details.
 
 ## Versioning and API ##
-FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to sudden change.
+
+FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to change.

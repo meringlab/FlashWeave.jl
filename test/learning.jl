@@ -1,20 +1,24 @@
-using JLD2, FileIO
 using Base.Test
 using SimpleWeightedGraphs
 using LightGraphs
 using FlashWeave
+using FileIO
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
+data_sp = sparse(data)
+
 adj_exp_dict = load(joinpath("data", "learning_expected.jld2"))
 
 exp_dict = Dict(key=>SimpleWeightedGraph(adj_mat) for (key, adj_mat) in adj_exp_dict)
 
+rtol = 1e-2
+atol = 0.0
 
 function make_network(data, test_name, make_sparse=false, prec=64, verbose=false; kwargs...)
     data_norm = FlashWeave.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
     kwargs_dict = Dict(kwargs)
-    graph_res = FlashWeave.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
-    graph_res.graph
+    lgl_res = FlashWeave.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
+    lgl_res.graph
 end
 
 
@@ -78,7 +82,7 @@ function compare_graph_results(g1::SimpleWeightedGraph, g2::SimpleWeightedGraph;
 end
 
 
-@testset "main_test_modes" begin
+@testset "LGL_backend" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
         @testset "$test_name" begin
             for max_k in [0, 3]
@@ -97,9 +101,8 @@ end
                                 @testset "parallel $parallel" begin
                                     is_il = endswith(parallel, "_il")
                                     time_limit = is_il ? 30.0 : 0.0
-                                    graph = make_network(data, test_name, make_sparse, 64,
+                                    pred_graph = make_network(data, test_name, make_sparse, 64,
                                         max_k=max_k, parallel=parallel, time_limit=time_limit)
-
 
                                     rtol = 1e-2
                                     atol = 0.0
@@ -114,7 +117,7 @@ end
                                     end
 
                                     @testset "edge_identity" begin
-                                        @test compare_graph_results(exp_graph, graph,
+                                        @test compare_graph_results(exp_graph, pred_graph,
                                                                     rtol=rtol, atol=atol,
                                                                     approx=is_il,
                                                                     approx_nbr_diff=approx_nbr_diff,
@@ -133,16 +136,48 @@ end
 
 @testset "precision_32" begin
     for (test_name, make_sparse) in [("mi_nz", true), ("fz", false)]
-        for make_sparse in [true]
+        for make_sparse in [true, false]
             @testset "$(test_name)_$(make_sparse)_single" begin
-                graph = make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single", time_limit=0.0)
+                pred_graph = make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single", time_limit=0.0)
                 exp_graph = exp_dict["exp_$(test_name)_maxk3"]
-                @test compare_graph_results(exp_graph, graph, rtol=1e-2, atol=0.0)
+                @test compare_graph_results(exp_graph, pred_graph, rtol=1e-2, atol=0.0)
             end
         end
     end
 end
 
+@testset "learn_network" begin
+    approx_nbr_diff = 0
+    approx_weight_meandiff = 0.05
+    header = ["X" * string(i) for i in 1:size(data, 2)]
+
+    for heterogeneous in [true, false]
+        for sensitive in [true, false]
+
+            if !any([heterogeneous, sensitive])
+                # skip mi test
+                continue
+            end
+
+            @testset "het_$heterogeneous // sens_$sensitive" begin
+                sens_str = sensitive ? "fz" : "mi"
+                het_str = heterogeneous ? "_nz" : ""
+                test_name = sens_str * het_str
+                exp_graph = exp_dict["exp_$(test_name)_maxk3"]
+                pred_graph = graph(learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
+                                   max_k=3, header=header, verbose=false))
+
+                @testset "edge_identity" begin
+                    @test compare_graph_results(exp_graph, pred_graph,
+                                                rtol=rtol, atol=atol,
+                                                approx=true,
+                                                approx_nbr_diff=approx_nbr_diff,
+                                                approx_weight_meandiff=approx_weight_meandiff)
+                end
+            end
+        end
+    end
+end
 
 # to create expected output
 
@@ -154,6 +189,5 @@ end
 #      end
 # end
 #
-# out_path = joinpath("data", "learning_expected.jld")
-# rm(out_path)
+# out_path = joinpath("data", "learning_expected.jld2")
 # save(out_path, exp_dict)

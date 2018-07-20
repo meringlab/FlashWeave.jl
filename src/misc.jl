@@ -1,5 +1,23 @@
 const inf_weight = 708.3964185322641
 
+
+function check_data(data::AbstractMatrix, meta_data::AbstractMatrix; header=nothing, meta_header=nothing)
+    @assert size(data, 1) == size(meta_data, 1) "observations of data do not fit meta_data: $(size(data, 1)) vs. $(size(meta_data, 1))"
+
+    @assert !xor(header == nothing, meta_header == nothing) "provide two headers (or none)"
+
+    if header != nothing
+        check_data(data, header)
+        @assert size(meta_data, 2) == length(meta_header) "meta_header does not fit meta_data"
+    end
+end
+
+function check_data(data::AbstractMatrix, header::AbstractVector; meta_mask=nothing)
+    @assert size(data, 2) == length(header) "header does not fit data: $(size(data, 2)) vs. $(length(header))"
+    meta_mask != nothing && @assert size(data, 2) == length(meta_mask) "meta_mask does not fit data: $(length(data, 2)) vs. $(length(meta_mask))"
+end
+
+
 function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool; max_k::Integer=0,
         levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), cache_pcor::Bool=true)
     discrete_test = isdiscrete(test_name)

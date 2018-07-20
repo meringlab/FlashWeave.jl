@@ -4,14 +4,16 @@
 const valid_net_formats = (".edgelist", ".jld2")
 const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2")
 
-function load_data(data_path::AbstractString, meta_path=nothing; data_key="data",
-     meta_key="meta_data", header_key="header", meta_header_key="meta_header")
+function load_data(data_path::AbstractString, meta_path=nothing; transposed::Bool=false,
+     data_key::AbstractString="data", meta_key::AbstractString="meta_data",
+     header_key::AbstractString="header", meta_header_key::AbstractString="meta_header")
      """Load OTU tables and meta data from various formats.
-     -- Set jld keys you don't want to use to 'nothing'"""
+     -- Set jld keys you don't want to use to 'nothing'
+     -- delimited formats must have headers (or row indices if transposed=true)"""
 
     file_ext = splitext(data_path)[2]
     if file_ext in [".tsv", ".csv"]
-        ld_results = load_dlm(data_path, meta_path)
+        ld_results = load_dlm(data_path, meta_path, transposed=transposed)
     elseif file_ext == ".biom"
         ld_results = load_biom(data_path, meta_path)
     elseif file_ext == ".jld2"
@@ -23,7 +25,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; data_key="data"
     ld_results
 end
 
-function save_network(out_path::AbstractString, net_result::LGLResult; detailed=false)
+function save_network(out_path::AbstractString, net_result::LGLResult; detailed::Bool=false)
     file_ext = splitext(out_path)[2]
     if file_ext == ".edgelist"
         write_edgelist(out_path, net_result.graph)
@@ -79,14 +81,26 @@ function load_jld(data_path::AbstractString, data_key::AbstractString, header_ke
  end
 
 
-function load_dlm(data_path::AbstractString, meta_path=nothing)
+hasrowids(data::AbstractMatrix) = data[1, 1] == "" || isa(data[2, 1], AbstractString)
+
+function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool=false)
     sep = splitext(data_path)[2] == ".tsv" ? '\t' : ','
 
-    data, header = readdlm(data_path, sep, header=true)
-    header = header[:]
+    data = readdlm(data_path, sep)
+
+    if transposed
+        data = data'
+    end
+
+    if hasrowids(data)
+        data = data[:, 2:end]
+    end
+
+    header = Vector{String}(data[1, :])[:]
+    data = Matrix{Float64}(data[2:end, :])
 
     if meta_path != nothing
-        meta_data, meta_header = load_dlm(meta_path)
+        meta_data, meta_header = load_dlm(meta_path, transposed=transposed)
     else
         meta_data = meta_header = nothing
     end
