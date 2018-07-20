@@ -142,8 +142,7 @@ function load_biom(data_path, meta_path=nothing)
         Base.invokelatest(load_biom_hdf5, data_path)
     catch
         try
-            isdefined(:JSON) || @eval using JSON
-            Base.invokelatest(load_biom_json, data_path)
+            load_biom_json(data_path)
         catch
             error("file $data_path is not valid .biom")
         end

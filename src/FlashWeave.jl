@@ -9,6 +9,9 @@ using LightGraphs, SimpleWeightedGraphs
 # statistics
 using StatsBase, Distributions, Combinatorics
 
+# io
+using JSON
+
 # utilities
 import Base.show
 
@@ -35,7 +38,7 @@ export learn_network,
        graph
 
 function __init__()
-   warn_pairs = [(:FileIO, "JLD2"), (:JSON, "BIOM 1.0"), (:HDF5, "BIOM 2.0")]
+   warn_pairs = [(:FileIO, "JLD2"), (:HDF5, "BIOM 2.0")]
    for (x, y) in warn_pairs
        isdefined(x) && warn("Package $x was loaded before importing FlashWeave. $y saving/loading will not be available.")
    end
