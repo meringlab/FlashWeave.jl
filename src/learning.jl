@@ -383,7 +383,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
 
     n_mvs = sum(meta_mask)
     if verbose
-        println("""Inferring network\n
+        println("""Inferring network with $(mode_string(heterogeneous, sensitive, max_k))\n
         \tRun information:
         \tsensitive - $sensitive
         \theterogeneous - $heterogeneous

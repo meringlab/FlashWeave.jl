@@ -208,14 +208,12 @@ function unchecked_statistics(result::FWResult)
     end
 end
 
+
 function show(io::IO, result::FWResult{T}) where T<:Integer
     G = graph(result)
     params = parameters(result)
-    het_str = params[:heterogeneous] ? "HE" : ""
-    sens_str = params[:sensitive] ? "sensitive" : "fast"
-    cond_str = params[:max_k] == 0 ? "univariate" : "conditional (max_k $(params[:max_k]))"
     println(io, "\nMode:")
-    println(io, "FlashWeave$het_str, $cond_str, $sens_str\n")
+    println(io, mode_string([params[key] for key in [:heterogeneous, :sensitive, :max_k]]...), "\n")
 
     println(io, "Network:")
     n_meta_vars = sum(result.meta_variable_mask)

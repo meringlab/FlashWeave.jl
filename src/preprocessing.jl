@@ -322,7 +322,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
 
     if verbose
         println("\t-> discarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
-        println("\nnormalization")
+        println("\nNormalization")
     end
 
     if norm == "rows"

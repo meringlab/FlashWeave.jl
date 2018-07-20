@@ -1,6 +1,14 @@
 const inf_weight = 708.3964185322641
 
 
+function mode_string(heterogeneous, sensitive, max_k)
+    het_str = heterogeneous ? "HE" : ""
+    sens_str = sensitive ? "sensitive" : "fast"
+    cond_str = max_k == 0 ? "univariate" : "conditional"
+    "FlashWeave$het_str - $sens_str ($cond_str)"
+end
+
+
 function check_data(data::AbstractMatrix, meta_data::AbstractMatrix; header=nothing, meta_header=nothing)
     @assert size(data, 1) == size(meta_data, 1) "observations of data do not fit meta_data: $(size(data, 1)) vs. $(size(meta_data, 1))"
 
