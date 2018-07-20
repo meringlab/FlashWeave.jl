@@ -364,7 +364,7 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
             nz_mask = issparse(data) ? BitMatrix(0, 0) : data .!= 0
 
             if endswith(norm, "rows")
-                data = rownorm(data)
+                rownorm!(data)
             elseif endswith(norm, "clr")
                 data = clrnorm!(data, "clr_nz", 0.0)
             end
@@ -424,17 +424,22 @@ function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::Str
 end
 
 
-function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::String; verbose::Bool=true, make_sparse::Bool=issparse(data), env_cols::Vector{Int}=Int[], factor_cols::Vector{Int}=Int[], prec::Integer=32, header::Vector{String}=String[], preprocess_kwargs...) where ElType <: Real
+function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::AbstractString; verbose::Bool=true, make_sparse::Bool=issparse(data), env_cols::Vector{Int}=Int[], factor_cols::Vector{Int}=Int[], prec::Integer=32, header::Vector{String}=String[], preprocess_kwargs...) where ElType <: Real
     default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
-    data = preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, env_cols=env_cols, prec=prec, header=header, preprocess_kwargs...)
-    data
+    preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, env_cols=env_cols, prec=prec, header=header, preprocess_kwargs...)
 end
 
 
-function normalize_data(data::AbstractMatrix{ElType}, test_name::AbstractString; meta_mask::AbstractArray{Bool}=BitVector(),
+function normalize_data(data::AbstractMatrix{ElType}, test_name::AbstractString="", norm_mode::AbstractString=""; meta_mask::AbstractArray{Bool}=BitVector(),
     header::Vector{String}=String[], verbose::Bool=true, prec::Integer=32, filter_data::Bool=true) where ElType <: Real
-
+    @assert xor(isempty(test_name), isempty(norm_mode)) "provide either test_name and norm_mode (but not both)"
     @assert !xor(isempty(meta_mask), isempty(header)) "provide both meta_mask and header (or none)"
+
+    mode_map = Dict("clr-adapt"=>"clr_adapt", "clr-nonzero"=>"clr_nz",
+                    "clr-nonzero-binned"=>"binned_nz_clr", "pres-abs"=>"binary",
+                    "tss"=>"rows", "tss-nonzero-binned"=>"binned_nz_rows")
+
+    @assert isempty(norm_mode) || haskey(mode_map, norm_mode) "$norm_mode not a valid normalization mode"
 
     T = try
             eval(Symbol("Float$prec"))
@@ -444,8 +449,19 @@ function normalize_data(data::AbstractMatrix{ElType}, test_name::AbstractString;
 
     MatType = issparse(data) ? SparseMatrixCSC{T, eval(Symbol("Int$prec"))} : Matrix{T}
     data = convert(MatType, data)
-    norm_results = preprocess_data_default(data, test_name; env_cols=find(meta_mask), header=header,
-                                           verbose=verbose, filter_data=filter_data, prec=prec)
+
+    if !isempty(test_name)
+        preproc_fun = preprocess_data_default
+        norm_str = test_name
+    else
+        preproc_fun = preprocess_data
+        norm_str = mode_map[norm_mode]
+    end
+
+    #norm_results = preprocess_data_default(data, test_name; env_cols=find(meta_mask), header=header,
+    #                                       verbose=verbose, filter_data=filter_data, prec=prec)
+    norm_results = preproc_fun(data, norm_str; env_cols=find(meta_mask), header=header,
+                               verbose=verbose, filter_data=filter_data, prec=prec, make_sparse=issparse(data))
 
     if !isempty(header)
         data, header = norm_results
