@@ -390,7 +390,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
         \tmax_k - $(max_k)
         \talpha - $alpha
         \tsparse - $(issparse(data))
-        \tworkers - $(nprocs())
+        \tworkers - $(length(workers()))
         \tOTUs - $(size(data, 2) - n_mvs)
         \tMVs - $(n_mvs)""")
     end
@@ -406,7 +406,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
 
     if normalize
        verbose && println("\n### Normalizing ###\n")
-       input_data, header, meta_mask = normalize_data(data, test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose)
+       input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose)
     else
        warn("Skipping normalization, only experts should choose this option.")
        input_data = data
@@ -422,7 +422,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
 
     net_result = FWResult(lgl_results, header, meta_mask, params_dict)
 
-    verbose && println("Finished inference. Time taken: ", time_taken, "s")
+    verbose && println("\nFinished inference. Time taken: ", round(time_taken, 3), "s")
 
     net_result
 end

@@ -51,7 +51,10 @@ function load_network(net_path::AbstractString)
     elseif file_ext == ".jld2"
         isdefined(:FileIO) || @eval using FileIO: save, load
         d = Base.invokelatest(load, net_path)
+        #isdefined(:JLD2) || @eval using JLD2
+        #d = Base.invokelatest(jldopen, net_path, "r")
         net_result = d["results"]
+        #close(d)
     else
         error("$(file_ext) not a valid network format. Valid formats are $(valid_net_formats)")
     end
@@ -67,6 +70,10 @@ function load_jld(data_path::AbstractString, data_key::AbstractString, header_ke
      isdefined(:FileIO) || @eval using FileIO: save, load
      d = Base.invokelatest(load, data_path)
 
+     # hack around JLD2 out-of-bounds error gotten for some data sets
+     #isdefined(:JLD2) || @eval using JLD2
+     #d = Base.invokelatest(jldopen, data_path, "r")
+
      data = d[data_key]
      header = d[header_key]
 
@@ -76,6 +83,9 @@ function load_jld(data_path::AbstractString, data_key::AbstractString, header_ke
      else
          meta_data = meta_header = nothing
      end
+
+     # finish hack
+     #close(d)
 
      data, header, meta_data, meta_header
  end

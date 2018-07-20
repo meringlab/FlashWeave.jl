@@ -36,13 +36,13 @@ end
 @testset "norm per test type" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
         @testset "$test_name" begin
-            data_norm = normalize_data(data, test_name, verbose=false)
+            data_norm = normalize_data(data, test_name=test_name, verbose=false)
 
             @testset "dense" begin
                 @test all(data_norm .== exp_dict[test_name])
             end
 
-            data_norm_sparse = normalize_data(data_sparse, test_name, verbose=false)
+            data_norm_sparse = normalize_data(data_sparse, test_name=test_name, verbose=false)
             @testset "sparse" begin
                 @test all(data_norm_sparse .== exp_dict[test_name])
             end
@@ -64,7 +64,7 @@ end
 #
 # exp_dict = Dict{String,Any}()
 # for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
-#     exp_dict[test_name] = normalize_data(data, test_name, verbose=false)
+#     exp_dict[test_name] = normalize_data(data, test_name=test_name, verbose=false)
 # end
 #
 # save(joinpath("data", "preprocessing_expected.jld2"), "exp_dict", exp_dict)

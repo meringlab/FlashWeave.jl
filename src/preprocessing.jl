@@ -430,7 +430,7 @@ function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::Abstra
 end
 
 
-function normalize_data(data::AbstractMatrix{ElType}, test_name::AbstractString="", norm_mode::AbstractString=""; meta_mask::AbstractArray{Bool}=BitVector(),
+function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString="", norm_mode::AbstractString="", meta_mask::AbstractArray{Bool}=BitVector(),
     header::Vector{String}=String[], verbose::Bool=true, prec::Integer=32, filter_data::Bool=true) where ElType <: Real
     @assert xor(isempty(test_name), isempty(norm_mode)) "provide either test_name and norm_mode (but not both)"
     @assert !xor(isempty(meta_mask), isempty(header)) "provide both meta_mask and header (or none)"

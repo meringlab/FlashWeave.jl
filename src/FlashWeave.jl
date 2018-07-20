@@ -38,9 +38,9 @@ export learn_network,
        graph
 
 function __init__()
-   warn_pairs = [(:FileIO, "JLD2"), (:HDF5, "BIOM 2.0")]
-   for (x, y) in warn_pairs
-       isdefined(x) && warn("Package $x was loaded before importing FlashWeave. $y saving/loading will not be available.")
+   warn_items = [(:FileIO, "JLD2"), (:HDF5, "BIOM 2.0")]
+   for (mod_symbol, format) in warn_items
+       isdefined(mod_symbol) && warn("Package $mod_symbol was loaded before importing FlashWeave. $format will not be available for FlashWeave's IO functions.")
    end
 end
 
