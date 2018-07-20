@@ -8,10 +8,9 @@ using LightGraphs, SimpleWeightedGraphs
 
 # statistics
 using StatsBase, Distributions, Combinatorics
-using Clustering
 
-# IO
-#using JLD2, FileIO, JSON, HDF5
+# utilities
+import Base.show
 
 
 include("types.jl")
@@ -31,6 +30,14 @@ export learn_network,
        normalize_data,
        save_network,
        load_network,
-       load_data
+       load_data,
+       show
+
+function __init__()
+   warn_pairs = [(:FileIO, "JLD2"), (:JSON, "BIOM 1.0"), (:HDF5, "BIOM 2.0")]
+   for (x, y) in warn_pairs
+       isdefined(x) && warn("Package $x was loaded before importing FlashWeave. $y saving/loading will not be available.")
+   end
+end
 
 end

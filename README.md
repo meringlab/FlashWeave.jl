@@ -10,11 +10,12 @@ In an interactive Julia session, you can then install FlashWeave via
 
 ```julia
 Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
+# to run tests: Pkg.test("FlashWeave")
 ```
 
 ## Basic usage ##
 
-OTU tables can be provided in several formats: delimited formats (".csv", ".tsv"), [BIOM 1.0](http://biom-format.org/documentation/format_versions/biom-1.0.html) or the high-performance formats [BIOM 2.0](http://biom-format.org/documentation/format_versions/biom-2.0.html) (".biom") and [JLD2](https://github.com/simonster/JLD2.jl) (".jld2"). Meta data should be provided as delimited format. IMPORTANT NOTE: For delimited and JLD2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
+OTU tables can be provided in several formats: delimited formats (".csv", ".tsv"), [BIOM 1.0](http://biom-format.org/documentation/format_versions/biom-1.0.html) (".biom") or the high-performance formats [BIOM 2.0](http://biom-format.org/documentation/format_versions/biom-2.0.html) and [JLD2](https://github.com/simonster/JLD2.jl) (".jld2"). Meta data should be provided as delimited format. IMPORTANT NOTE: For delimited and JLD2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
 
 To learn an interaction network, you can do
 
@@ -23,12 +24,12 @@ julia> using FlashWeave # this has some pre-compilation delay the first time it'
 
 julia> data_path = "/my/example/data.tsv" # or .csv, .biom
 julia> meta_data_path = "/my/example/meta_data.tsv"
-julia> netw_results = learn_network(data_path, meta_data=meta_data_path, sensitive=true, heterogeneous=false)
+julia> netw_results = learn_network(data_path, meta_data_path, sensitive=true, heterogeneous=false)
 julia> netw_results.graph # weighted graph representing interactions
 
 julia> # for JLD2, you can provide keys:
 julia> # data_path = "/my/example/data.jld2"
-julia> # netw_results = learn_network(data_path, data_key="data", data_header_key="header" meta_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
+julia> # netw_results = learn_network(data_path, data_key="data", data_header_key="header", meta_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
 
 Results can currently be saved in JLD2 (".jld2"), fast for large networks, or as traditional edgelist (".edgelist") format:

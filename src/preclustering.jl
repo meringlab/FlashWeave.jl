@@ -152,7 +152,7 @@ function cluster_data{T,ElType<:Real}(data::AbstractMatrix{ElType}, stat_type::S
     if !greedy
         verbose && println("\tComputing hierarchical clusters")
         isdefined(:Clustering) || @eval using Clustering
-        clust_dict = cluster_hierarchical(dist_mat, data, cluster_sim_threshold)
+        clust_dict = Base.invokelatest(cluster_hierarchical, dist_mat, data, cluster_sim_threshold)
     end
 
     (sort(collect(keys(clust_dict))), clust_dict)

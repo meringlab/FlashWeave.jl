@@ -165,6 +165,75 @@ LGLResult(graph::SimpleWeightedGraph{T,Float64}) where T<:Integer = LGLResult(gr
                                                                         Dict{T, HitonState{T}}())
 
 
+struct FWResult{T<:Integer}
+    inference_results::LGLResult{T}
+    variable_ids::Vector{String}
+    meta_variable_mask::BitVector
+    parameters::Dict{Symbol,Any}
+end
+
+function FWResult(inf_results::LGLResult{T}, params, variable_ids=nothing, meta_variable_mask=nothing) where T<:Integer
+    n_vars = nv(inf_results.graph)
+    if variable_ids == nothing
+        variable_ids = ["X" * string(x) for x in 1:n_vars]
+    end
+
+    if meta_variable_mask == nothing
+        meta_variable_mask = falses(n_vars)
+    end
+
+    @assert n_vars == length(variable_ids) "variable_ids do not fit number of variables"
+    @assert n_vars == length(meta_variable_mask) "meta_variable_mask does not fit number of variables"
+
+    FWResult(inf_results, variable_ids, meta_variable_mask, params)
+end
+
+graph(result::FWResult{T}) where T<:Integer = result.inference_results.graph
+rejections(result::FWResult{T}) where T<:Integer = result.inference_results.rejections
+unfinished_states(result::FWResult{T}) where T<:Integer = result.inference_results.unfinished_states
+parameters(result::FWResult{T}) where T<:Integer = result.params
+variable_ids(result::FWResult{T}) where T<:Integer = result.variable_ids
+
+function unchecked_statistics(result::FWResult)
+    unf_states_dict = unfinished_states(result)
+    if isempty(unf_states_dict)
+        0, 0, 0.0
+    else
+        n_unf = length(unf_states_dict)
+        n_unchecked, n_checked = [map(s -> length(getfield(s, fld)), values(unf_states_dict)) for fld in [:unchecked_vars, :state_results]]
+        mean_n_unchecked = mean(n_unchecked)
+        mean_frac_unchecked = mean(n_unchecked ./ (n_unchecked .+ n_checked))
+        n_unf, mean_n_unchecked, mean_frac_unchecked
+    end
+end
+
+function show(io::IO, result::FWResult{T}) where T<:Integer
+    G = graph(result)
+    params = parameters(result)
+    het_str = params[:heterogeneous] ? "HE" : ""
+    sens_str = params[:sensitive] ? "sensitive" : "fast"
+    cond_str = params[:max_k] == 0 ? "univariate" : "conditional (max_k $(params[:max_k]))"
+    println(io, "Mode:")
+    println(io, "FlashWeave$het_str, $cond_str, $sens_str\n")
+
+    println(io, "Network:")
+    n_meta_vars = sum(result.meta_variable_mask)
+    n_vars = nv(G)
+    println(io, "$(ne(G)) interactions between $n_vars variables ($(n_vars - n_meta_vars) OTUs
+     and $(n_meta_vars) MVs)\n")
+
+    println(io, "Unfinished variables:")
+    n_unf, mean_n_unchecked, mean_frac_unchecked = unchecked_statistics(result)
+    if n_unf == 0
+        println(io, "none\n")
+    else
+        println(io, "$n_unf, on average missing $mean_n_unchecked neighbors ($mean_frac_unchecked%)\n")
+    end
+
+    println(io, "Rejections:")
+    println(io, !isempty(rejections(result)) ? "tracked" : "not tracked")
+end
+
 #################################
 ## COMBINATIONS WITH WHITELIST ##
 #################################
