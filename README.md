@@ -1,4 +1,4 @@
-# FlashWeave
+# FlashWeave #
 
 FlashWeave predicts ecological interactions between microbes from large-scale compositional abundance data (i.e. OTU tables constructed from sequencing data) through statistical co-occurrence. It reports direct associations, corrected for bystander effects and other confounders, and can furthermore integrate environmental or technical factors into the analysis of microbial systems.
 
@@ -52,7 +52,7 @@ A convenient loading function is available:
 
 ## Performance tips ##
 
-Depending on your data, make sure to chose the appropriate flags (```heterogeneous=true``` for multi-habitat or -protocol data sets, ```sensitive=false``` when sensible) for optimal runtimes. If FlashWeave gets stuck on a small fraction of nodes with large neighborhoods, try increasing the convergence criterion (```conv```). To run FlashWeave in parallel, see the section below.
+Depending on your data, make sure to chose the appropriate flags (```heterogeneous=true``` for multi-habitat or -protocol data sets, ```sensitive=false``` for faster, but more coarse-grained associations) for optimal runtime. If FlashWeave should get stuck on a small fraction of nodes with large neighborhoods, try increasing the convergence criterion (```conv```). To run FlashWeave in parallel, see the section below.
 
 Note, that FlashWeave is optimized for large-scale data sets. On small data (hundreds of samples and OTUs) its speed advantages can be negated by JIT-compilation overhead.
 
@@ -61,7 +61,7 @@ Note, that FlashWeave is optimized for large-scale data sets. On small data (hun
 FlashWeave leverages Julia's built-in [parallel infrastructure](https://docs.julialang.org/en/stable/manual/parallel-computing/). In the most simple case, you can start julia with several workers
 
 ```bash
-julia -p 4 # for 4 workers
+$ julia -p 4 # for 4 workers
 ```
 
 or manually add workers at the beginning of an interactive session
@@ -74,7 +74,7 @@ julia> learn_network(...
 
 and network learning will be parallelized in a shared-memory, multi-process fashion.
 
-If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` can be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package). Details differ depending on the setup (queueing system, resource requirements, ...), but a simple example for a Sun Grid Engine (SGE) system would be:
+If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` can be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package, installable via ```julia Pkg.add("ClusterManagers")```). Details differ depending on the setup (queueing system, resource requirements, ...), but a simple example for a Sun Grid Engine (SGE) system would be:
 
 ```julia
 julia> using ClusterManagers

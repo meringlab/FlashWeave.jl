@@ -447,7 +447,8 @@ function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString=
             error("'$prec' not a valid precision")
     end
 
-    MatType = issparse(data) ? SparseMatrixCSC{T, eval(Symbol("Int$prec"))} : Matrix{T}
+    # currently need sparse 64 precision indices due to performance bug
+    MatType = issparse(data) ? SparseMatrixCSC{T, Int64} : Matrix{T}
     data = convert(MatType, data)
 
     if !isempty(test_name)
