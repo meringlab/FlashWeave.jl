@@ -4,7 +4,7 @@ using LightGraphs
 using FlashWeave
 using FileIO
 
-data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
+data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_sp = sparse(data)
 
 adj_exp_dict = load(joinpath("data", "learning_expected.jld2"))

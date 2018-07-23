@@ -10,7 +10,7 @@ using LightGraphs, SimpleWeightedGraphs
 using StatsBase, Distributions, Combinatorics
 
 # io
-using JSON
+using JSON, HDF5
 
 # utilities
 import Base.show
@@ -38,7 +38,7 @@ export learn_network,
        graph
 
 function __init__()
-   warn_items = [(:FileIO, "JLD2"), (:HDF5, "BIOM 2.0")]
+   warn_items = [(:FileIO, "JLD/JLD2")]
    for (mod_symbol, format) in warn_items
        isdefined(mod_symbol) && warn("Package $mod_symbol was loaded before importing FlashWeave. $format will not be available for FlashWeave's IO functions.")
    end

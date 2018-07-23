@@ -3,7 +3,7 @@ using StatsBase
 using FileIO
 using Base.Test
 
-data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
+data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_sparse = sparse(data)
 
 exp_dict = load(joinpath("data", "preprocessing_expected.jld2"))["exp_dict"]

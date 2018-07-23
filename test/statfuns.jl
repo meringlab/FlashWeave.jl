@@ -18,7 +18,7 @@ ctab12_34[2, 1, 3] = 2
 ctab12_34[2, 2, 4] = 1
 ctab12_34[2, 2, 5] = 1
 
-data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
+data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 
 
 @testset "correlation" begin

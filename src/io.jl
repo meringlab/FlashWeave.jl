@@ -1,8 +1,13 @@
 # note: needed lots of @eval and Base.invokelatest hacks for conditional
 # module loading
 
-const valid_net_formats = (".edgelist", ".jld2")
-const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2")
+const valid_net_formats = (".edgelist", ".jld2", ".jld")
+const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2", ".jld")
+
+isjld(ext::AbstractString) = ext in (".jld2", ".jld")
+isdlm(ext::AbstractString) = ext in (".tsv", ".csv")
+isbiom(ext::AbstractString) = ext == ".biom"
+isedgelist(ext::AbstractString) = ext == ".edgelist"
 
 function load_data(data_path::AbstractString, meta_path=nothing; transposed::Bool=false,
      data_key::AbstractString="data", meta_key::AbstractString="meta_data",
@@ -10,13 +15,14 @@ function load_data(data_path::AbstractString, meta_path=nothing; transposed::Boo
      """Load OTU tables and meta data from various formats.
      -- Set jld keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
-
     file_ext = splitext(data_path)[2]
-    if file_ext in [".tsv", ".csv"]
+    transposed && file_ext != ".biom" && warn("'transposed' cannot be used with .biom files")
+
+    if isdlm(file_ext)
         ld_results = load_dlm(data_path, meta_path, transposed=transposed)
-    elseif file_ext == ".biom"
+    elseif isbiom(file_ext)
         ld_results = load_biom(data_path, meta_path)
-    elseif file_ext == ".jld2"
+    elseif isjld(file_ext)
         ld_results = load_jld(data_path, data_key, header_key, meta_key, meta_header_key)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_data_formats)")
@@ -27,9 +33,9 @@ end
 
 function save_network(out_path::AbstractString, net_result::LGLResult; detailed::Bool=false)
     file_ext = splitext(out_path)[2]
-    if file_ext == ".edgelist"
+    if isedgelist(file_ext)
         write_edgelist(out_path, net_result.graph)
-    elseif file_ext == ".jld2"
+    elseif isjld(file_ext)
         isdefined(:FileIO) || @eval using FileIO: save, load
         Base.invokelatest(save, out_path, "results", net_result)
     else
@@ -45,16 +51,13 @@ end
 
 function load_network(net_path::AbstractString)
     file_ext = splitext(net_path)[2]
-    if file_ext == ".edgelist"
+    if isedgelist(file_ext)
         G = read_edgelist(net_path)
         net_result = LGLResult(G)
-    elseif file_ext == ".jld2"
+    elseif isjld(file_ext)
         isdefined(:FileIO) || @eval using FileIO: save, load
         d = Base.invokelatest(load, net_path)
-        #isdefined(:JLD2) || @eval using JLD2
-        #d = Base.invokelatest(jldopen, net_path, "r")
         net_result = d["results"]
-        #close(d)
     else
         error("$(file_ext) not a valid network format. Valid formats are $(valid_net_formats)")
     end
@@ -70,10 +73,6 @@ function load_jld(data_path::AbstractString, data_key::AbstractString, header_ke
      isdefined(:FileIO) || @eval using FileIO: save, load
      d = Base.invokelatest(load, data_path)
 
-     # hack around JLD2 out-of-bounds error gotten for some data sets
-     #isdefined(:JLD2) || @eval using JLD2
-     #d = Base.invokelatest(jldopen, data_path, "r")
-
      data = d[data_key]
      header = d[header_key]
 
@@ -84,15 +83,13 @@ function load_jld(data_path::AbstractString, data_key::AbstractString, header_ke
          meta_data = meta_header = nothing
      end
 
-     # finish hack
-     #close(d)
-
      data, header, meta_data, meta_header
  end
 
 
 hasrowids(data::AbstractMatrix) = data[1, 1] == "" || isa(data[2, 1], AbstractString)
 
+# this could eventually replaced with FileIO
 function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool=false)
     sep = splitext(data_path)[2] == ".tsv" ? '\t' : ','
 
@@ -148,8 +145,7 @@ end
 
 function load_biom(data_path, meta_path=nothing)
     data, header = try
-        isdefined(:HDF5) || @eval using HDF5
-        Base.invokelatest(load_biom_hdf5, data_path)
+        load_biom_hdf5(data_path)
     catch
         try
             load_biom_json(data_path)

@@ -8,7 +8,7 @@ net_result = load_network(joinpath("data", "io_expected.jld2"))
 @testset "networks" begin
     tmp_path = tempname()
 
-    for net_format in ["edgelist", "jld2"]
+    for net_format in ["edgelist", "jld2", "jld"]
         @testset "$net_format" begin
             tmp_net_path = tmp_path * "." * net_format
             save_network(tmp_net_path, net_result)
@@ -18,6 +18,7 @@ net_result = load_network(joinpath("data", "io_expected.jld2"))
     end
 end
 
+
 tmp_path = tempname()
 net_format = "jld2"
 tmp_net_path = tmp_path * "." * net_format
@@ -25,23 +26,21 @@ save_network(tmp_net_path, net_result)
 net_result_ld = load_network(tmp_net_path)
 net_result_ld.graph == net_result.graph
 
-
-
-data, header = readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t', header=true)
+data, header = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t', header=true)
 data = Matrix{Int}(data[1:19, 2:20])
 header = Vector{String}(header[2:20])
-meta_data, meta_header = readdlm(joinpath("data", "HMP_SRA_gut_tiny_meta.tsv"), '\t', Int, header=true)
+meta_data, meta_header = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny_meta.tsv"), '\t', Int, header=true)
 meta_header = Vector{String}(meta_header[:])
 
 
-@testset "input data" begin
+@testset "table data" begin
     tmp_path = tempname()
 
-    for (data_format, data_suff, meta_suff) in zip(["tsv", "csv", "biom_json", "biom_hdf5", "jld2"],
-                                                   [".tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2"],
-                                                   ["_meta.tsv", "_meta.csv", "_meta.tsv", "_meta.tsv", ""])
+    for (data_format, data_suff, meta_suff) in zip(["tsv", "csv", "biom_json", "biom_hdf5", "jld2", "jld"],
+                                                   [".tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2", "_plus_meta.jld"],
+                                                   ["_meta.tsv", "_meta.csv", "_meta.tsv", "_meta.tsv", "", ""])
         @testset "$data_format" begin
-            data_path, meta_path = [joinpath("data", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
+            data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             data_ld = load_data(data_path, meta_path)
             @test all(data_ld[1] .== data)
             @test all(data_ld[2] .== header)
@@ -50,6 +49,8 @@ meta_header = Vector{String}(meta_header[:])
         end
     end
 end
+
+
 
 
 # to create expected output
