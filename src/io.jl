@@ -16,14 +16,14 @@ function load_data(data_path::AbstractString, meta_path=nothing; transposed::Boo
      -- Set jld keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
     file_ext = splitext(data_path)[2]
-    transposed && file_ext != ".biom" && warn("'transposed' cannot be used with .biom files")
+    transposed && file_ext == ".biom" && warn("'transposed' cannot be used with .biom files")
 
     if isdlm(file_ext)
         ld_results = load_dlm(data_path, meta_path, transposed=transposed)
     elseif isbiom(file_ext)
         ld_results = load_biom(data_path, meta_path)
     elseif isjld(file_ext)
-        ld_results = load_jld(data_path, data_key, header_key, meta_key, meta_header_key)
+        ld_results = load_jld(data_path, data_key, header_key, meta_key, meta_header_key, transposed=transposed)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_data_formats)")
     end
@@ -69,7 +69,7 @@ end
 ######################
 
 function load_jld(data_path::AbstractString, data_key::AbstractString, header_key::AbstractString,
-     meta_key=nothing, meta_header_key=nothing)
+     meta_key=nothing, meta_header_key=nothing; transposed::Bool=false)
      isdefined(:FileIO) || @eval using FileIO: save, load
      d = Base.invokelatest(load, data_path)
 
@@ -83,6 +83,11 @@ function load_jld(data_path::AbstractString, data_key::AbstractString, header_ke
          meta_data = meta_header = nothing
      end
 
+     if transposed
+         data = data'
+         meta_data = meta_data'
+     end
+
      data, header, meta_data, meta_header
  end
 
@@ -92,11 +97,11 @@ hasrowids(data::AbstractMatrix) = data[1, 1] == "" || isa(data[2, 1], AbstractSt
 # this could eventually replaced with FileIO
 function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool=false)
     sep = splitext(data_path)[2] == ".tsv" ? '\t' : ','
-
     data = readdlm(data_path, sep)
 
     if transposed
-        data = data'
+        # hacky transpose for string data
+        data = permutedims(data, (2,1))
     end
 
     if hasrowids(data)

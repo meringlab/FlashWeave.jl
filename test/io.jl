@@ -36,9 +36,9 @@ meta_header = Vector{String}(meta_header[:])
 @testset "table data" begin
     tmp_path = tempname()
 
-    for (data_format, data_suff, meta_suff) in zip(["tsv", "csv", "biom_json", "biom_hdf5", "jld2", "jld"],
-                                                   [".tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2", "_plus_meta.jld"],
-                                                   ["_meta.tsv", "_meta.csv", "_meta.tsv", "_meta.tsv", "", ""])
+    for (data_format, data_suff, meta_suff) in zip(["tsv", "tsv_rownames", "csv", "biom_json", "biom_hdf5", "jld2", "jld"],
+                                                   [".tsv", "_ids.tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2", "_plus_meta.jld"],
+                                                   ["_meta.tsv", "_meta.csv", "_meta.csv", "_meta.tsv", "_meta.tsv", "", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             data_ld = load_data(data_path, meta_path)
@@ -49,6 +49,25 @@ meta_header = Vector{String}(meta_header[:])
         end
     end
 end
+
+
+@testset "transposed" begin
+    tmp_path = tempname()
+
+    for (data_format, data_suff, meta_suff) in zip(["tsv"],
+                                                   ["_ids_transp.tsv"],
+                                                   ["_meta_transp.tsv"])
+        @testset "$data_format" begin
+            data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
+            data_ld = load_data(data_path, meta_path, transposed=true)
+            @test all(data_ld[1] .== data)
+            @test all(data_ld[2] .== header)
+            @test all(data_ld[3] .== meta_data)
+            @test all(data_ld[4] .== meta_header)
+        end
+    end
+end
+
 
 
 
