@@ -202,7 +202,7 @@ function print_network_stats(graph::LightGraphs.Graph)
 end
 
 
-function maxweight(weight1::Float64, weight2::Float64)
+function maxweight(weight1::Float64, weight2::Float64, e1::Int, e2::Int, header::Vector{String}=String[])
     sign1 = sign(weight1)
     sign2 = sign(weight2)
 
@@ -212,7 +212,8 @@ function maxweight(weight1::Float64, weight2::Float64)
         return weight1
     else
         if sign1 * sign2 < 0
-            warn("Opposite signs for the same edge detected. Arbitarily choosing one.")
+            e1w, e2w = isempty(header) ? (e1, e2) : (header[e1], header[e2])
+            warn("Opposite signs for edge $e1w <-> $e2w detected. Arbitarily choosing one.")
             return weight1
         else
             return max(abs(weight1), abs(weight2)) * sign1
@@ -230,7 +231,7 @@ function SimpleWeightedGraph_nodemax(i::AbstractVector{T}, j::AbstractVector{T},
 end
 
 
-function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight, max_var::Int=-1)
+function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight, max_var::Int=-1, header::Vector{String}=String[])
     if max_var < 0
         max_val_key = maximum(map(x -> !isempty(x) ? maximum(keys(x)) : 0, values(weights_dict)))
         max_key_key = maximum(keys(weights_dict))
@@ -241,6 +242,7 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     dsts = Int[]
     ws = Float64[]
 
+    trans_nodes = !isempty(header)
     prev_edges = Set{Tuple{Int,Int}}()
     for node1 in keys(weights_dict)
         for node2 in keys(weights_dict[node1])
@@ -249,7 +251,8 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
             if !(e in prev_edges)
                 weight = weights_dict[node1][node2]
                 rev_weight = get(weights_dict[node2], node1, NaN64)
-                sym_weight = edge_merge_fun(weight, rev_weight)
+
+                sym_weight = edge_merge_fun(weight, rev_weight, node1, node2, header)
                 push!(srcs, e[1])
                 push!(dsts, e[2])
                 push!(ws, sym_weight)

@@ -314,7 +314,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
         weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type, test_name)
     end
 
-    graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, max_var=size(data, 2))
+    graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, max_var=size(data, 2), header=header)
 
     if verbose
         toc()

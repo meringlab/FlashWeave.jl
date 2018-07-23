@@ -1,8 +1,11 @@
 using Base.Test
 using SimpleWeightedGraphs
 using LightGraphs
+
+nprocs() == 1 && addprocs(1)
 using FlashWeave
 using FileIO
+
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_sp = sparse(data)
