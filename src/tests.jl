@@ -61,9 +61,9 @@ function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Integer},
     Test all variables Ys for univariate association with X"""
     @inbounds levels_x = test_obj.levels[X]
     if levels_x < 2
-        return [TestResult(0.0, 1.0, 0, false) for Y in Ys]
+        return TestResult[TestResult(0.0, 1.0, 0, false) for Y in Ys]
     else
-        return map(Y -> test(X, Y, data, test_obj, hps, n_obs_min), Ys)
+        return map(Y -> test(X, Y, data, test_obj, hps, n_obs_min), Ys)::Vector{TestResult}
     end
 end
 
@@ -142,7 +142,7 @@ function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFl
 
     Test all variables Ys for univariate association with X"""
 
-    map(Y -> test(X, Y, data, test_obj, n_obs_min, false), Ys)
+    map(Y -> test(X, Y, data, test_obj, n_obs_min, false), Ys)::Vector{TestResult}
 end
 
 #convenience wrapper

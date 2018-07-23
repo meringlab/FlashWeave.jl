@@ -52,7 +52,7 @@ A convenient loading function is available:
 
 ## Performance tips ##
 
-Depending on your data, make sure to chose the appropriate flags (```heterogeneous=true``` for multi-habitat or -protocol data sets, ```sensitive=false``` for faster, but more coarse-grained associations) for optimal runtime. If FlashWeave should get stuck on a small fraction of nodes with large neighborhoods, try increasing the convergence criterion (```conv```). To run FlashWeave in parallel, see the section below.
+Depending on your data, make sure to chose the appropriate flags (```heterogeneous=true``` for multi-habitat or -protocol data sets with ideally at least thousands of samples; ```sensitive=false``` for faster, but more coarse-grained associations) to achieve optimal runtime. If FlashWeave should get stuck on a small fraction of nodes with large neighborhoods, try increasing the convergence criterion (```conv```). To run FlashWeave in parallel, see the section below.
 
 Note, that FlashWeave is optimized for large-scale data sets. On small data (hundreds of samples and OTUs) its speed advantages can be negated by JIT-compilation overhead.
 
@@ -74,7 +74,7 @@ julia> learn_network(...
 
 and network learning will be parallelized in a shared-memory, multi-process fashion.
 
-If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` can be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package, installable via ```julia Pkg.add("ClusterManagers")```). Details differ depending on the setup (queueing system, resource requirements, ...), but a simple example for a Sun Grid Engine (SGE) system would be:
+If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` can be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package, installable via ```Pkg.add("ClusterManagers")```). Details differ depending on the setup (queueing system, resource requirements etc.), but a simple example for a Sun Grid Engine (SGE) system would be:
 
 ```julia
 julia> using ClusterManagers

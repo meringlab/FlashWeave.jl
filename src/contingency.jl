@@ -38,31 +38,30 @@ function contingency_table!{ElType<:Integer}(X::Int, Y::Int, Zs::Tuple{Vararg{In
     levels_z
 end
 
-# convenience wrapper for two-way contingency tables
-function contingency_table(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_name::String, levels::Vector{<:Integer}=get_levels(data))
-    if issparse(data)
-        test_obj = make_test_object(test_name, false, max_k=0, levels=levels, cor_mat=zeros(Float64, 0, 0))
-        contingency_table!(X, Y, data, test_obj)
-        ctab = test_obj.ctab
-    else
-        ctab = contingency_table(X, Y, data)
-    end
-    ctab
+## convenience wrapper for two-way contingency tables
+function contingency_table(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer}, test_name::String, levels::Vector{<:Integer}=get_levels(data))
+    test_obj = make_test_object(test_name, false, max_k=0, levels=levels, cor_mat=zeros(Float64, 0, 0))
+    contingency_table!(X, Y, data, test_obj)
+    test_obj.ctab::Matrix{Int}
 end
 
+contingency_table(X::Int, Y::Int, data::Matrix{<:Integer}, test_name::String) = contingency_table(X, Y, data)
 
-# convenience wrapper for three-way contingency tables
-function contingency_table(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer}, test_name::String,
-    levels::Vector{<:Integer}=get_levels(data))
+
+## convenience wrappers for three-way contingency tables
+function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Matrix{<:Integer},
+    test_obj::ContTest3D)
+    z = zeros(eltype(test_obj.levels), size(data, 1))
+    contingency_table!(X, Y, Zs, data, test_obj.ctab, z, test_obj.zmap.cum_levels, test_obj.zmap.z_map_arr)
+end
+
+function contingency_table(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer},
+    test_name::String, levels::Vector{<:Integer}=get_levels(data))
     test_obj = make_test_object(test_name, true, max_k=length(Zs), levels=levels, cor_mat=zeros(Float64, 0, 0))
-    if issparse(data)
-        contingency_table!(X, Y, Zs, data, test_obj)
-    else
-        z = zeros(eltype(levels), size(data, 1))
-        contingency_table!(X, Y, Zs, data, test_obj.ctab, z, test_obj.zmap.cum_levels, test_obj.zmap.z_map_arr)
-    end
-    test_obj.ctab
+    contingency_table!(X, Y, Zs, data, test_obj)
+    test_obj.ctab::Array{Int,3}
 end
+
 
 
 # SPARSE DATA

@@ -54,9 +54,15 @@ end
 for sparsity_mode in ["dense", "sparse"]
     @testset "$sparsity_mode" begin
         ts_data = sparsity_mode == "dense" ? data_contingency : sparse(data_contingency)
-        @test all(FlashWeave.contingency_table(1, 2, ts_data, "mi")[1:2, 1:2] .== ctab12)
-        @test all(FlashWeave.contingency_table(2, 3, ts_data, "mi")[1:2, 1:3] .== ctab23)
-        @test compare_cond_ctabs(FlashWeave.contingency_table(1, 2, (3,), ts_data, "mi"), ctab12_3)
-        @test compare_cond_ctabs(FlashWeave.contingency_table(1, 2, (3, 4), ts_data, "mi"), ctab12_34)
+
+        @testset "2-way" begin
+            @test all(@inferred(FlashWeave.contingency_table(1, 2, ts_data, "mi"))[1:2, 1:2] .== ctab12)
+            @test all(@inferred(FlashWeave.contingency_table(2, 3, ts_data, "mi"))[1:2, 1:3] .== ctab23)
+        end
+
+        @testset "3-way" begin
+            @test compare_cond_ctabs(@inferred(FlashWeave.contingency_table(1, 2, (3,), ts_data, "mi")), ctab12_3)
+            @test compare_cond_ctabs(@inferred(FlashWeave.contingency_table(1, 2, (3, 4), ts_data, "mi")), ctab12_34)
+        end
     end
 end

@@ -305,7 +305,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                                                                        interleaved_kwargs)
 
     if verbose
-        println("Postprocessing..")
+        println("\nPostprocessing..")
         tic()
     end
 
@@ -317,8 +317,8 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, max_var=size(data, 2))
 
     if verbose
-        println("Complete.")
         toc()
+        println("Complete.")
     end
 
     LGLResult{Int}(graph, rej_dict, unfinished_state_dict)
@@ -422,7 +422,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
 
     net_result = FWResult(lgl_results, header, meta_mask, params_dict)
 
-    verbose && println("\nFinished inference. Time taken: ", round(time_taken, 3), "s")
+    verbose && println("\nFinished inference. Total time taken: ", round(time_taken, 3), "s")
 
     net_result
 end

@@ -205,31 +205,6 @@ function mi_pval(mi::AbstractFloat, df::Integer, n_obs::Integer)
 end
 
 
-function mutual_information{T<:Integer}(ctab::AbstractArray{T})
-    num_dims = ndims(ctab)
-    levels_x = size(ctab, 1)
-    levels_y = size(ctab, 2)
-
-    if num_dims == 3
-        levels_z = size(ctab, 3)
-    end
-
-    if num_dims == 3
-        ni = zeros(T, levels_x, levels_z)
-        nj = zeros(T, levels_y, levels_z)
-        nk = zeros(T, levels_z)
-
-        return mutual_information(ctab, levels_x, levels_y, levels_z, ni, nj, nk)
-    else
-        ni = zeros(T, levels_x)
-        nj = zeros(T, levels_y)
-
-        return mutual_information(ctab, levels_x, levels_y, ni, nj)
-    end
-
-end
-
-
 function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer, levels_y::Integer,
         levels_z::Integer, marg_i::AbstractMatrix{<:Integer}, marg_j::AbstractMatrix{<:Integer}, marg_k::AbstractVector{<:Integer})
     """Note: returns mutual information * number of observations!"""
@@ -264,9 +239,13 @@ function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer
 end
 
 
+"""
+IMPORTANT NOTE: returns mutual information * number of observations!
+(avoids repeated calculation later)
+"""
 function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, levels_y::Integer,
         marg_i::AbstractVector{<:Integer}, marg_j::AbstractVector{<:Integer})
-    """Note: returns mutual information * number of observations!"""
+
     fill!(marg_i, 0)
     fill!(marg_j, 0)
 
@@ -294,6 +273,32 @@ function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, 
 
     mi_stat / n_obs
 end
+
+## Convenience functions for mutual information
+
+function mutual_information{T<:Integer}(ctab::AbstractArray{T, 2})
+    levels_x = size(ctab, 1)
+    levels_y = size(ctab, 2)
+
+    ni = zeros(T, levels_x)
+    nj = zeros(T, levels_y)
+
+    mutual_information(ctab, levels_x, levels_y, ni, nj)
+end
+
+
+function mutual_information{T<:Integer}(ctab::AbstractArray{T, 3})
+    levels_x = size(ctab, 1)
+    levels_y = size(ctab, 2)
+    levels_z = size(ctab, 3)
+
+    ni = zeros(T, levels_x, levels_z)
+    nj = zeros(T, levels_y, levels_z)
+    nk = zeros(T, levels_z)
+
+    mutual_information(ctab, levels_x, levels_y, levels_z, ni, nj, nk)
+end
+
 
 
 function adjust_df{T<:Integer}(marg_i::AbstractVector{T}, marg_j::AbstractVector{T}, levels_x::Integer, levels_y::Integer)
@@ -338,9 +343,10 @@ function nz_adjust_cont_tab(levels_x::Integer, levels_y::Integer, ctab::Abstract
 end
 
 
+"""Accelerated version of that found in MultipleTesting.jl"""
 function benjamini_hochberg!{T <: AbstractFloat}(pvals::AbstractVector{T};
     alpha::AbstractFloat=0.01, m=length(pvals))
-    """Accelerated version of that found in MultipleTesting.jl"""
+
 
     sorted_pval_pairs = filter(x -> x[2] < alpha, collect(enumerate(pvals)))
     sort!(sorted_pval_pairs, by=x->x[2])

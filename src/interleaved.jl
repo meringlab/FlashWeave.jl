@@ -102,7 +102,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
 
     if verbose
-        println("Starting workers and sending data..")
+        println("\nPreparing workers for conditional search..")
         tic()
     end
 
@@ -113,8 +113,8 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                       for wid in worker_ids]
 
     if verbose
-        println("Done. Starting inference..")
         toc()
+        println("\nDone. Starting inference..")
     end
 
     remaining_jobs = jobs_total
@@ -268,11 +268,11 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                     delta_num_edges = (new_num_edges - last_conv_num_edges) / last_conv_num_edges
                     conv_level = delta_num_edges / delta_time
 
-                    verbose && println("Current convergence level: $conv_level")
+                    verbose && println("Latest convergence step change: $(round(conv_level, 5))")
 
                     if conv_level < convergence_threshold
                         converged = true
-                        verbose && println("\tCONVERGED! Waiting for remaining processes to finish their current load.")
+                        verbose && println("\tCONVERGED! Waiting for the remaining processes to finish their current load.")
                         if !isempty(output_folder)
                             save_latest_graph(output_graph, output_folder, temp_output_type, verbose)
                             last_output_time = curr_time
