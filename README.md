@@ -9,7 +9,7 @@ To install Julia, please follow instructions on https://github.com/JuliaLang/jul
 In an interactive Julia session, you can then install FlashWeave via
 
 ```julia
-# if it's a fresh julia installation your first need to run Pkg.init()
+# if it's a fresh julia installation first run Pkg.init()
 Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
 # to run tests: Pkg.test("FlashWeave")
 ```
@@ -33,7 +33,7 @@ julia> G = graph(netw_results) # weighted graph representing interactions + weig
 
 julia> # for JLD2, you can provide keys:
 julia> # data_path = "/my/example/data.jld2"
-julia> # netw_results = learn_network(data_path, data_key="data", header_key="header", meta_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
+julia> # netw_results = learn_network(data_path, otu_data_key="data", otu_header_key="header", meta_data_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
 
 Results can currently be saved in JLD/2, fast also for large networks, or as traditional edgelist (".edgelist") format:
