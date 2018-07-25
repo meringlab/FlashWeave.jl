@@ -325,14 +325,34 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
 end
 
 
-function learn_network(data_path::AbstractString, meta_data_path=nothing;  data_key::AbstractString="data",
-    header_key::AbstractString="header", meta_key::AbstractString="meta_data",
-    meta_header_key::AbstractString="meta_header", make_sparse::Bool=true, verbose::Bool=true,
+"""
+    learn_network(data_path::AbstractString, meta_data_path::AbstractString) -> FWResult{Int}
+
+Works like learn_network(data::AbstractArray{ElType}), but takes file paths an OTU table and optionally a
+meta data table as an input (instead of a data matrix).
+
+- `data_path` - path to a file storing an OTU count table (and in the case of JLD/2 possibly meta data)
+
+- `meta_data_path` - optional path to a file with meta data
+
+- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names within a JLD/2 file
+
+- `verbose` - print progress information
+
+- `transposed` - if `true`, rows of `data` are variables and columns are samples
+
+- `kwargs...` - additional keyword arguments passed to learn_network(data::AbstractArray{ElType})
+
+
+"""
+function learn_network(data_path::AbstractString, meta_data_path=nothing;  otu_data_key::AbstractString="data",
+    otu_header_key::AbstractString="header", meta_data_key::AbstractString="meta_data",
+    meta_header_key::AbstractString="meta_header", verbose::Bool=true,
     transposed::Bool=false, kwargs...)
 
     verbose && println("\n### Loading data ###\n")
-    data, header, meta_data, meta_header = load_data(data_path, meta_data_path, data_key=data_key,
-                                                     header_key=header_key, meta_key=meta_key,
+    data, header, meta_data, meta_header = load_data(data_path, meta_data_path, otu_data_key=otu_data_key,
+                                                     otu_header_key=otu_header_key, meta_key=meta_data_key,
                                                      meta_header_key=meta_header_key, transposed=transposed)
 
 
@@ -350,9 +370,63 @@ function learn_network(data_path::AbstractString, meta_data_path=nothing;  data_
 end
 
 
+"""
+    learn_network(data::AbstractArray{<:Real}) -> FWResult{Int}
+
+Learn an interaction network from a data table (including OTUs and optionally meta variables).
+
+- `data` - data table with information on OTU counts and (optionally) meta variables
+
+- `header` - names of variable-column s in `data`
+
+- `meta_mask` - true/false mask indicating which variables are meta variables
+
+*Algorithmic parameters*:
+
+- `heterogeneous` - enable heterogeneous mode for multi-habitat or -protocol data with at least thousands of samples (FlashWeaveHE)
+
+- `sensitive` - enable fine-grained associations (FlashWeave-S, FlashWeaveHE-S),  `sensitive=false` results in the `fast` modes FlashWeave-F or FlashWeaveHE-F
+
+- `max_k` - maximum size of conditioning sets, high values can strongly increase runtime. `max_k=0` results in no conditioning (univariate mode)
+
+- `alpha` - threshold used to determine statistical significance
+
+- `conv` - convergence threshold, i.e. if `conv=0.01` assume convergence if the number of edges increased by only 1% after doubling the runtime
+
+- `feed_forward` - enable feed-forward heuristic
+
+- `max_tests` - maximum number of conditional tests that should be performed on a variable pair before association is assumed
+
+- `hps` - reliability criterion for statistical tests when `sensitive=false`
+
+- `FDR` - perform False Discovery Rate correction (Benjamini-Hochberg method) on pairwise associations
+
+- `n_obs_min` - don't compute associations between variables having less reliable samples (i.e. non-zero if `heterogeneous=true`) than this number. `-1`: automatically choose a threshold.
+
+- `time_limit` - if feed-forward heuristic is active, determines the interval (seconds) at which neighborhood information is updated
+
+*General parameters*:
+
+- `normalize` - automatically choose and perform data normalization (based on `sensitive` and `heterogeneous`)
+
+- `track_rejections` - store for each discarded edge, which variable set lead to its exclusion (can be memory intense for large networks)
+
+- verbose` - print progress information
+
+- `transposed` - if `true`, rows of `data` are variables and columns are samples
+
+- `output_folder` - if feed-forward heuristic is active, periodically save the latest network in this directory
+
+- `prec` - precision in bits to use for calculations (16, 32, 64 or 128)
+
+- `make_sparse` - use a sparse data representation (should be left at `true` in almost all cases)
+
+- `update_interval` - if `verbose=true`, determines the interval (seconds) at which network stat updates are printed
+
+"""
 function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
-    conv::AbstractFloat=0.01, header=nothing, meta_mask=nothing, filter_data::Bool=true,
+    conv::AbstractFloat=0.01, header=nothing, meta_mask=nothing,
     feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
     transposed::Bool=false, output_folder::AbstractString="", prec::Integer=32, make_sparse::Bool=true,
     max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1, cache_pcor::Bool=false,

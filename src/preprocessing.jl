@@ -430,8 +430,30 @@ function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::Abstra
 end
 
 
-function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString="", norm_mode::AbstractString="", meta_mask::AbstractArray{Bool}=BitVector(),
-    header::Vector{String}=String[], verbose::Bool=true, prec::Integer=32, filter_data::Bool=true) where ElType <: Real
+"""
+    normalize_data(data::AbstractMatrix{<:Real}) -> AbstractMatrix OR (AbstractMatrix{<:Real}, Vector{String})
+
+Normalize data using various forms of clr transform and discretization. This should only be used manually when experimenting with different normalization techniques.
+
+- `data` - data table with information on OTU counts and (optionally) meta variables
+
+- `header` - names of variable-column s in `data`
+
+- `meta_mask` - true/false mask indicating which variables are meta variables
+
+- `test_name` - name of a FlashWeave-specific statistical test mode, the appropriate normalization method will be chosen automatically
+
+- `norm_mode` - identifier of a valid normalization mode ('clr-adapt', 'clr-nonzero', 'clr-nonzero-binned', 'pres-abs', 'tss', 'tss-nonzero-binned')
+
+- `filter_data` - whether to remove samples and variables without information from `data`
+
+- `verbose` - print progress information
+
+- `prec` - precision in bits to use for calculations (16, 32, 64 or 128)
+"""
+function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString="", norm_mode::AbstractString="",
+    header::Vector{String}=String[], meta_mask::AbstractArray{Bool}=BitVector(),
+    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true) where ElType <: Real
     @assert xor(isempty(test_name), isempty(norm_mode)) "provide either test_name and norm_mode (but not both)"
     @assert !xor(isempty(meta_mask), isempty(header)) "provide both meta_mask and header (or none)"
 

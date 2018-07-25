@@ -9,9 +9,23 @@ isdlm(ext::AbstractString) = ext in (".tsv", ".csv")
 isbiom(ext::AbstractString) = ext == ".biom"
 isedgelist(ext::AbstractString) = ext == ".edgelist"
 
+
+"""
+    load_data(data_path::AbstractString, meta_path::AbstractString) -> (AbstractMatrix{<:Real}, Vector{String}, AbstractMatrix{<:Real}, Vector{String})
+
+Load tables with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv', '.biom', '.jld' and '.jld2'.
+
+- `data_path` - path to a file storing an OTU count table
+
+- `meta_data_path` - optional path to a file with meta variable information
+
+- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names within a JLD/2 file
+
+- `transposed` - if `true`, rows of `data` are variables and columns are samples
+"""
 function load_data(data_path::AbstractString, meta_path=nothing; transposed::Bool=false,
-     data_key::AbstractString="data", meta_key::AbstractString="meta_data",
-     header_key::AbstractString="header", meta_header_key::AbstractString="meta_header")
+     otu_data_key::AbstractString="data", meta_data_key::AbstractString="meta_data",
+     otu_header_key::AbstractString="header", meta_header_key::AbstractString="meta_header")
      """Load OTU tables and meta data from various formats.
      -- Set jld keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
@@ -23,7 +37,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; transposed::Boo
     elseif isbiom(file_ext)
         ld_results = load_biom(data_path, meta_path)
     elseif isjld(file_ext)
-        ld_results = load_jld(data_path, data_key, header_key, meta_key, meta_header_key, transposed=transposed)
+        ld_results = load_jld(data_path, otu_data_key, otu_header_key, meta_data_key, meta_header_key, transposed=transposed)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_data_formats)")
     end
@@ -31,29 +45,49 @@ function load_data(data_path::AbstractString, meta_path=nothing; transposed::Boo
     ld_results
 end
 
-function save_network(out_path::AbstractString, net_result::LGLResult; detailed::Bool=false)
-    file_ext = splitext(out_path)[2]
+
+"""
+    save_network(net_path::AbstractString, net_result::FWResult) -> Void
+
+Save network results to disk. Available formats are '.tsv', '.csv', '.jld' and '.jld2'.
+
+- `net_path` - output path for the network
+
+- `net_result` - network results object that should be saved
+
+- `detailed` - output additional information, such as discarding sets, if available
+"""
+function save_network(net_path::AbstractString, net_result::FWResult; detailed::Bool=false)
+    file_ext = splitext(net_path)[2]
     if isedgelist(file_ext)
-        write_edgelist(out_path, net_result.graph)
+        write_edgelist(net_path, graph(net_result))
     elseif isjld(file_ext)
         isdefined(:FileIO) || @eval using FileIO: save, load
-        Base.invokelatest(save, out_path, "results", net_result)
+        Base.invokelatest(save, net_path, "results", net_result)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_net_formats)")
     end
 
     if detailed
-        out_trunk = splitext(out_path)[1]
+        out_trunk = splitext(net_path)[1]
         save_rejections(out_trunk * "_rejections.tsv", net_result)
         save_unfinished_variable_info(out_trunk * "_unchecked.tsv", net_result)
     end
 end
 
+
+"""
+    load_network(net_path::AbstractString) -> FWResult{Int}
+
+Load network results from disk. Available formats are '.tsv', '.csv', '.jld' and '.jld2'.
+
+- `net_path` - path from which to load the network results
+"""
 function load_network(net_path::AbstractString)
     file_ext = splitext(net_path)[2]
     if isedgelist(file_ext)
         G = read_edgelist(net_path)
-        net_result = LGLResult(G)
+        net_result = FWResult(G)
     elseif isjld(file_ext)
         isdefined(:FileIO) || @eval using FileIO: save, load
         d = Base.invokelatest(load, net_path)

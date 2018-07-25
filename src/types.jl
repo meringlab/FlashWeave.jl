@@ -172,8 +172,12 @@ struct FWResult{T<:Integer}
     parameters::Dict{Symbol,Any}
 end
 
-function FWResult(inf_results::LGLResult{T}, params, variable_ids=nothing, meta_variable_mask=nothing) where T<:Integer
+function FWResult(inf_results::LGLResult{T}, params=nothing, variable_ids=nothing, meta_variable_mask=nothing) where T<:Integer
     n_vars = nv(inf_results.graph)
+    if params == nothing
+        params = Dict{Symbol,Any}()
+    end
+
     if variable_ids == nothing
         variable_ids = ["X" * string(x) for x in 1:n_vars]
     end
@@ -188,10 +192,30 @@ function FWResult(inf_results::LGLResult{T}, params, variable_ids=nothing, meta_
     FWResult(inf_results, variable_ids, meta_variable_mask, params)
 end
 
+FWResult(G::SimpleWeightedGraph) = FWResult(LGLResult(G))
+
+
+"""
+    graph(result::FWResult{T}) -> SimpleWeightedGraph{Int, Float64}
+
+Extract the underlying weighted graph from network results.
+"""
 graph(result::FWResult{T}) where T<:Integer = result.inference_results.graph
 rejections(result::FWResult{T}) where T<:Integer = result.inference_results.rejections
 unfinished_states(result::FWResult{T}) where T<:Integer = result.inference_results.unfinished_states
+
+"""
+    parameters(result::FWResult{T}) -> Dict{Symbol, Any}
+
+Extract the used parameters from network results.
+"""
 parameters(result::FWResult{T}) where T<:Integer = result.parameters
+
+"""
+    variable_ids(result::FWResult{T}) -> Vector{T}
+
+Extract the IDs/names of all variables (nodes) in the network.
+"""
 variable_ids(result::FWResult{T}) where T<:Integer = result.variable_ids
 converged(result::FWResult{T}) where T<:Integer = !isempty(result.inference_results.unfinished_states)
 
@@ -213,7 +237,11 @@ function show(io::IO, result::FWResult{T}) where T<:Integer
     G = graph(result)
     params = parameters(result)
     println(io, "\nMode:")
-    println(io, mode_string([params[key] for key in [:heterogeneous, :sensitive, :max_k]]...), "\n")
+    if isempty(params)
+        println(io, "unknown\n")
+    else
+        println(io, mode_string([params[key] for key in [:heterogeneous, :sensitive, :max_k]]...), "\n")
+    end
 
     println(io, "Network:")
     n_meta_vars = sum(result.meta_variable_mask)

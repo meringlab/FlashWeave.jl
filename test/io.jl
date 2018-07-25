@@ -1,6 +1,5 @@
 using Base.Test
 using FlashWeave
-using FlashWeave: LGLResult, RejDict, HitonState
 using SimpleWeightedGraphs
 
 net_result = load_network(joinpath("data", "io_expected.jld2"))
@@ -13,18 +12,11 @@ net_result = load_network(joinpath("data", "io_expected.jld2"))
             tmp_net_path = tmp_path * "." * net_format
             save_network(tmp_net_path, net_result)
             net_result_ld = load_network(tmp_net_path)
-            @test net_result_ld.graph == net_result.graph
+            @test graph(net_result_ld) == graph(net_result)
         end
     end
 end
 
-
-tmp_path = tempname()
-net_format = "jld2"
-tmp_net_path = tmp_path * "." * net_format
-save_network(tmp_net_path, net_result)
-net_result_ld = load_network(tmp_net_path)
-net_result_ld.graph == net_result.graph
 
 data, header = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t', header=true)
 data = Matrix{Int}(data[1:19, 2:20])
