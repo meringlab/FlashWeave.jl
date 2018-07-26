@@ -16,7 +16,7 @@ Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
 
 ## Basic usage ##
 
-OTU tables can be provided in several formats: delimited formats (".csv", ".tsv"), [BIOM 1.0](http://biom-format.org/documentation/format_versions/biom-1.0.html) (".biom") or the high-performance formats [BIOM 2.0](http://biom-format.org/documentation/format_versions/biom-2.0.html) and [JLD](https://github.com/JuliaIO/JLD.jl)/[JLD2](https://github.com/simonster/JLD2.jl) (".jld", ".jld2"). Meta data should be provided as delimited format (except for JLD/2, see below). IMPORTANT NOTE: For delimited and JLD/2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
+OTU tables can be provided in several formats: delimited formats (".csv", ".tsv"), [BIOM 1.0](http://biom-format.org/documentation/format_versions/biom-1.0.html) (".biom") or the high-performance formats [BIOM 2.0](http://biom-format.org/documentation/format_versions/biom-2.0.html) and [JLD](https://github.com/JuliaIO/JLD.jl)/[JLD2](https://github.com/simonster/JLD2.jl) (".jld", ".jld2"). Meta data should be provided as delimited format (except for JLD/2, see below). See the ```test/data/HMP_SRA_gut``` directory for examples. IMPORTANT NOTE: For delimited and JLD/2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
 
 To learn an interaction network, you can do
 
@@ -33,7 +33,7 @@ julia> G = graph(netw_results) # weighted graph representing interactions + weig
 
 julia> # for JLD2, you can provide keys:
 julia> # data_path = "/my/example/data.jld2"
-julia> # netw_results = learn_network(data_path, otu_data_key="data", otu_header_key="header", meta_data_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
+julia> # netw_results = learn_network(data_path, otu_data_key="otu_data", otu_header_key="otu_header", meta_data_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
 
 Results can currently be saved in JLD/2, fast also for large networks, or as traditional edgelist (".edgelist") format:

@@ -47,8 +47,8 @@ end
     tmp_path = tempname()
 
     for (data_format, data_suff, meta_suff) in zip(["tsv", "jld", "jld2"],
-                                                   ["_ids_transp.tsv", "_plus_meta_transposed.jld", "_plus_meta_transposed.jld2"],
-                                                   ["_meta_transp.tsv", "", ""])
+                                                   ["_ids_transposed.tsv", "_plus_meta_transposed.jld", "_plus_meta_transposed.jld2"],
+                                                   ["_meta_transposed.tsv", "", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             data_ld = load_data(data_path, meta_path, transposed=true)

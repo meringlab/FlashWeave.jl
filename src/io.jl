@@ -24,8 +24,8 @@ Load tables with OTU count and optionally meta data from disc. Available formats
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
 function load_data(data_path::AbstractString, meta_path=nothing; transposed::Bool=false,
-     otu_data_key::AbstractString="data", meta_data_key::AbstractString="meta_data",
-     otu_header_key::AbstractString="header", meta_header_key::AbstractString="meta_header")
+     otu_data_key::AbstractString="otu_data", meta_data_key::AbstractString="meta_data",
+     otu_header_key::AbstractString="otu_header", meta_header_key::AbstractString="meta_header")
      """Load OTU tables and meta data from various formats.
      -- Set jld keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
