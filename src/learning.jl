@@ -345,14 +345,14 @@ meta data table as an input (instead of a data matrix).
 
 
 """
-function learn_network(data_path::AbstractString, meta_data_path=nothing;  otu_data_key::AbstractString="data",
-    otu_header_key::AbstractString="header", meta_data_key::AbstractString="meta_data",
+function learn_network(data_path::AbstractString, meta_data_path=nothing;  otu_data_key::AbstractString="otu_data",
+    otu_header_key::AbstractString="otu_header", meta_data_key::AbstractString="meta_data",
     meta_header_key::AbstractString="meta_header", verbose::Bool=true,
     transposed::Bool=false, kwargs...)
 
     verbose && println("\n### Loading data ###\n")
     data, header, meta_data, meta_header = load_data(data_path, meta_data_path, otu_data_key=otu_data_key,
-                                                     otu_header_key=otu_header_key, meta_key=meta_data_key,
+                                                     otu_header_key=otu_header_key, meta_data_key=meta_data_key,
                                                      meta_header_key=meta_header_key, transposed=transposed)
 
 
@@ -362,8 +362,8 @@ function learn_network(data_path::AbstractString, meta_data_path=nothing;  otu_d
     else
         check_data(data, meta_data, header=header, meta_header=meta_header)
         data = hcat(data, meta_data)
-        header = hcat(header, meta_header)
-        meta_mask = hcat(falses(length(header)), trues(length(meta_header)))
+        meta_mask = vcat(falses(length(header)), trues(length(meta_header)))
+        header = vcat(header, meta_header)
     end
 
     learn_network(data; header=header, meta_mask=meta_mask, verbose=verbose, kwargs...)
@@ -444,15 +444,19 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
         data = data'
     end
 
+    if header == nothing
+        header = ["X" * string(i) for i in 1:size(data, 2)]
+    end
+
+    if meta_mask == nothing
+        meta_mask = falses(length(header))
+    end
+
     check_data(data, header, meta_mask=meta_mask)
 
     if !issparse(data) && make_sparse
         verbose && println("\n### Converting data to sparse matrix ###\n")
         data = sparse(data)
-    end
-
-    if header != nothing && meta_mask == nothing
-        meta_mask = falses(length(header))
     end
 
     n_mvs = sum(meta_mask)

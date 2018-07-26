@@ -62,8 +62,9 @@ function save_network(net_path::AbstractString, net_result::FWResult; detailed::
     if isedgelist(file_ext)
         write_edgelist(net_path, graph(net_result))
     elseif isjld(file_ext)
-        isdefined(:FileIO) || @eval using FileIO: save, load
-        Base.invokelatest(save, net_path, "results", net_result)
+        # isdefined(:FileIO) || @eval using FileIO: save, load
+        # Base.invokelatest(save, net_path, "results", net_result)
+        save(net_path, "results", net_result)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_net_formats)")
     end
@@ -88,10 +89,13 @@ function load_network(net_path::AbstractString)
     if isedgelist(file_ext)
         G = read_edgelist(net_path)
         net_result = FWResult(G)
+
     elseif isjld(file_ext)
-        isdefined(:FileIO) || @eval using FileIO: save, load
-        d = Base.invokelatest(load, net_path)
-        net_result = d["results"]
+        # isdefined(:FileIO) || @eval using FileIO: save, load
+        # d = Base.invokelatest(load, net_path)
+        # net_result = d["results"]
+        net_result = load(net_path, "results")
+
     else
         error("$(file_ext) not a valid network format. Valid formats are $(valid_net_formats)")
     end
@@ -102,16 +106,17 @@ end
 ## Helper functions ##
 ######################
 
-function load_jld(data_path::AbstractString, data_key::AbstractString, header_key::AbstractString,
-     meta_key=nothing, meta_header_key=nothing; transposed::Bool=false)
-     isdefined(:FileIO) || @eval using FileIO: save, load
-     d = Base.invokelatest(load, data_path)
+function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_header_key::AbstractString,
+     meta_data_key=nothing, meta_header_key=nothing; transposed::Bool=false)
+     # isdefined(:FileIO) || @eval using FileIO: save, load
+     # d = Base.invokelatest(load, data_path)
+     d = load(data_path)
 
-     data = d[data_key]
-     header = d[header_key]
+     data = d[otu_data_key]
+     header = d[otu_header_key]
 
-     if meta_key != nothing
-         meta_data = d[meta_key]
+     if meta_data_key != nothing
+         meta_data = d[meta_data_key]
          meta_header = d[meta_header_key]
      else
          meta_data = meta_header = nothing

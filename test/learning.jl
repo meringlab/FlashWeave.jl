@@ -6,8 +6,8 @@ nprocs() == 1 && addprocs(1)
 using FlashWeave
 using FileIO
 
-
-data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
+data_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv")
+data = Matrix{Float64}(readdlm(data_path, '\t')[2:end, 2:end])
 data_sp = sparse(data)
 
 adj_exp_dict = load(joinpath("data", "learning_expected.jld2"))
@@ -172,6 +172,29 @@ end
 
                 @testset "edge_identity" begin
                     @test compare_graph_results(exp_graph, pred_graph,
+                                                rtol=rtol, atol=atol,
+                                                approx=true,
+                                                approx_nbr_diff=approx_nbr_diff,
+                                                approx_weight_meandiff=approx_weight_meandiff)
+                end
+            end
+        end
+    end
+
+    @testset "from file" begin
+        path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
+        for (data_format, suff_pair, transp_suff_pair) in zip(["tsv", "jld"],
+                                                       [(".tsv", "_ids_transposed.tsv"),
+                                                        ("_plus_meta.jld", "_plus_meta_transposed.jld")],
+                                                        [("_meta.tsv", "_meta_transposed.tsv"),("","")])
+            @testset "$data_format" begin
+                path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]
+                pred_graphs = [graph(learn_network(path_pairs[i], path_pairs[i_meta], sensitive=true,
+                                                   heterogeneous=false, max_k=3, verbose=false, transposed=transp))
+                               for (i, i_meta, transp) in [(1, 3, false), (2, 4, true)]]
+
+                for pred_graph in pred_graphs
+                    @test compare_graph_results(pred_graphs...,
                                                 rtol=rtol, atol=atol,
                                                 approx=true,
                                                 approx_nbr_diff=approx_nbr_diff,

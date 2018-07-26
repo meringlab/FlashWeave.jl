@@ -22,7 +22,7 @@ end
 
 function check_data(data::AbstractMatrix, header::AbstractVector; meta_mask=nothing)
     @assert size(data, 2) == length(header) "header does not fit data: $(size(data, 2)) vs. $(length(header))"
-    meta_mask != nothing && @assert size(data, 2) == length(meta_mask) "meta_mask does not fit data: $(length(data, 2)) vs. $(length(meta_mask))"
+    meta_mask != nothing && @assert size(data, 2) == length(meta_mask) "meta_mask does not fit data: $(size(data, 2)) vs. $(length(meta_mask))"
 end
 
 
