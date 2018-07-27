@@ -7,7 +7,7 @@ net_result = load_network(joinpath("data", "io_expected.jld2"))
 @testset "networks" begin
     tmp_path = tempname()
 
-    for net_format in ["edgelist", "jld2", "jld"]
+    for net_format in ["edgelist", "gml", "jld2", "jld"]
         @testset "$net_format" begin
             tmp_net_path = tmp_path * "." * net_format
             save_network(tmp_net_path, net_result)

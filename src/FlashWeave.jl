@@ -13,7 +13,7 @@ using StatsBase, Distributions, Combinatorics
 using JSON, HDF5, FileIO
 
 # utilities
-import Base.show
+import Base.show, Base.names, Base.==
 
 
 include("types.jl")
@@ -35,7 +35,8 @@ export learn_network,
        load_network,
        load_data,
        show,
-       graph
+       graph,
+       meta_variable_mask
 
 # function __init__()
 #    warn_items = [(:FileIO, "JLD/JLD2")]

@@ -159,7 +159,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     end
 
     if verbose
-        println("Starting conditioning search..")
+        println("\nStarting conditioning search..")
         tic()
     end
 
@@ -391,7 +391,7 @@ Learn an interaction network from a data table (including OTUs and optionally me
 
 - `alpha` - threshold used to determine statistical significance
 
-- `conv` - convergence threshold, i.e. if `conv=0.01` assume convergence if the number of edges increased by only 1% after doubling the runtime
+- `conv` - convergence threshold, i.e. if `conv=0.01` assume convergence if the number of edges increased by only 1% after 100% more runtime (checked in intervals)
 
 - `feed_forward` - enable feed-forward heuristic
 

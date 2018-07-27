@@ -1,13 +1,14 @@
 # note: needed lots of @eval and Base.invokelatest hacks for conditional
 # module loading
 
-const valid_net_formats = (".edgelist", ".jld2", ".jld")
+const valid_net_formats = (".edgelist", ".gml", ".jld2", ".jld")
 const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2", ".jld")
 
 isjld(ext::AbstractString) = ext in (".jld2", ".jld")
 isdlm(ext::AbstractString) = ext in (".tsv", ".csv")
 isbiom(ext::AbstractString) = ext == ".biom"
 isedgelist(ext::AbstractString) = ext == ".edgelist"
+isgml(ext::AbstractString) = ext == ".gml"
 
 
 """
@@ -49,7 +50,7 @@ end
 """
     save_network(net_path::AbstractString, net_result::FWResult) -> Void
 
-Save network results to disk. Available formats are '.tsv', '.csv', '.jld' and '.jld2'.
+Save network results to disk. Available formats are '.tsv', '.csv', '.gml', '.jld' and '.jld2'.
 
 - `net_path` - output path for the network
 
@@ -60,10 +61,10 @@ Save network results to disk. Available formats are '.tsv', '.csv', '.jld' and '
 function save_network(net_path::AbstractString, net_result::FWResult; detailed::Bool=false)
     file_ext = splitext(net_path)[2]
     if isedgelist(file_ext)
-        write_edgelist(net_path, graph(net_result))
+        write_edgelist(net_path, net_result)
+    elseif isgml(file_ext)
+        write_gml(net_path, net_result)
     elseif isjld(file_ext)
-        # isdefined(:FileIO) || @eval using FileIO: save, load
-        # Base.invokelatest(save, net_path, "results", net_result)
         save(net_path, "results", net_result)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_net_formats)")
@@ -80,22 +81,18 @@ end
 """
     load_network(net_path::AbstractString) -> FWResult{Int}
 
-Load network results from disk. Available formats are '.tsv', '.csv', '.jld' and '.jld2'.
+Load network results from disk. Available formats are '.tsv', '.csv', '.gml', '.jld' and '.jld2'. For GraphML, only files with structure identical to save_network('network.gml') output can currently be loaded.
 
 - `net_path` - path from which to load the network results
 """
 function load_network(net_path::AbstractString)
     file_ext = splitext(net_path)[2]
     if isedgelist(file_ext)
-        G = read_edgelist(net_path)
-        net_result = FWResult(G)
-
+        net_result = read_edgelist(net_path)
+    elseif isgml(file_ext)
+        net_result = read_gml(net_path)
     elseif isjld(file_ext)
-        # isdefined(:FileIO) || @eval using FileIO: save, load
-        # d = Base.invokelatest(load, net_path)
-        # net_result = d["results"]
         net_result = load(net_path, "results")
-
     else
         error("$(file_ext) not a valid network format. Valid formats are $(valid_net_formats)")
     end
@@ -108,14 +105,12 @@ end
 
 function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_header_key::AbstractString,
      meta_data_key=nothing, meta_header_key=nothing; transposed::Bool=false)
-     # isdefined(:FileIO) || @eval using FileIO: save, load
-     # d = Base.invokelatest(load, data_path)
      d = load(data_path)
 
      data = d[otu_data_key]
      header = d[otu_header_key]
 
-     if meta_data_key != nothing
+     if meta_data_key != nothing && haskey(d, meta_data_key) && haskey(d, meta_header_key)
          meta_data = d[meta_data_key]
          meta_header = d[meta_header_key]
      else
@@ -250,8 +245,15 @@ end
 
 
 
-function write_edgelist(out_path::AbstractString, G::SimpleWeightedGraph; header=nothing)
+function write_edgelist(out_path::AbstractString, net_result::FWResult)
+    G = graph(net_result)
+    meta_mask = net_result.meta_variable_mask
+    header = names(net_result)
+
     open(out_path, "w") do out_f
+        write(out_f, "# header\t", join(header, ","), "\n")
+        write(out_f, "# meta mask\t", join(meta_mask, ","), "\n")
+
         for e in edges(G)
             if header == nothing
                 e1 = e.src
@@ -266,31 +268,138 @@ function write_edgelist(out_path::AbstractString, G::SimpleWeightedGraph; header
 end
 
 
-function read_edgelist(in_path::AbstractString; header=nothing)
+function read_edgelist(in_path::AbstractString)
     srcs = Int[]
     dsts = Int[]
     ws = Float64[]
 
-    if header != nothing
+    header, meta_mask = open(in_path, "r") do in_f
+        header_items = split(readline(in_f), "\t")[end]
+        header = Vector{String}(split(header_items, ","))
         inv_header = Dict{eltype(header), Int}(zip(header, 1:length(header)))
-    end
 
-    open(in_path, "r") do in_f
+        meta_items = split(readline(in_f), "\t")[end]
+        meta_mask = BitVector(map(x->parse(Bool, x), split(meta_items, ",")))
+
         for line in eachline(in_f)
             line_items = split(chomp(line), '\t')
 
-            if header != nothing
-                src = inv_header[line_items[1]]
-                dst = inv_header[line_items[2]]
-            else
-                src = parse(Int, line_items[1])
-                dst = parse(Int, line_items[2])
-            end
+            src = inv_header[line_items[1]]
+            dst = inv_header[line_items[2]]
 
             push!(srcs, src)
             push!(dsts, dst)
             push!(ws, parse(Float64, line_items[end]))
         end
+
+        header, meta_mask
     end
-    SimpleWeightedGraph(srcs, dsts, ws)
+    G = SimpleWeightedGraph(srcs, dsts, ws)
+    net_result = FWResult(G; variable_ids=header, meta_variable_mask=meta_mask)
+end
+
+
+function write_gml(out_path::AbstractString, net_result::FWResult)
+    G = graph(net_result)
+    header = names(net_result)
+    meta_mask = net_result.meta_variable_mask
+
+    open(out_path, "w") do out_f
+        write(out_f, "graph [", "\n")
+        write(out_f, "\tdirected 0", "\n")
+
+        for node in vertices(G)
+            write(out_f, "\tnode [", "\n")
+            write(out_f, "\t\tid " * string(node), "\n")
+            write(out_f, "\t\tlabel \"" * header[node] * "\"", "\n")
+            write(out_f, "\t\tmv " * string(Int(meta_mask[node])), "\n")
+            write(out_f, "\t]", "\n")
+        end
+
+        for e in edges(G)
+            e1, e2, weight = e.src, e.dst, e.weight
+            write(out_f, "\tedge [", "\n")
+            write(out_f, "\t\tsource " * string(e1), "\n")
+            write(out_f, "\t\ttarget " * string(e2), "\n")
+            write(out_f, "\t\tweight " * string(weight), "\n")
+            write(out_f, "\t]", "\n")
+        end
+
+        write(out_f, "]", "\n")
+    end
+    nothing
+end
+
+
+function parse_gml_field(in_f::IO)
+    line = strip(readline(in_f))
+    info_pairs = Tuple[]
+
+    if !(startswith(line, "node") || startswith(line, "edge"))
+        return info_pairs
+    end
+
+    if startswith(line, "node") || startswith(line, "edge")
+        while !startswith(line, "]")
+            push!(info_pairs, Tuple(split(line)))
+            line = strip(readline(in_f))
+        end
+    end
+
+    # field_type = info_pairs[1][1]
+
+    # if field_type == "node"
+    #     @NT(ent=field_type, id=parse(Int, info_pairs[2][2]), label=info_pairs[3][2],
+    #         mv=parse(Bool, info_pairs[4][2]))
+    # elseif field_type == "edge"
+    #     @NT(ent=field_type, source=parse(Int, info_pairs[2][2]), target=info_pairs[3][2],
+    #         weight=parse(Float64, info_pairs[4][2]))
+    # else
+    #     error("$field_type is not a valid field.")
+    # end
+    info_pairs
+end
+
+
+function read_gml(in_path::AbstractString)
+    node_dict = Dict{Int,Vector{Tuple}}()
+
+    srcs = Int[]
+    dsts = Int[]
+    ws = Float64[]
+
+    header, meta_mask = open(in_path, "r") do in_f
+        line = readline(in_f)
+        line = readline(in_f)
+
+        node_info = parse_gml_field(in_f)#[("node", "")]# @NT(ent="node")
+        while node_info[1][1] == "node"
+            #println(node_info)
+            node_id = parse(Int, node_info[2][2])
+            node_dict[node_id] = node_info
+            node_info = parse_gml_field(in_f)
+        end
+        #println(node_info)
+
+        n_nodes = maximum(keys(node_dict))
+        header = fill("", n_nodes)#Vector{String}(n_nodes)
+        meta_mask = falses(n_nodes)#BitVector(n_nodes)
+        for (node_id, n_inf) in node_dict
+            header[node_id] = n_inf[3][2][2:end-1]#node_info.label
+            meta_mask[node_id] = Bool(parse(Int, n_inf[4][2]))
+        end
+
+        edge_info = node_info#[("edge", "")]#@NT(ent="edge")
+        while !isempty(edge_info) && edge_info[1][1] == "edge"
+            #println(edge_info)
+            push!(srcs, parse(Int, edge_info[2][2]))
+            push!(dsts, parse(Int, edge_info[3][2]))
+            push!(ws, parse(Float64, edge_info[4][2]))
+            edge_info = parse_gml_field(in_f)
+        end
+
+        header, meta_mask
+    end
+    G = SimpleWeightedGraph(srcs, dsts, ws)
+    net_result = FWResult(G; variable_ids=header, meta_variable_mask=meta_mask)
 end

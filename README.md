@@ -36,11 +36,11 @@ julia> # data_path = "/my/example/data.jld2"
 julia> # netw_results = learn_network(data_path, otu_data_key="otu_data", otu_header_key="otu_header", meta_data_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
 
-Results can currently be saved in JLD/2, fast also for large networks, or as traditional edgelist (".edgelist") format:
+Results can currently be saved in JLD/2, fast for large networks, or as traditional GraphML (".gml") or edgelist (".edgelist") formats:
 
 ```julia
 julia> save_network("/my/example/network_output.jld2", netw_results)
-julia> ## or: save_network("/my/example/network_output.edgelist", netw_results)
+julia> ## or: save_network("/my/example/network_output.gml", netw_results)
 ```
 
 For output of additional information (such as discarding sets, if available) in separate files you can specify the "detailed" flag:

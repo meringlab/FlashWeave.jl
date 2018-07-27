@@ -172,10 +172,11 @@ struct FWResult{T<:Integer}
     parameters::Dict{Symbol,Any}
 end
 
-function FWResult(inf_results::LGLResult{T}, params=nothing, variable_ids=nothing, meta_variable_mask=nothing) where T<:Integer
+function FWResult(inf_results::LGLResult{T}; variable_ids=nothing, meta_variable_mask=nothing,
+    parameters=nothing) where T<:Integer
     n_vars = nv(inf_results.graph)
-    if params == nothing
-        params = Dict{Symbol,Any}()
+    if parameters == nothing
+        parameters = Dict{Symbol,Any}()
     end
 
     if variable_ids == nothing
@@ -189,10 +190,10 @@ function FWResult(inf_results::LGLResult{T}, params=nothing, variable_ids=nothin
     @assert n_vars == length(variable_ids) "variable_ids do not fit number of variables"
     @assert n_vars == length(meta_variable_mask) "meta_variable_mask does not fit number of variables"
 
-    FWResult(inf_results, variable_ids, meta_variable_mask, params)
+    FWResult(inf_results, variable_ids, meta_variable_mask, parameters)
 end
 
-FWResult(G::SimpleWeightedGraph) = FWResult(LGLResult(G))
+FWResult(G::SimpleWeightedGraph; kwargs...) = FWResult(LGLResult(G); kwargs...)
 
 
 """
@@ -216,8 +217,11 @@ parameters(result::FWResult{T}) where T<:Integer = result.parameters
 
 Extract the IDs/names of all variables (nodes) in the network.
 """
-variable_ids(result::FWResult{T}) where T<:Integer = result.variable_ids
+names(result::FWResult{T}) where T<:Integer = result.variable_ids
+meta_variable_mask(result::FWResult{T}) where T<:Integer = result.meta_variable_mask
 converged(result::FWResult{T}) where T<:Integer = !isempty(result.inference_results.unfinished_states)
+==(result1::FWResult{T}, result2::FWResult{S}) where {T<:Integer, S<:Integer} =
+    all([f(result1) == f(result2) for f in (graph, names, meta_variable_mask)])
 
 function unchecked_statistics(result::FWResult)
     unf_states_dict = unfinished_states(result)

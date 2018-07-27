@@ -102,7 +102,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
 
     if verbose
-        println("\nPreparing workers for conditional search..")
+        println("\nPreparing workers..")
         tic()
     end
 
