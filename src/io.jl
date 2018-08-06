@@ -81,7 +81,7 @@ end
 """
     load_network(net_path::AbstractString) -> FWResult{Int}
 
-Load network results from disk. Available formats are '.tsv', '.csv', '.gml', '.jld' and '.jld2'. For GraphML, only files with structure identical to save_network('network.gml') output can currently be loaded.
+Load network results from disk. Available formats are '.tsv', '.csv', '.gml', '.jld' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters ("Mode") are only available when loading from JLD/2.
 
 - `net_path` - path from which to load the network results
 """
