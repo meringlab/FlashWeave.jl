@@ -1,9 +1,7 @@
 environment:
   matrix:
-  - JULIAVERSION: "julialang/bin/winnt/x86/0.5/julia-0.5-latest-win32.exe"
-  - JULIAVERSION: "julialang/bin/winnt/x64/0.5/julia-0.5-latest-win64.exe"
-  - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
-  - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
+  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x86/0.6/julia-0.6-latest-win32.exe"
+  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x64/0.6/julia-0.6-latest-win64.exe"
 
 branches:
   only:
@@ -28,7 +26,7 @@ build_script:
 # Need to convert from shallow to complete for Pkg.clone to work
   - IF EXIST .git\shallow (git fetch --unshallow)
   - C:\projects\julia\bin\julia -e "versioninfo();
-      Pkg.clone(pwd(), \"Cauocc\"); Pkg.build(\"Cauocc\")"
+      Pkg.clone(pwd(), \"FlashWeave\"); Pkg.build(\"FlashWeave\")"
 
 test_script:
-  - C:\projects\julia\bin\julia -e "Pkg.test(\"Cauocc\")"
+  - C:\projects\julia\bin\julia -e "Pkg.test(\"FlashWeave\")"

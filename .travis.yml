@@ -4,8 +4,7 @@ os:
   - linux
   - osx
 julia:
-  - release
-  - nightly
+  - 0.6
 notifications:
   email: false
 # uncomment the following lines to override the default test script
@@ -14,6 +13,6 @@ notifications:
 #  - julia -e 'Pkg.clone(pwd()); Pkg.build("Cauocc"); Pkg.test("Cauocc"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
-  - julia -e 'cd(Pkg.dir("Cauocc")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+  - julia -e 'cd(Pkg.dir("FlashWeave")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
-  - julia -e 'cd(Pkg.dir("Cauocc")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'cd(Pkg.dir("FlashWeave")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
