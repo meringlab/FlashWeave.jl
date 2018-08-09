@@ -7,6 +7,11 @@ julia:
   - 0.6
 notifications:
   email: false
+addons:
+  apt:
+    packages:
+    - hdf5-tools
+sudo: required
 # uncomment the following lines to override the default test script
 #script:
 #  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
