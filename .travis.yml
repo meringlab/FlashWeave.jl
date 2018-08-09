@@ -12,8 +12,6 @@ addons:
     packages:
     - hdf5-tools
 sudo: required
-before_install:
-    - brew install hdf5
 # uncomment the following lines to override the default test script
 #script:
 #  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
