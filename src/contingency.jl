@@ -1,4 +1,4 @@
-function contingency_table!{ElType <: Integer}(X::Int, Y::Int, data::AbstractMatrix{ElType}, cont_tab::Matrix{<:Integer})
+function contingency_table!(X::Int, Y::Int, data::AbstractMatrix{ElType}, cont_tab::Matrix{<:Integer}) where ElType <: Integer
     """2x2"""
     fill!(cont_tab, 0)
 
@@ -22,8 +22,8 @@ end
 contingency_table(X::Int, Y::Int, data::AbstractMatrix{<:Integer}) = contingency_table(X, Y, data, length(unique(data[:, X])), length(unique(data[:, Y])))
 
 
-function contingency_table!{ElType<:Integer}(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{ElType}, cont_tab::Array{<:Integer, 3},
-    z::Vector{<:Integer}, cum_levels::Vector{<:Integer}, z_map_arr::Vector{<:Integer})
+function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{ElType}, cont_tab::Array{<:Integer, 3},
+    z::Vector{<:Integer}, cum_levels::Vector{<:Integer}, z_map_arr::Vector{<:Integer}) where ElType<:Integer
     fill!(cont_tab, 0)
     levels_z = level_map!(Zs, data, z, cum_levels, z_map_arr)
 

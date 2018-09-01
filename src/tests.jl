@@ -334,10 +334,10 @@ function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}
 end
 
 
-function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
-                            stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
-                            test_obj::AbstractTest, hps::Integer, n_obs_min::Integer,
-                            correct_reliable_only::Bool=false)
+function pw_univar_kernel!(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
+            stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
+            test_obj::AbstractTest, hps::Integer, n_obs_min::Integer,
+            correct_reliable_only::Bool=false) where ElType <: Real
     n_vars = size(data, 2)
 
     if needs_nz_view(X, data, test_obj)
@@ -369,8 +369,8 @@ function pw_univar_kernel!{ElType <: Real}(X::Int, Ys_slice::AbstractVector{Int}
     end
 end
 
-function pw_univar_kernel{ElType <: Real}(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
-                            test_obj::AbstractTest, hps::Integer, n_obs_min::Integer)
+function pw_univar_kernel(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
+            test_obj::AbstractTest, hps::Integer, n_obs_min::Integer) where ElType <: Real
     n_vars = size(data, 2)
 
     if needs_nz_view(X, data, test_obj)
@@ -425,12 +425,12 @@ function pw_univar_worker(data::AbstractMatrix{ElType}, test_obj::AbstractTest,
 end
 
 
-function pw_univar_neighbors{ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}(data::AbstractMatrix{ElType};
+function pw_univar_neighbors(data::AbstractMatrix{ElType};
         test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
         levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
         chunk_size::Union{Int,Void}=nothing, tmp_folder::AbstractString="",
-        correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true)
+        correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     target_vars = collect(1:size(data, 2))
 

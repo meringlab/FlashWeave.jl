@@ -11,7 +11,7 @@ function mapslices_sparse_nz(f, A::SparseMatrixCSC, dim::Integer=1)
 end
 
 
-function pseudocount_vars_from_sample{ElType <: AbstractFloat}(s::Vector{ElType})
+function pseudocount_vars_from_sample(s::Vector{ElType}) where ElType <: AbstractFloat
     z_mask = s .== 0
     k = sum(z_mask)
     Nprod = sum(log.(s[.!z_mask]))
@@ -19,7 +19,7 @@ function pseudocount_vars_from_sample{ElType <: AbstractFloat}(s::Vector{ElType}
 end
 
 
-function adaptive_pseudocount{ElType <: AbstractFloat}(x1::ElType, s1::Vector{ElType}, s2::Vector{ElType})::ElType
+function adaptive_pseudocount(x1::ElType, s1::Vector{ElType}, s2::Vector{ElType})::ElType where ElType <: AbstractFloat
     k, Nprod1_log = pseudocount_vars_from_sample(s1)
     n, Nprod2_log = pseudocount_vars_from_sample(s2)
     p = length(s1)
@@ -29,7 +29,7 @@ function adaptive_pseudocount{ElType <: AbstractFloat}(x1::ElType, s1::Vector{El
 end
 
 
-function adaptive_pseudocount!{ElType <: AbstractFloat}(X::Matrix{ElType})
+function adaptive_pseudocount!(X::Matrix{ElType}) where ElType <: AbstractFloat
     max_depth_index = findmax(sum(X, 2))[2]
     max_depth_sample::Vector{ElType} = X[max_depth_index, :]
     min_abund = minimum(X[X .!= 0])
@@ -42,7 +42,7 @@ function adaptive_pseudocount!{ElType <: AbstractFloat}(X::Matrix{ElType})
     end
 end
 
-function clr!{ElType <: AbstractFloat}(X::SparseMatrixCSC{ElType})
+function clr!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
     """Specialized in-place version for sparse matrices that always excludes zero entries (thereby no need for pseudo counts)"""
     gmeans_vec = mapslices_sparse_nz(geomean, X, 1)
     rows = rowvals(X)
@@ -56,7 +56,7 @@ function clr!{ElType <: AbstractFloat}(X::SparseMatrixCSC{ElType})
 end
 
 
-function clr!{ElType <: AbstractFloat}(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false)
+function clr!(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false) where ElType <: AbstractFloat
     if !ignore_zeros
         X .+= pseudo_count
         center_fun = geomean
@@ -73,14 +73,14 @@ function clr!{ElType <: AbstractFloat}(X::Matrix{ElType}; pseudo_count::ElType=1
 end
 
 
-function adaptive_clr!{ElType <: AbstractFloat}(X::Matrix{ElType})
+function adaptive_clr!(X::Matrix{ElType}) where ElType <: AbstractFloat
     adaptive_pseudocount!(X)
     clr!(X, pseudo_count=0.0, ignore_zeros=false)
 end
 
 
-function discretize{ElType <: AbstractFloat}(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
-        rank_method::String="tied", disc_method::String="median", nz_mask::BitMatrix=BitMatrix(0,0))
+function discretize(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
+        rank_method::String="tied", disc_method::String="median", nz_mask::BitMatrix=BitMatrix(0,0)) where ElType <: AbstractFloat
     if nz
         if issparse(X)
             disc_vecs = SparseVector{Int}[]
@@ -97,7 +97,7 @@ function discretize{ElType <: AbstractFloat}(X::AbstractMatrix{ElType}; n_bins::
     end
 end
 
-function discretize{ElType <: AbstractFloat}(x_vec::Vector{ElType}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median")
+function discretize(x_vec::Vector{ElType}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median") where ElType <: AbstractFloat
     if disc_method == "median"
         if isempty(x_vec)
             disc_vec = x_vec
@@ -132,13 +132,13 @@ function discretize{ElType <: AbstractFloat}(x_vec::Vector{ElType}, n_bins::Inte
 end
 
 
-function discretize_nz{ElType <: AbstractFloat}(x_vec::SparseVector{ElType}, n_bins::Integer=3;
-        rank_method::String="tied", disc_method::String="median")
+function discretize_nz(x_vec::SparseVector{ElType}, n_bins::Integer=3;
+        rank_method::String="tied", disc_method::String="median") where ElType <: AbstractFloat
     disc_nz_vec = discretize(x_vec.nzval, n_bins-1, rank_method=rank_method, disc_method=disc_method) + 1
     SparseVector(x_vec.n, x_vec.nzind, disc_nz_vec)
 end
 
-function discretize_nz{ElType <: AbstractFloat}(x_vec::AbstractVector{ElType}, nz_vec::AbstractVector{Bool}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median")
+function discretize_nz(x_vec::AbstractVector{ElType}, nz_vec::AbstractVector{Bool}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median") where ElType <: AbstractFloat
     nz_indices = findn(nz_vec)
 
     if !isempty(nz_indices)
@@ -156,7 +156,7 @@ end
 
 iscontinuousnorm(norm::String) = norm == "rows" || startswith(norm, "clr")
 
-function discretize_meta!{ElType <: Real}(meta_data::Matrix{ElType}, norm, n_bins)
+function discretize_meta!(meta_data::Matrix{ElType}, norm, n_bins) where ElType <: Real
     for i in 1:size(meta_data, 2)
         meta_vec = meta_data[:, i]
         try
@@ -175,7 +175,7 @@ function discretize_meta!{ElType <: Real}(meta_data::Matrix{ElType}, norm, n_bin
     end
 end
 
-function discretize_meta{ElType <: Real}(meta_data::SparseMatrixCSC{ElType}, norm, n_bins)
+function discretize_meta(meta_data::SparseMatrixCSC{ElType}, norm, n_bins) where ElType <: Real
     meta_data_dense = full(meta_data)
     discretize_meta!(meta_data_dense, norm, n_bins)
     sparse(meta_data_dense)
@@ -225,9 +225,9 @@ presabs_norm!(X::SparseMatrixCSC{ElType}) where ElType <: Real = map!(sign, X.nz
 presabs_norm!(X::Matrix{ElType}) where ElType <: Real = map!(sign, X, X)
 
 
-function preprocess_data{ElType <: Real}(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
+function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
     disc_method::String="median", verbose::Bool=true, meta_mask::BitVector=falses(size(data, 2)), make_sparse::Bool=issparse(data), factor_cols::Vector{Int}=Int[],
-    prec::Integer=32, filter_data=true, header::Vector{String}=String[])
+    prec::Integer=32, filter_data=true, header::Vector{String}=String[]) where ElType <: Real
 
     verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     has_meta = any(meta_mask)

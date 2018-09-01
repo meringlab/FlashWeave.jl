@@ -4,7 +4,7 @@ import Base: put!, take!, push!, fetch, shift!, show, isready, wait, eltype, clo
 
 const DEF_CHANNEL_SZ=32
 
-type StackChannel{T} <: AbstractChannel where T
+mutable struct StackChannel{T} <: AbstractChannel where T
     cond_take::Condition    # waiting for data to become available
     cond_put::Condition     # waiting for a writeable slot
     state::Symbol
@@ -35,7 +35,7 @@ function close(c::StackChannel)
 end
 isopen(c::StackChannel) = (c.state == :open)
 
-type InvalidStateException <: Exception
+mutable struct InvalidStateException <: Exception
     msg::AbstractString
     state::Symbol
 end
@@ -94,13 +94,13 @@ function notify_error(c::StackChannel, err)
     notify_error(c.cond_put, err)
 end
 
-eltype{T}(::Type{StackChannel{T}}) = T
+eltype(::Type{StackChannel{T}}) where {T} = T
 
 n_avail(c::StackChannel) = length(c.data)
 
 show(io::IO, c::StackChannel) = print(io, "$(typeof(c))(sz_max:$(c.sz_max),sz_curr:$(n_avail(c)))")
 
-start{T}(c::StackChannel{T}) = Ref{Nullable{T}}()
+start(c::StackChannel{T}) where {T} = Ref{Nullable{T}}()
 function done(c::StackChannel, state::Ref)
     try
         # we are waiting either for more data or channel to be closed
@@ -114,6 +114,6 @@ function done(c::StackChannel, state::Ref)
         end
     end
 end
-next{T}(c::StackChannel{T}, state) = (v=get(state[]); state[]=nothing; (v, state))
+next(c::StackChannel{T}, state) where {T} = (v=get(state[]); state[]=nothing; (v, state))
 
-iteratorsize{C<:StackChannel}(::Type{C}) = SizeUnknown()
+iteratorsize(::Type{C}) where {C<:StackChannel} = SizeUnknown()

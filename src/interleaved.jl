@@ -18,7 +18,7 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
         warn("nonsparse_cond currently not implemented")
     end
 
-    const converged = false
+    converged = false
     while true
         try
             target_var, univar_nbrs, prev_state, skip_nbrs = take!(shared_job_q)
