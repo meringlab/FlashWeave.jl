@@ -298,7 +298,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
                 end
                 test_fraction = num_tests / num_tests_total
 
-                max_tests > 0 && num_tests >= max_tests && warn("Maximum number of tests for variable pair $X / $Y at $num_tests out of $num_tests_total tests (fraction: $(round(test_fraction, 3)), size of Z: $(length(Z_total))).")
+                max_tests > 0 && num_tests >= max_tests && warn("Maximum number of tests for variable pair $X / $Y at $num_tests out of $num_tests_total tests (fraction: $(round(test_fraction, digits=3)), size of Z: $(length(Z_total))).")
 
                 return test_result, Zs, num_tests, test_fraction
 
@@ -429,7 +429,7 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
         test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
         levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
-        chunk_size::Union{Int,Void}=nothing, tmp_folder::AbstractString="",
+        chunk_size::Union{Int,Nothing}=nothing, tmp_folder::AbstractString="",
         correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     target_vars = collect(1:size(data, 2))

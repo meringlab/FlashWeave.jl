@@ -3,11 +3,11 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
     output_folder::AbstractString, edge_rule::AbstractString)  where {ElType<:Real}
 
-    !isempty(tmp_folder) && warn("tmp_folder currently not implemented")
+    !isempty(tmp_folder) && @warn("tmp_folder currently not implemented")
 
     if edge_rule != "OR"
         if edge_rule == "AND"
-            warn("AND rule currently disabled (insufficiently tested)")
+            @warn("AND rule currently disabled (insufficiently tested)")
         else
             warn("edge_rule $(edge_rule) not a valid option, setting it to OR")
         end
@@ -26,9 +26,9 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     end
 
     if time_limit != 0.0 && !endswith(parallel, "_il")
-        warn("Using time_limit without interleaved parallelism is not advised.")
+        @warn("Using time_limit without interleaved parallelism is not advised.")
     elseif parallel == "multi_il" && time_limit == 0.0 && feed_forward
-        warn("Specify 'time_limit' when using interleaved parallelism to potentially increase speed.")
+        @warn("Specify 'time_limit' when using interleaved parallelism to potentially increase speed.")
     end
 
     disc_type = Int32
@@ -68,7 +68,7 @@ end
 
 function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String, alpha::AbstractFloat, hps::Integer,
     n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
-    correct_reliable_only::Bool, verbose::Bool, chunk_size::Union{Int,Void}=nothing,
+    correct_reliable_only::Bool, verbose::Bool, chunk_size::Union{Int,Nothing}=nothing,
     tmp_folder::AbstractString="") where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
@@ -89,7 +89,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
         nbr_nums = map(length, values(all_univar_nbrs))
         println(summarystats(nbr_nums), "\n")
         if mean(nbr_nums) > size(data, 2) * 0.2
-            warn("The univariate network is exceptionally dense, computations may be very slow.
+            @warn("The univariate network is exceptionally dense, computations may be very slow.
                  Check if appropriate normalization was used (employ niche-mode if not yet the case)
                  and try using the AND rule to gain speed.")
         end
@@ -117,7 +117,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     end
 
     if nonsparse_cond && !endswith(parallel, "il")
-        warn("nonsparse_cond currently not implemented")
+        @warn("nonsparse_cond currently not implemented")
     end
 
     if parallel == "single"
@@ -195,7 +195,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     FDR::Bool=true, parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
     verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="",
-    output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Void}=nothing,
+    output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Nothing}=nothing,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
     header::AbstractVector{String}=String[], recursive_pcor::Bool=true, cache_pcor::Bool=false,
     correct_reliable_only::Bool=true, feed_forward::Bool=true, track_rejections::Bool=false,
@@ -423,7 +423,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
        verbose && println("\n### Normalizing ###\n")
        input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose)
     else
-       warn("Skipping normalization, only experts should choose this option.")
+       @warn("Skipping normalization, only experts should choose this option.")
        input_data = data
     end
 
@@ -437,7 +437,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
 
     net_result = FWResult(lgl_results, header, meta_mask, params_dict)
 
-    verbose && println("\nFinished inference. Total time taken: ", round(time_taken, 3), "s")
+    verbose && println("\nFinished inference. Total time taken: ", round(time_taken, digits=3), "s")
 
     net_result
 end

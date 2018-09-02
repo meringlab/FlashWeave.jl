@@ -31,7 +31,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; transposed::Boo
      -- Set jld keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
     file_ext = splitext(data_path)[2]
-    transposed && file_ext == ".biom" && warn("'transposed' cannot be used with .biom files")
+    transposed && file_ext == ".biom" && @warn("'transposed' cannot be used with .biom files")
 
     if isdlm(file_ext)
         ld_results = load_dlm(data_path, meta_path, transposed=transposed)
@@ -227,7 +227,7 @@ function save_rejections(rej_path, net_result)
                     rej_set = rej_info[1]
                     num_tests, frac_tested = rej_info[3]
 
-                    line_items = [string(var_A) * " <-> " * string(var_B), join(rej_set, ","), round(stat, 5), pval, num_tests, round(frac_tested, 3)]
+                    line_items = [string(var_A) * " <-> " * string(var_B), join(rej_set, ","), round(stat, digits=5), pval, num_tests, round(frac_tested, digits=3)]
                     write(f, join(line_items, "\t"), "\n")
                 end
             end

@@ -5,7 +5,7 @@ println("Preparing tests")
 nprocs() == 1 && addprocs(1)
 
 using FlashWeave
-using Base.Test
+using Test
 
 for test_module in sort(filter(x -> endswith(x, ".jl") && x != "runtests.jl", readdir(pwd())))
     println("\nTesting $test_module")

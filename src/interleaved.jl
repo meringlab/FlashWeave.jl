@@ -15,7 +15,7 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
      shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
 
     if nonsparse_cond
-        warn("nonsparse_cond currently not implemented")
+        @warn("nonsparse_cond currently not implemented")
     end
 
     converged = false
@@ -268,7 +268,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                     delta_num_edges = (new_num_edges - last_conv_num_edges) / last_conv_num_edges
                     conv_level = delta_num_edges / delta_time
 
-                    verbose && println("Latest convergence step change: $(round(conv_level, 5))")
+                    verbose && println("Latest convergence step change: $(round(conv_level, digits=5))")
 
                     if conv_level < convergence_threshold
                         converged = true

@@ -14,7 +14,7 @@ mutable struct StackChannel{T} <: AbstractChannel where T
 
     function StackChannel{T}(sz) where T
         sz_max = sz == typemax(Int) ? typemax(Int) - 1 : sz
-        new(Condition(), Condition(), :open, Array{T}(0), sz_max)
+        new(Condition(), Condition(), :open, Array{T}(undef, 0), sz_max)
     end
 end
 

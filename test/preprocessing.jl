@@ -1,7 +1,7 @@
 using FlashWeave
 using StatsBase
 using FileIO
-using Base.Test
+using Test
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_sparse = sparse(data)

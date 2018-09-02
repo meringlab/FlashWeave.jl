@@ -1,5 +1,5 @@
 using FlashWeave
-using Base.Test
+using Test
 
 ctab12 = [4 2; 2 4]
 ctab23 = [6 0 0; 0 5 1]

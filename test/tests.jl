@@ -1,7 +1,7 @@
 using FlashWeave
 using FlashWeave: TestResult
 using FileIO
-using Base.Test
+using Test
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_clr, mask = FlashWeave.preprocess_data_default(data, "fz", verbose=false, prec=64)
