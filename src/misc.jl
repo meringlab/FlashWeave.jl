@@ -26,8 +26,8 @@ function check_data(data::AbstractMatrix, header::AbstractVector; meta_mask=noth
 end
 
 
-function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool; max_k::Integer=0,
-        levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), cache_pcor::Bool=true)
+function make_test_object(test_name::String, cond::Bool; max_k::Integer=0,
+        levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), cache_pcor::Bool=true) where ContType<:AbstractFloat
     discrete_test = isdiscrete(test_name)
     nz = is_zero_adjusted(test_name) ? Nz() : NoNz()
 
@@ -40,7 +40,7 @@ function make_test_object{ContType<:AbstractFloat}(test_name::String, cond::Bool
 end
 
 
-function get_levels{ElType <: Integer}(x::Int, data::SparseMatrixCSC{ElType})
+function get_levels(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
     unique_vals = IntSet()
     for j in nzrange(data, x)
         push!(unique_vals, data.nzval[j])
@@ -51,12 +51,12 @@ function get_levels{ElType <: Integer}(x::Int, data::SparseMatrixCSC{ElType})
 end
 
 
-function get_levels{ElType <: Integer}(x::Int, data::Matrix{ElType})
+function get_levels(x::Int, data::Matrix{ElType}) where ElType <: Integer
     length(unique(@view data[:, x]))
 end
 
 
-function get_levels{ElType <: Integer}(data::AbstractMatrix{ElType})
+function get_levels(data::AbstractMatrix{ElType}) where ElType <: Integer
     map(x -> get_levels(x, data), 1:size(data, 2))
 end
 
@@ -64,7 +64,7 @@ end
 stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit > 0.0 ? time() - start_time > time_limit : false
 
 
-function needs_nz_view{ElType}(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest)
+function needs_nz_view(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest) where ElType
     nz = is_zero_adjusted(test_obj)
     is_nz_var = iscontinuous(test_obj) || test_obj.levels[X] > 2
     nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))# || isa(test_obj, MiTestCond))
@@ -128,9 +128,9 @@ function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_n
 end
 
 
-function level_map!{ElType <: Integer}(Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{ElType}, z::AbstractVector{<:Integer},
+function level_map!(Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{ElType}, z::AbstractVector{<:Integer},
         cum_levels::AbstractVector{<:Integer},
-    z_map_arr::AbstractVector{<:Integer})
+    z_map_arr::AbstractVector{<:Integer}) where ElType <: Integer
     fill!(z_map_arr, -1)
     levels_z = zero(ElType)
 
@@ -231,8 +231,8 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
 end
 
 
-function iter_apply_sparse_rows!{ElType <: Real}(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
-        red_fun, red_obj, x_nzadj=false, y_nzadj=false)
+function iter_apply_sparse_rows!(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
+        red_fun, red_obj, x_nzadj=false, y_nzadj=false) where ElType <: Real
     n_rows, n_cols = size(data)
     num_out_of_bounds = 0
     row_inds = rowvals(data)

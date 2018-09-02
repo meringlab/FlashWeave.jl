@@ -64,8 +64,8 @@ function pcor(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Abs
 end
 
 
-function pcor_rec{ContType<:AbstractFloat}(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, cor_mat::AbstractMatrix{ContType},
-     pcor_set_dict::Dict{String,Dict{String,ContType}}, cache_result::Bool=true)
+function pcor_rec(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, cor_mat::AbstractMatrix{ContType},
+     pcor_set_dict::Dict{String,Dict{String,ContType}}, cache_result::Bool=true) where ContType<:AbstractFloat
 
     XY_key = string(X) * "_" * string(Y)
     Zs_key = join(Zs, "_")
@@ -276,7 +276,7 @@ end
 
 ## Convenience functions for mutual information
 
-function mutual_information{T<:Integer}(ctab::AbstractArray{T, 2})
+function mutual_information(ctab::AbstractArray{T, 2}) where T<:Integer
     levels_x = size(ctab, 1)
     levels_y = size(ctab, 2)
 
@@ -287,7 +287,7 @@ function mutual_information{T<:Integer}(ctab::AbstractArray{T, 2})
 end
 
 
-function mutual_information{T<:Integer}(ctab::AbstractArray{T, 3})
+function mutual_information(ctab::AbstractArray{T, 3}) where T<:Integer
     levels_x = size(ctab, 1)
     levels_y = size(ctab, 2)
     levels_z = size(ctab, 3)
@@ -301,7 +301,7 @@ end
 
 
 
-function adjust_df{T<:Integer}(marg_i::AbstractVector{T}, marg_j::AbstractVector{T}, levels_x::Integer, levels_y::Integer)
+function adjust_df(marg_i::AbstractVector{T}, marg_j::AbstractVector{T}, levels_x::Integer, levels_y::Integer) where T<:Integer
     alx = 0
     aly = 0
     @inbounds for i in 1:levels_x
@@ -320,7 +320,7 @@ function adjust_df{T<:Integer}(marg_i::AbstractVector{T}, marg_j::AbstractVector
 end
 
 
-function adjust_df{T<:Integer}(marg_i::AbstractMatrix{T}, marg_j::AbstractMatrix{T}, levels_x::Integer, levels_y::Integer, levels_z::Integer)
+function adjust_df(marg_i::AbstractMatrix{T}, marg_j::AbstractMatrix{T}, levels_x::Integer, levels_y::Integer, levels_z::Integer) where T<:Integer
     df = 0
     @inbounds for k in 1:levels_z
         df += adjust_df(marg_i[:, k], marg_j[:, k], levels_x, levels_y)
@@ -344,8 +344,8 @@ end
 
 
 """Accelerated version of that found in MultipleTesting.jl"""
-function benjamini_hochberg!{T <: AbstractFloat}(pvals::AbstractVector{T};
-    alpha::AbstractFloat=0.01, m=length(pvals))
+function benjamini_hochberg!(pvals::AbstractVector{T};
+    alpha::AbstractFloat=0.01, m=length(pvals)) where T <: AbstractFloat
 
 
     sorted_pval_pairs = filter(x -> x[2] < alpha, collect(enumerate(pvals)))

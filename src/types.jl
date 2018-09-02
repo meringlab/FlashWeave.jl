@@ -28,7 +28,7 @@ mutable struct ZMapper{T<:Integer}
     levels_total::T
 end
 
-function ZMapper{T<:Integer}(max_k::Integer, max_level::T)
+function ZMapper(max_k::Integer, max_level::T) where T<:Integer
     cum_levels = zeros(T, max_k)
     cum_levels[1] = 1
 
@@ -44,7 +44,7 @@ function ZMapper{T<:Integer}(max_k::Integer, max_level::T)
     ZMapper{T}(z_map_arr, cum_levels, 0)
 end
 
-function reset!{T<:Integer}(zmap::ZMapper{T})
+function reset!(zmap::ZMapper{T}) where T<:Integer
     fill!(zmap.z_map_arr, -1)
     zmap.levels_total = 0
 end
@@ -83,7 +83,7 @@ struct MiTest{S<:Integer, T<:AbstractNz} <: ContTest2D{S, T}
     nz::T
 end
 
-function MiTest{S<:Integer}(levels::Vector{S}, nz::AbstractNz)
+function MiTest(levels::Vector{S}, nz::AbstractNz) where S<:Integer
     max_level = maximum(levels)
     MiTest(zeros(Int, max_level, max_level), levels, zeros(S, max_level), zeros(S, max_level), nz)
 end
@@ -103,7 +103,7 @@ struct MiTestCond{S<:Integer, T<:AbstractNz} <: ContTest3D{S, T}
     nz::T
 end
 
-function MiTestCond{S<:Integer}(levels::Vector{S}, nz::AbstractNz, max_k::Integer)
+function MiTestCond(levels::Vector{S}, nz::AbstractNz, max_k::Integer) where S<:Integer
     max_level = maximum(levels)
     zmap = ZMapper(max_k, max_level)
     ctab = zeros(Int, (max_level, max_level, max_level^max_k))
