@@ -20,13 +20,13 @@ Load tables with OTU count and optionally meta data from disc. Available formats
 
 - `meta_data_path` - optional path to a file with meta variable information
 
-- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names within a JLD/2 file
+- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD/2 file, if a data item is absent the corresponding key should be 'nothing'
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
 function load_data(data_path::AbstractString, meta_path=nothing; transposed::Bool=false,
-     otu_data_key::AbstractString="otu_data", meta_data_key::AbstractString="meta_data",
-     otu_header_key::AbstractString="otu_header", meta_header_key::AbstractString="meta_header")
+     otu_data_key::AbstractString="otu_data", meta_data_key=nothing,
+     otu_header_key::AbstractString="otu_header", meta_header_key=nothing)
      """Load OTU tables and meta data from various formats.
      -- Set jld keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
@@ -107,10 +107,17 @@ function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_h
      meta_data_key=nothing, meta_header_key=nothing; transposed::Bool=false)
      d = load(data_path)
 
+     for (key, key_desc) in [(otu_data_key, "otu_data_key"),
+                             (otu_header_key, "otu_header_key"),
+                             (meta_data_key, "meta_data_key"),
+                             (meta_header_key, "meta_header_key")]
+         key != nothing && !haskey(d, key) && error("key '$key' not found in input file. Please make sure to provide the appropriate $key_desc when using non-standard input files for FlashWeave or set $key_desc to 'nothing'. Keys present in input file: $(join(keys(d), ", "))")
+     end
+
      data = d[otu_data_key]
      header = d[otu_header_key]
 
-     if meta_data_key != nothing && haskey(d, meta_data_key) && haskey(d, meta_header_key)
+     if meta_data_key != nothing
          meta_data = d[meta_data_key]
          meta_header = d[meta_header_key]
      else
@@ -119,7 +126,9 @@ function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_h
 
      if transposed
          data = data'
-         meta_data = meta_data'
+         if meta_data != nothing
+             meta_data = meta_data'
+         end
      end
 
      data, header, meta_data, meta_header

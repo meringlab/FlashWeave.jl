@@ -4,10 +4,10 @@ using FileIO
 using Base.Test
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
-data_clr = FlashWeave.preprocess_data_default(data, "fz", verbose=false, prec=64)
-data_clr_nz = FlashWeave.preprocess_data_default(data, "fz_nz", verbose=false, prec=64)
-data_bin = FlashWeave.preprocess_data_default(data, "mi", verbose=false, prec=64)
-data_mi_nz = FlashWeave.preprocess_data_default(data, "mi_nz", verbose=false, prec=64)
+data_clr, mask = FlashWeave.preprocess_data_default(data, "fz", verbose=false, prec=64)
+data_clr_nz, mask = FlashWeave.preprocess_data_default(data, "fz_nz", verbose=false, prec=64)
+data_bin, mask = FlashWeave.preprocess_data_default(data, "mi", verbose=false, prec=64)
+data_mi_nz, mask = FlashWeave.preprocess_data_default(data, "mi_nz", verbose=false, prec=64)
 
 exp_dict = load(joinpath("data", "tests_expected.jld2"))
 

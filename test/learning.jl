@@ -18,7 +18,7 @@ rtol = 1e-2
 atol = 0.0
 
 function make_network(data, test_name, make_sparse=false, prec=64, verbose=false; kwargs...)
-    data_norm = FlashWeave.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
+    data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
     kwargs_dict = Dict(kwargs)
     lgl_res = FlashWeave.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
     lgl_res.graph

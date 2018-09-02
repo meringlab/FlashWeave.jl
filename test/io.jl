@@ -23,6 +23,8 @@ data = Matrix{Int}(data[1:19, 2:20])
 header = Vector{String}(header[2:20])
 meta_data, meta_header = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny_meta.tsv"), '\t', Int, header=true)
 meta_header = Vector{String}(meta_header[:])
+meta_data_key = "meta_data"
+meta_header_key = "meta_header"
 
 
 @testset "table data" begin
@@ -33,7 +35,7 @@ meta_header = Vector{String}(meta_header[:])
                                                    ["_meta.tsv", "_meta.csv", "_meta.csv", "_meta.tsv", "_meta.tsv", "", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
-            data_ld = load_data(data_path, meta_path)
+            data_ld = load_data(data_path, meta_path, meta_data_key=meta_data_key, meta_header_key=meta_header_key)
             @test all(data_ld[1] .== data)
             @test all(data_ld[2] .== header)
             @test all(data_ld[3] .== meta_data)
@@ -51,7 +53,8 @@ end
                                                    ["_meta_transposed.tsv", "", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
-            data_ld = load_data(data_path, meta_path, transposed=true)
+            data_ld = load_data(data_path, meta_path, transposed=true, meta_data_key=meta_data_key,
+                                meta_header_key=meta_header_key)
             @test all(data_ld[1] .== data)
             @test all(data_ld[2] .== header)
             @test all(data_ld[3] .== meta_data)

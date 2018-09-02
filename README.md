@@ -5,7 +5,7 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/vdesge86ssj91htc?svg=true)](https://ci.appveyor.com/project/jtackm/flashweave-jl)
 [![Coverage Status](https://coveralls.io/repos/github/meringlab/FlashWeave.jl/badge.svg?branch=master)](https://coveralls.io/github/meringlab/FlashWeave.jl?branch=master)
 
-FlashWeave predicts ecological interactions between microbes from large-scale compositional abundance data (i.e. OTU tables constructed from sequencing data) through statistical co-occurrence. It reports direct associations, corrected for bystander effects and other confounders, and can furthermore integrate environmental or technical factors into the analysis of microbial systems.
+FlashWeave predicts ecological interactions between microbes from large-scale compositional abundance data (i.e. OTU tables constructed from sequencing data) through statistical co-occurrence or co-abundance. It reports direct associations, with adjustment for bystander effects and other confounders, and can furthermore integrate environmental or technical factors into the analysis of microbial systems.
 
 ## Installation ##
 
@@ -56,7 +56,7 @@ julia> save_network("/my/example/network_output.jld2", netw_results, detailed=tr
 
 A convenient loading function is available:
  ```julia
- julia> netw_results = load_network("/my/example/network_output.jld2")
+julia> netw_results = load_network("/my/example/network_output.jld2")
  ```
 
 To get more information on a function, use `?`:

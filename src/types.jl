@@ -264,39 +264,3 @@ function show(io::IO, result::FWResult{T}) where T<:Integer
     println(io, "Rejections:")
     println(io, !isempty(rejections(result)) ? "tracked" : "not tracked")
 end
-
-#################################
-## COMBINATIONS WITH WHITELIST ##
-#################################
-
-import Combinatorics:Combinations
-import Base:start,next,done
-
-struct CombinationsWL{T,S}
-    c::Combinations{T}
-    wl::S
-end
-
-start(c::CombinationsWL) = start(c.c)
-next(c::CombinationsWL, s) = next(c.c, s)
-
-function done(c::CombinationsWL, s)
-    if done(c.c, s)
-        return true
-    else
-        (comb, next_s) = next(c.c, s)
-        return !(comb[1] in c.wl)
-    end
-end
-
-function combinations_with_whitelist(a::AbstractVector{T}, wl::AbstractVector{T}, t::Integer) where T <: Integer
-    wl_set = Set(wl)
-
-    a_wl = copy(wl)
-    for e in a
-        if !(e in wl_set)
-            push!(a_wl, e)
-        end
-    end
-    CombinationsWL(combinations(a_wl, t), wl_set)
-end

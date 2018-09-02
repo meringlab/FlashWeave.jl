@@ -105,21 +105,6 @@ function workers_all_local()
 end
 
 
-function make_single_weight(cond_stat, cond_pval, uni_stat, uni_pval, weight_type, test_name)
-    weight_kind = split(weight_type, "_")[2]
-
-    if startswith(weight_type, "uni")
-        return signed_weight(uni_stat, uni_pval, weight_kind)
-    else
-        weight = signed_weight(cond_stat, cond_pval, weight_kind)
-
-        if startswith(test_name, "mi")
-            weight = sign(uni_stat) * abs(weight)
-        end
-        return weight
-    end
-end
-
 function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}, weight_type::String, test_name::String)
     # create weights
     nbr_dict = Dict{Int,Float64}()
@@ -140,25 +125,6 @@ function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_n
     end
 
     nbr_dict
-end
-
-
-function make_cum_levels!{ElType <: Integer}(cum_levels::AbstractVector{ElType}, Zs::Tuple{Vararg{Int64,N} where N<:Int}, levels::AbstractVector{ElType})
-
-    cum_levels[1] = 1
-
-    @inbounds for j in 2:length(Zs)
-        Z_var = Zs[j]
-        levels_z = levels[Z_var]
-        cum_levels[j] = cum_levels[j - 1] * levels_z
-    end
-end
-
-
-function make_cum_levels{ElType <: Integer}(Zs::Tuple{Vararg{Int64,N} where N<:Int}, levels::AbstractVector{ElType})
-    cum_levels = zeros(Int, length(Zs))
-    make_cum_levels!(cum_levels, Zs, levels)
-    cum_levels
 end
 
 
@@ -262,35 +228,6 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     end
 
     SimpleWeightedGraph_nodemax(srcs, dsts, ws; m=max_var)
-end
-
-
-function map_edge_keys(nbr_dict::Dict{Int,T}, key_map_dict::Dict{Int,Int}) where T <: Associative{Int}
-    new_nbr_dict = similar(nbr_dict)
-
-    for (key, sub_dict) in nbr_dict
-        var_key = key_map_dict[key]
-        new_sub_dict = similar(sub_dict)
-
-        for (sub_key, sub_val) in sub_dict
-            if haskey(key_map_dict, sub_key)
-                var_sub_key = key_map_dict[sub_key]
-                new_sub_dict[var_sub_key] = sub_val
-            end
-        end
-
-        new_nbr_dict[var_key] = new_sub_dict
-    end
-    new_nbr_dict
-end
-
-
-function weightedgraph_to_adjmat(G::SimpleWeightedGraph, header::AbstractVector{String})
-    n_vars = length(header)
-    adj_mat = full(G.weights)
-    adj_mat_final = vcat(reshape(header, 1, size(adj_mat, 2)), adj_mat)
-    adj_mat_final = hcat(reshape(["", header...], size(adj_mat_final, 2) + 1, 1), adj_mat_final)
-    adj_mat_final
 end
 
 
