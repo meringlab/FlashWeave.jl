@@ -474,7 +474,7 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
                     pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats, shared_pvals, test_obj, hps,
                                       n_obs_min, correct_reliable_only), work_items)
                 else
-                    @sync @parallel for work_item in work_items
+                    @sync @distributed for work_item in work_items
                         pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_obj, hps,
                                           n_obs_min, correct_reliable_only)
                     end

@@ -1,5 +1,9 @@
 module FlashWeave
 
+# stdlib
+using Distributed, SparseArrays, Statistics, DelimitedFiles, Random,
+      SharedArrays, LinearAlgebra, Dates
+
 # data structures
 using DataStructures
 using LightGraphs, SimpleWeightedGraphs
@@ -12,6 +16,8 @@ using JSON, HDF5, FileIO
 
 # utilities
 import Base.show, Base.names, Base.==
+
+
 
 
 include("types.jl")

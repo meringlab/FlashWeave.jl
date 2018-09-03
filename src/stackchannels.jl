@@ -4,7 +4,7 @@ import Base: put!, take!, push!, fetch, shift!, show, isready, wait, eltype, clo
 
 const DEF_CHANNEL_SZ=32
 
-mutable struct StackChannel{T} <: AbstractChannel where T
+mutable struct StackChannel{T} <: AbstractChannel{T}
     cond_take::Condition    # waiting for data to become available
     cond_put::Condition     # waiting for a writeable slot
     state::Symbol

@@ -41,7 +41,7 @@ end
 
 
 function get_levels(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
-    unique_vals = IntSet()
+    unique_vals = BitSet()
     for j in nzrange(data, x)
         push!(unique_vals, data.nzval[j])
     end

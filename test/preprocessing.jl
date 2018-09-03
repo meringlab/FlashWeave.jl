@@ -2,6 +2,7 @@ using FlashWeave
 using StatsBase
 using FileIO
 using Test
+using SparseArrays, DelimitedFiles, Statistics
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_sparse = sparse(data)
@@ -28,7 +29,7 @@ end
 
 @testset "TSS" begin
     data_norm, mask = FlashWeave.preprocess_data(data, "rows"; make_sparse=false, verbose=false)
-    @test all(isapprox.(sum(data_norm, 2), 1))
+    @test all(isapprox.(sum(data_norm, dims=2), 1))
     data_norm_sparse, mask = FlashWeave.preprocess_data(data, "rows"; make_sparse=true, verbose=false)
     @test all(data_norm .== data_norm_sparse)
 end
@@ -39,12 +40,12 @@ end
             data_norm, mask = normalize_data(data, test_name=test_name, verbose=false)
 
             @testset "dense" begin
-                @test all(data_norm .== exp_dict[test_name])
+                @test data_norm == exp_dict[test_name]
             end
 
             data_norm_sparse, mask = normalize_data(data_sparse, test_name=test_name, verbose=false)
             @testset "sparse" begin
-                @test all(data_norm_sparse .== exp_dict[test_name])
+                @test data_norm_sparse == exp_dict[test_name]
             end
         end
     end

@@ -1,13 +1,14 @@
 using Test
 using FlashWeave
 using SimpleWeightedGraphs
+using SparseArrays, DelimitedFiles
 
 net_result = load_network(joinpath("data", "io_expected.jld2"))
 
 @testset "networks" begin
     tmp_path = tempname()
 
-    for net_format in ["edgelist", "gml", "jld2", "jld"]
+    for net_format in ["edgelist", "gml", "jld2"]
         @testset "$net_format" begin
             tmp_net_path = tmp_path * "." * net_format
             save_network(tmp_net_path, net_result)
@@ -30,9 +31,9 @@ meta_header_key = "meta_header"
 @testset "table data" begin
     tmp_path = tempname()
 
-    for (data_format, data_suff, meta_suff) in zip(["tsv", "tsv_rownames", "csv", "biom_json", "biom_hdf5", "jld2", "jld"],
-                                                   [".tsv", "_ids.tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2", "_plus_meta.jld"],
-                                                   ["_meta.tsv", "_meta.csv", "_meta.csv", "_meta.tsv", "_meta.tsv", "", ""])
+    for (data_format, data_suff, meta_suff) in zip(["tsv", "tsv_rownames", "csv", "biom_json", "biom_hdf5", "jld2"],
+                                                   [".tsv", "_ids.tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2"],
+                                                   ["_meta.tsv", "_meta.csv", "_meta.csv", "_meta.tsv", "_meta.tsv", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             data_ld = load_data(data_path, meta_path, meta_data_key=meta_data_key, meta_header_key=meta_header_key)
@@ -48,9 +49,9 @@ end
 @testset "transposed" begin
     tmp_path = tempname()
 
-    for (data_format, data_suff, meta_suff) in zip(["tsv", "jld", "jld2"],
-                                                   ["_ids_transposed.tsv", "_plus_meta_transposed.jld", "_plus_meta_transposed.jld2"],
-                                                   ["_meta_transposed.tsv", "", ""])
+    for (data_format, data_suff, meta_suff) in zip(["tsv", "jld2"],
+                                                   ["_ids_transposed.tsv", "_plus_meta_transposed.jld2"],
+                                                   ["_meta_transposed.tsv", ""])
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             data_ld = load_data(data_path, meta_path, transposed=true, meta_data_key=meta_data_key,

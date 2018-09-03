@@ -27,8 +27,6 @@ data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_smal
     exp_pcor_Z1 = -0.16393307352649364
     cor_mat = cor(data_clr)
     @testset "pcor_Z1" begin
-        #pred_res1 = @inferred FlashWeave.pcor(1, 16, (41,), data_clr)
-        #pred_res2 = @inferred
         @test isapprox(@inferred(FlashWeave.pcor(1, 16, (41,), data_clr)), exp_pcor_Z1, rtol=1e-6)
         @test isapprox(@inferred(FlashWeave.pcor_rec(1, 16, (41,), cor_mat, Dict{String,Dict{String,Float64}}())), exp_pcor_Z1, rtol=1e-6)
     end

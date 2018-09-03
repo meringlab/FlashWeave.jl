@@ -62,6 +62,13 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         verbose && println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
     end
 
+    n_obs_min > size(data, 1) && error("dataset has insufficient observations (< 'n_obs_min'), try using a smaller 'max_k' parameter")
+
+    if verbose && is_zero_adjusted(test_name)
+        n_unrel = sum(sum(data .!= 0, dims=1) .< n_obs_min)
+        n_unrel > 0 && @warn "$n_unrel variables have insufficient observations (< 'n_obs_min') and will not be used for interaction prediction"
+    end
+
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule
 end
 
@@ -74,7 +81,6 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
     # precompute univariate associations and sort variables (fewest neighbors first)
     if verbose
         println("Computing univariate associations..")
-        tic()
     end
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
@@ -93,7 +99,6 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
                  Check if appropriate normalization was used (employ niche-mode if not yet the case)
                  and try using the AND rule to gain speed.")
         end
-        toc()
     end
 
     target_vars, all_univar_nbrs
@@ -113,7 +118,6 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
 
     if verbose
         println("\nStarting conditioning search..")
-        tic()
     end
 
     if nonsparse_cond && !endswith(parallel, "il")
@@ -125,7 +129,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     else
         # embarassing parallelism
         if parallel == "multi_ep"
-            nbr_results::Vector{HitonState{Int}} = @parallel (vcat) for x in target_vars
+            nbr_results::Vector{HitonState{Int}} = @distributed (vcat) for x in target_vars
                 si_HITON_PC(x, data, levels, cor_mat; univar_nbrs=all_univar_nbrs[x], hiton_kwargs...)
             end
 
@@ -179,10 +183,6 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
                     rej_dict[target_var] = nbr_state.state_rejections
                 end
             end
-        end
-
-        if verbose
-            toc()
         end
     end
 
@@ -241,10 +241,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                                                                       verbose, track_rejections, hiton_kwargs,
                                                                        interleaved_kwargs)
 
-    if verbose
-        println("\nPostprocessing..")
-        tic()
-    end
+    verbose && println("\nPostprocessing..")
 
     weights_dict = Dict{Int,Dict{Int,Float64}}()
     for target_var in keys(nbr_dict)
@@ -253,10 +250,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
 
     graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, max_var=size(data, 2), header=header)
 
-    if verbose
-        toc()
-        println("Complete.")
-    end
+    verbose && println("Complete.")
 
     LGLResult{Int}(graph, rej_dict, unfinished_state_dict)
 end
@@ -268,11 +262,11 @@ end
 Works like learn_network(data::AbstractArray{ElType}), but takes file paths an OTU table and optionally a
 meta data table as an input (instead of a data matrix).
 
-- `data_path` - path to a file storing an OTU count table (and in the case of JLD/2 possibly meta data)
+- `data_path` - path to a file storing an OTU count table (and in the case of JLD2 possibly meta data)
 
 - `meta_data_path` - optional path to a file with meta data
 
-- `*_key`  - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD/2 file, if a data item is absent the corresponding key should be 'nothing'. More help under '?load_data'
+- `*_key`  - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file, if a data item is absent the corresponding key should be 'nothing'. More help under '?load_data'
 
 - `verbose` - print progress information
 

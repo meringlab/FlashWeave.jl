@@ -1,10 +1,10 @@
 # note: needed lots of @eval and Base.invokelatest hacks for conditional
 # module loading
 
-const valid_net_formats = (".edgelist", ".gml", ".jld2", ".jld")
-const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2", ".jld")
+const valid_net_formats = (".edgelist", ".gml", ".jld2")
+const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2")
 
-isjld(ext::AbstractString) = ext in (".jld2", ".jld")
+isjld(ext::AbstractString) = ext == ".jld2"
 isdlm(ext::AbstractString) = ext in (".tsv", ".csv")
 isbiom(ext::AbstractString) = ext == ".biom"
 isedgelist(ext::AbstractString) = ext == ".edgelist"
@@ -14,13 +14,13 @@ isgml(ext::AbstractString) = ext == ".gml"
 """
     load_data(data_path::AbstractString, meta_path::AbstractString) -> (AbstractMatrix{<:Real}, Vector{String}, AbstractMatrix{<:Real}, Vector{String})
 
-Load tables with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv', '.biom', '.jld' and '.jld2'.
+Load tables with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv', '.biom' and '.jld2'.
 
 - `data_path` - path to a file storing an OTU count table
 
 - `meta_data_path` - optional path to a file with meta variable information
 
-- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD/2 file, if a data item is absent the corresponding key should be 'nothing'
+- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file, if a data item is absent the corresponding key should be 'nothing'
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
@@ -28,7 +28,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; transposed::Boo
      otu_data_key::AbstractString="otu_data", meta_data_key=nothing,
      otu_header_key::AbstractString="otu_header", meta_header_key=nothing)
      """Load OTU tables and meta data from various formats.
-     -- Set jld keys you don't want to use to 'nothing'
+     -- Set jld2 keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
     file_ext = splitext(data_path)[2]
     transposed && file_ext == ".biom" && @warn("'transposed' cannot be used with .biom files")
@@ -50,7 +50,7 @@ end
 """
     save_network(net_path::AbstractString, net_result::FWResult) -> Void
 
-Save network results to disk. Available formats are '.tsv', '.csv', '.gml', '.jld' and '.jld2'.
+Save network results to disk. Available formats are '.tsv', '.csv', '.gml' and '.jld2'.
 
 - `net_path` - output path for the network
 
@@ -81,7 +81,7 @@ end
 """
     load_network(net_path::AbstractString) -> FWResult{Int}
 
-Load network results from disk. Available formats are '.tsv', '.csv', '.gml', '.jld' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters ("Mode") are only available when loading from JLD/2.
+Load network results from disk. Available formats are '.tsv', '.csv', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters ("Mode") are only available when loading from JLD2.
 
 - `net_path` - path from which to load the network results
 """
@@ -171,7 +171,7 @@ function load_biom_json(data_path)
 
     if json_struc["matrix_type"] == "sparse"
         otu_table = otu_table'
-        otu_table = sparse(otu_table[:, 1] + 1, otu_table[:, 2] + 1, otu_table[:, 3])'
+        otu_table = sparse(otu_table[:, 1] .+ 1, otu_table[:, 2] .+ 1, otu_table[:, 3])'
     end
 
     header = [x["id"] for x in json_struc["rows"]]
@@ -183,7 +183,7 @@ function load_biom_hdf5(data_path)
     f = h5open(data_path, "r")
     m, n = read(attrs(f)["shape"])
     colptr, rowval, nzval = [read(f, "sample/matrix/$key") for key in ["indptr", "indices", "data"]]
-    otu_table = SparseMatrixCSC(m, n, colptr + 1, rowval + 1, Vector{Int}(nzval))'
+    otu_table = SparseMatrixCSC(m, n, colptr .+ 1, rowval .+ 1, Vector{Int}(nzval))'
     header = read(f, "observation/ids")
     close(f)
 

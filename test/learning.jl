@@ -1,10 +1,14 @@
 using Test
 using SimpleWeightedGraphs
 using LightGraphs
+using FileIO
+using SparseArrays, DelimitedFiles, Statistics, Distributed
 
 nprocs() == 1 && addprocs(1)
-using FlashWeave
-using FileIO
+
+@everywhere using FlashWeave
+
+
 
 data_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv")
 data = Matrix{Float64}(readdlm(data_path, '\t')[2:end, 2:end])
@@ -107,9 +111,6 @@ end
                                     pred_graph = make_network(data, test_name, make_sparse, 64,
                                         max_k=max_k, parallel=parallel, time_limit=time_limit)
 
-                                    rtol = 1e-2
-                                    atol = 0.0
-
                                     # special case for conditional mi
                                     if is_il && test_name == "mi" && max_k == 3
                                         approx_nbr_diff = 22
@@ -149,10 +150,12 @@ end
     end
 end
 
+
+header = ["X" * string(i) for i in 1:size(data, 2)]
 @testset "learn_network" begin
     approx_nbr_diff = 0
     approx_weight_meandiff = 0.05
-    header = ["X" * string(i) for i in 1:size(data, 2)]
+
 
     for heterogeneous in [true, false]
         for sensitive in [true, false]
@@ -183,9 +186,9 @@ end
 
     @testset "from file" begin
         path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
-        for (data_format, suff_pair, transp_suff_pair) in zip(["tsv", "jld"],
+        for (data_format, suff_pair, transp_suff_pair) in zip(["tsv", "jld2"],
                                                        [(".tsv", "_ids_transposed.tsv"),
-                                                        ("_plus_meta.jld", "_plus_meta_transposed.jld")],
+                                                        ("_plus_meta.jld2", "_plus_meta_transposed.jld2")],
                                                         [("_meta.tsv", "_meta_transposed.tsv"),("","")])
             @testset "$data_format" begin
                 path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]

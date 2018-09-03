@@ -87,7 +87,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
     # initialize jobs
     queued_jobs = 0
-    waiting_vars = Stack(Int)
+    waiting_vars = Stack{Int}()
     for (i, target_var) in enumerate(reverse(target_vars))
         job = (target_var, all_univar_nbrs[target_var], HitonState{Int}('S', OrderedDict(), OrderedDict(),
                                                                         [], Dict()), Set{Int}())
@@ -100,22 +100,14 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         end
     end
 
-
-    if verbose
-        println("\nPreparing workers..")
-        tic()
-    end
-
+    verbose && println("\nPreparing workers..")
 
     worker_returns = [@spawnat wid interleaved_worker(data, levels, cor_mat, edge_rule,
                                                       nonsparse_cond,
                                                       shared_job_q, shared_result_q, GLL_args)
                       for wid in worker_ids]
 
-    if verbose
-        toc()
-        println("\nDone. Starting inference..")
-    end
+    verbose && println("\nDone. Starting inference..")
 
     remaining_jobs = jobs_total
     n_vars = size(data, 2)
@@ -255,8 +247,8 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         if convergence_threshold != 0.0 && !converged
             if !check_convergence && remaining_jobs / jobs_total <= conv_check_start
                 check_convergence = true
-                last_conv_time = curr_time - start_time
-                last_conv_num_edges = ne(graph)
+                global last_conv_time = curr_time - start_time
+                global last_conv_num_edges = ne(graph)
 
                 verbose && println("Starting convergence checks at $last_conv_num_edges edges.")
 
