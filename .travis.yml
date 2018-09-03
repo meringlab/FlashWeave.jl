@@ -19,6 +19,6 @@ addons:
 #  - julia -e 'Pkg.clone(pwd()); Pkg.build("Cauocc"); Pkg.test("Cauocc"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
-  - julia -e 'import Pkg; Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder()); Codecov.submit(Codecov.process_folder())'
+    - julia -e 'Pkg.add("Coverage"); cd(Pkg.dir("FlashWeave")); using Coverage; Coveralls.submit(process_folder()); Codecov.submit(process_folder())'
   # push coverage results to Codecov
   # - julia -e 'cd(Pkg.dir("FlashWeave")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
