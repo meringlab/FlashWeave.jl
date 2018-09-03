@@ -8,7 +8,7 @@ platform:
 
 branches:
   only:
-    - v07fixes
+    - master
 
 notifications:
   - provider: Email
