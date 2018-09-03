@@ -1,11 +1,12 @@
 start_time = time()
 
+using FlashWeave, Distributed, Test
+
 println("Preparing tests")
 
 nprocs() == 1 && addprocs(1)
 
-using FlashWeave
-using Base.Test
+@everywhere using FlashWeave
 
 for test_module in sort(filter(x -> endswith(x, ".jl") && x != "runtests.jl", readdir(pwd())))
     println("\nTesting $test_module")

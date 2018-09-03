@@ -113,7 +113,7 @@ function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMa
 
         if !candidate_in_list
             if phase == 'E'
-                deleteat!(accepted, findin(accepted, candidate))
+                deleteat!(accepted, findall(in(candidate), accepted))
             end
 
             check_candidate!(candidate, T, data, accepted, accepted_dict, test_obj, max_k, alpha, hps, n_obs_min, max_tests, debug,

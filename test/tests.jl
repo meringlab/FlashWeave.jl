@@ -1,7 +1,8 @@
 using FlashWeave
 using FlashWeave: TestResult
 using FileIO
-using Base.Test
+using Test
+using DelimitedFiles
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_clr, mask = FlashWeave.preprocess_data_default(data, "fz", verbose=false, prec=64)
@@ -9,7 +10,7 @@ data_clr_nz, mask = FlashWeave.preprocess_data_default(data, "fz_nz", verbose=fa
 data_bin, mask = FlashWeave.preprocess_data_default(data, "mi", verbose=false, prec=64)
 data_mi_nz, mask = FlashWeave.preprocess_data_default(data, "mi_nz", verbose=false, prec=64)
 
-exp_dict = load(joinpath("data", "tests_expected.jld2"))
+exp_dict = load(joinpath("data", "tests_expected.jld2"))["exp_dict"]
 
 function compare_test_results(r1::FlashWeave.TestResult, r2::FlashWeave.TestResult)
     isapprox(r1.stat, r2.stat, rtol=1e-2) && isapprox(r1.pval, r2.pval, rtol=1e-2) && r1.df == r2.df && r1.suff_power == r2.suff_power

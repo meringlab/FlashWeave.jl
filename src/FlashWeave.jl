@@ -1,6 +1,8 @@
-__precompile__()
-
 module FlashWeave
+
+# stdlib
+using Distributed, SparseArrays, Statistics, DelimitedFiles, Random,
+      SharedArrays, LinearAlgebra, Dates
 
 # data structures
 using DataStructures

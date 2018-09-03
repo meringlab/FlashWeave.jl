@@ -3,11 +3,11 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
     output_folder::AbstractString, edge_rule::AbstractString)  where {ElType<:Real}
 
-    !isempty(tmp_folder) && warn("tmp_folder currently not implemented")
+    !isempty(tmp_folder) && @warn("tmp_folder currently not implemented")
 
     if edge_rule != "OR"
         if edge_rule == "AND"
-            warn("AND rule currently disabled (insufficiently tested)")
+            @warn("AND rule currently disabled (insufficiently tested)")
         else
             warn("edge_rule $(edge_rule) not a valid option, setting it to OR")
         end
@@ -26,9 +26,9 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     end
 
     if time_limit != 0.0 && !endswith(parallel, "_il")
-        warn("Using time_limit without interleaved parallelism is not advised.")
+        @warn("Using time_limit without interleaved parallelism is not advised.")
     elseif parallel == "multi_il" && time_limit == 0.0 && feed_forward
-        warn("Specify 'time_limit' when using interleaved parallelism to potentially increase speed.")
+        @warn("Specify 'time_limit' when using interleaved parallelism to potentially increase speed.")
     end
 
     disc_type = Int32
@@ -62,19 +62,25 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         verbose && println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
     end
 
+    n_obs_min > size(data, 1) && error("dataset has insufficient observations (< 'n_obs_min'), try using a smaller 'max_k' parameter")
+
+    if verbose && is_zero_adjusted(test_name)
+        n_unrel = sum(sum(data .!= 0, dims=1) .< n_obs_min)
+        n_unrel > 0 && @warn "$n_unrel variables have insufficient observations (< 'n_obs_min') and will not be used for interaction prediction"
+    end
+
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule
 end
 
 
 function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String, alpha::AbstractFloat, hps::Integer,
     n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
-    correct_reliable_only::Bool, verbose::Bool, chunk_size::Union{Int,Void}=nothing,
+    correct_reliable_only::Bool, verbose::Bool, chunk_size::Union{Int,Nothing}=nothing,
     tmp_folder::AbstractString="") where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
     if verbose
         println("Computing univariate associations..")
-        tic()
     end
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
@@ -89,11 +95,10 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
         nbr_nums = map(length, values(all_univar_nbrs))
         println(summarystats(nbr_nums), "\n")
         if mean(nbr_nums) > size(data, 2) * 0.2
-            warn("The univariate network is exceptionally dense, computations may be very slow.
+            @warn("The univariate network is exceptionally dense, computations may be very slow.
                  Check if appropriate normalization was used (employ niche-mode if not yet the case)
                  and try using the AND rule to gain speed.")
         end
-        toc()
     end
 
     target_vars, all_univar_nbrs
@@ -113,11 +118,10 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
 
     if verbose
         println("\nStarting conditioning search..")
-        tic()
     end
 
     if nonsparse_cond && !endswith(parallel, "il")
-        warn("nonsparse_cond currently not implemented")
+        @warn("nonsparse_cond currently not implemented")
     end
 
     if parallel == "single"
@@ -125,7 +129,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     else
         # embarassing parallelism
         if parallel == "multi_ep"
-            nbr_results::Vector{HitonState{Int}} = @parallel (vcat) for x in target_vars
+            nbr_results::Vector{HitonState{Int}} = @distributed (vcat) for x in target_vars
                 si_HITON_PC(x, data, levels, cor_mat; univar_nbrs=all_univar_nbrs[x], hiton_kwargs...)
             end
 
@@ -180,10 +184,6 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
                 end
             end
         end
-
-        if verbose
-            toc()
-        end
     end
 
     nbr_dict, unfinished_state_dict, rej_dict
@@ -195,7 +195,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     FDR::Bool=true, parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
     verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="",
-    output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Void}=nothing,
+    output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Nothing}=nothing,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
     header::AbstractVector{String}=String[], recursive_pcor::Bool=true, cache_pcor::Bool=false,
     correct_reliable_only::Bool=true, feed_forward::Bool=true, track_rejections::Bool=false,
@@ -241,10 +241,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                                                                       verbose, track_rejections, hiton_kwargs,
                                                                        interleaved_kwargs)
 
-    if verbose
-        println("\nPostprocessing..")
-        tic()
-    end
+    verbose && println("\nPostprocessing..")
 
     weights_dict = Dict{Int,Dict{Int,Float64}}()
     for target_var in keys(nbr_dict)
@@ -253,10 +250,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
 
     graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, max_var=size(data, 2), header=header)
 
-    if verbose
-        toc()
-        println("Complete.")
-    end
+    verbose && println("Complete.")
 
     LGLResult{Int}(graph, rej_dict, unfinished_state_dict)
 end
@@ -268,11 +262,11 @@ end
 Works like learn_network(data::AbstractArray{ElType}), but takes file paths an OTU table and optionally a
 meta data table as an input (instead of a data matrix).
 
-- `data_path` - path to a file storing an OTU count table (and in the case of JLD/2 possibly meta data)
+- `data_path` - path to a file storing an OTU count table (and in the case of JLD2 possibly meta data)
 
 - `meta_data_path` - optional path to a file with meta data
 
-- `*_key`  - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD/2 file, if a data item is absent the corresponding key should be 'nothing'. More help under '?load_data'
+- `*_key`  - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file, if a data item is absent the corresponding key should be 'nothing'. More help under '?load_data'
 
 - `verbose` - print progress information
 
@@ -282,9 +276,10 @@ meta data table as an input (instead of a data matrix).
 
 
 """
-function learn_network(data_path::AbstractString, meta_data_path=nothing;  otu_data_key::AbstractString="otu_data",
-    otu_header_key::AbstractString="otu_header", meta_data_key=nothing,
-    meta_header_key=nothing, verbose::Bool=true,
+function learn_network(data_path::AbstractString, meta_data_path=nothing;
+    otu_data_key::AbstractString="otu_data",
+    otu_header_key::AbstractString="otu_header", meta_data_key="meta_data",
+    meta_header_key="meta_header", verbose::Bool=true,
     transposed::Bool=false, kwargs...)
 
     verbose && println("\n### Loading data ###\n")
@@ -314,7 +309,7 @@ Learn an interaction network from a data table (including OTUs and optionally me
 
 - `data` - data table with information on OTU counts and (optionally) meta variables
 
-- `header` - names of variable-column s in `data`
+- `header` - names of variable columns in `data`
 
 - `meta_mask` - true/false mask indicating which variables are meta variables
 
@@ -348,7 +343,7 @@ Learn an interaction network from a data table (including OTUs and optionally me
 
 - `track_rejections` - store for each discarded edge, which variable set lead to its exclusion (can be memory intense for large networks)
 
-- verbose` - print progress information
+- `verbose` - print progress information
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 
@@ -423,7 +418,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
        verbose && println("\n### Normalizing ###\n")
        input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose)
     else
-       warn("Skipping normalization, only experts should choose this option.")
+       @warn("Skipping normalization, only experts should choose this option.")
        input_data = data
     end
 
@@ -437,7 +432,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
 
     net_result = FWResult(lgl_results, header, meta_mask, params_dict)
 
-    verbose && println("\nFinished inference. Total time taken: ", round(time_taken, 3), "s")
+    verbose && println("\nFinished inference. Total time taken: ", round(time_taken, digits=3), "s")
 
     net_result
 end

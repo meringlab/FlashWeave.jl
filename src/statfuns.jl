@@ -1,4 +1,4 @@
-import Base:cor
+import Statistics:cor
 
 function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
     sample_factor = n - len_z - 3

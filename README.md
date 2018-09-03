@@ -3,25 +3,24 @@
 [![Project Status: Active - The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![Build Status](https://travis-ci.org/meringlab/FlashWeave.jl.svg?branch=master)](https://travis-ci.org/meringlab/FlashWeave.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/vdesge86ssj91htc?svg=true)](https://ci.appveyor.com/project/jtackm/flashweave-jl)
-[![Coverage Status](https://coveralls.io/repos/github/meringlab/FlashWeave.jl/badge.svg?branch=master)](https://coveralls.io/github/meringlab/FlashWeave.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/meringlab/FlashWeave.jl/badge.svg?branch=v07fixes&service=github)](https://coveralls.io/github/meringlab/FlashWeave.jl?branch=v07fixes)
 
 FlashWeave predicts ecological interactions between microbes from large-scale compositional abundance data (i.e. OTU tables constructed from sequencing data) through statistical co-occurrence or co-abundance. It reports direct associations, with adjustment for bystander effects and other confounders, and can furthermore integrate environmental or technical factors into the analysis of microbial systems.
 
 ## Installation ##
 
-To install Julia, please follow instructions on https://github.com/JuliaLang/julia. The prefered way is to obtain a binary from https://julialang.org/downloads/. Make sure you install Julia 0.6.x, the versions currently supported by FlashWeave.
+To install Julia, please follow instructions on https://github.com/JuliaLang/julia. The prefered way is to obtain a binary from https://julialang.org/downloads/. Make sure you install Julia 1.0, the version currently supported by FlashWeave.
 
-In an interactive Julia session, you can then install FlashWeave via
+In an interactive Julia session, you can then install FlashWeave after typing `]` via
 
 ```julia
-# if it's a fresh julia installation first run Pkg.init()
-Pkg.clone("https://github.com/meringlab/FlashWeave.jl")
-# to run tests: Pkg.test("FlashWeave")
+(v1.0) pkg> add FlashWeave
+# to run tests: (v1.0) pkg> test FlashWeave
 ```
 
 ## Basic usage ##
 
-OTU tables can be provided in several formats: delimited formats (".csv", ".tsv"), [BIOM 1.0](http://biom-format.org/documentation/format_versions/biom-1.0.html) (".biom") or the high-performance formats [BIOM 2.0](http://biom-format.org/documentation/format_versions/biom-2.0.html) and [JLD](https://github.com/JuliaIO/JLD.jl)/[JLD2](https://github.com/simonster/JLD2.jl) (".jld", ".jld2"). Meta data should be provided as delimited format (except for JLD/2, see below). See the ```test/data/HMP_SRA_gut``` directory for examples. IMPORTANT NOTE: For delimited and JLD/2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
+OTU tables can be provided in several formats: delimited formats (".csv", ".tsv"), [BIOM 1.0](http://biom-format.org/documentation/format_versions/biom-1.0.html) (".biom") or the high-performance formats [BIOM 2.0](http://biom-format.org/documentation/format_versions/biom-2.0.html) and [JLD2](https://github.com/simonster/JLD2.jl) (".jld2"). Meta data should be provided as delimited format (except for JLD2, see below). See the ```test/data/HMP_SRA_gut``` directory for examples. IMPORTANT NOTE: For delimited and JLD2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
 
 To learn an interaction network, you can do
 
@@ -41,7 +40,7 @@ julia> # data_path = "/my/example/data.jld2"
 julia> # netw_results = learn_network(data_path, otu_data_key="otu_data", otu_header_key="otu_header", meta_data_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
 
-Results can currently be saved in JLD/2, fast for large networks, or as traditional [Graph Modelling Language](https://en.wikipedia.org/wiki/Graph_Modelling_Language) (".gml") or edgelist (".edgelist") formats:
+Results can currently be saved in JLD2, fast for large networks, or as traditional [Graph Modelling Language](https://en.wikipedia.org/wiki/Graph_Modelling_Language) (".gml") or edgelist (".edgelist") formats:
 
 ```julia
 julia> save_network("/my/example/network_output.jld2", netw_results)
@@ -82,8 +81,8 @@ $ julia -p 4 # for 4 workers
 or manually add workers at the beginning of an interactive session
 
 ```julia
-julia> addprocs(4)
-julia> using FlashWeave
+julia> using Distributed; addprocs(4) # can be skipped if julia was started with -p
+julia> @everywhere using FlashWeave
 julia> learn_network(...
 ```
 

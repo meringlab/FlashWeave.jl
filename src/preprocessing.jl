@@ -23,14 +23,14 @@ function adaptive_pseudocount(x1::ElType, s1::Vector{ElType}, s2::Vector{ElType}
     k, Nprod1_log = pseudocount_vars_from_sample(s1)
     n, Nprod2_log = pseudocount_vars_from_sample(s2)
     p = length(s1)
-    @assert n < p && k < p "samples with all zero abundances are not allowed"
+    #@assert n < p && k < p "samples with all zero abundances are not allowed"
     x2_log = (1 / (n-p)) * ((k-p)*log(x1) + Nprod1_log - Nprod2_log)
     return exp(x2_log)
 end
 
 
 function adaptive_pseudocount!(X::Matrix{ElType}) where ElType <: AbstractFloat
-    max_depth_index = findmax(sum(X, 2))[2]
+    max_depth_index = findmax(sum(X, dims=2))[2][1]
     max_depth_sample::Vector{ElType} = X[max_depth_index, :]
     min_abund = minimum(X[X .!= 0])
     base_pcount = min_abund >= 1 ? 1.0 : min_abund / 10
@@ -38,7 +38,7 @@ function adaptive_pseudocount!(X::Matrix{ElType}) where ElType <: AbstractFloat
 
     for i in 1:size(X, 1)
         s_vec = @view X[i, :]
-        s_vec[s_vec .== 0] = pseudo_counts[i]
+        s_vec[s_vec .== 0] .= pseudo_counts[i]
     end
 end
 
@@ -64,10 +64,10 @@ function clr!(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=f
         center_fun = x -> geomean(x[x .!= 0.0])
     end
 
-    X .= log.(X ./ mapslices(center_fun, X, 2))
+    X .= log.(X ./ mapslices(center_fun, X, dims=2))
 
     if ignore_zeros
-        X[isinf.(X)] = 0.0
+        X[isinf.(X)] .= 0.0
     end
     nothing
 end
@@ -80,7 +80,7 @@ end
 
 
 function discretize(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
-        rank_method::String="tied", disc_method::String="median", nz_mask::BitMatrix=BitMatrix(0,0)) where ElType <: AbstractFloat
+        rank_method::String="tied", disc_method::String="median", nz_mask::BitMatrix=BitMatrix(undef, (0,0))) where ElType <: AbstractFloat
     if nz
         if issparse(X)
             disc_vecs = SparseVector{Int}[]
@@ -134,18 +134,16 @@ end
 
 function discretize_nz(x_vec::SparseVector{ElType}, n_bins::Integer=3;
         rank_method::String="tied", disc_method::String="median") where ElType <: AbstractFloat
-    disc_nz_vec = discretize(x_vec.nzval, n_bins-1, rank_method=rank_method, disc_method=disc_method) + 1
+    disc_nz_vec = discretize(x_vec.nzval, n_bins-1, rank_method=rank_method, disc_method=disc_method) .+ 1
     SparseVector(x_vec.n, x_vec.nzind, disc_nz_vec)
 end
 
 function discretize_nz(x_vec::AbstractVector{ElType}, nz_vec::AbstractVector{Bool}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median") where ElType <: AbstractFloat
-    nz_indices = findn(nz_vec)
-
-    if !isempty(nz_indices)
-        x_vec_nz = x_vec[nz_indices]
-        disc_nz_vec = discretize(x_vec_nz, n_bins-1, rank_method=rank_method, disc_method=disc_method) + 1
+    if any(nz_vec)
+        x_vec_nz = x_vec[nz_vec]
+        disc_nz_vec = discretize(x_vec_nz, n_bins-1, rank_method=rank_method, disc_method=disc_method) .+ 1
         disc_vec = zeros(Int, size(x_vec))
-        disc_vec[nz_indices] = disc_nz_vec
+        disc_vec[nz_vec] = disc_nz_vec
     else
         disc_vec = zeros(ElType, size(x_vec))
     end
@@ -176,7 +174,7 @@ function discretize_meta!(meta_data::Matrix{ElType}, norm, n_bins) where ElType 
 end
 
 function discretize_meta(meta_data::SparseMatrixCSC{ElType}, norm, n_bins) where ElType <: Real
-    meta_data_dense = full(meta_data)
+    meta_data_dense = Matrix(meta_data)
     discretize_meta!(meta_data_dense, norm, n_bins)
     sparse(meta_data_dense)
 end
@@ -205,7 +203,7 @@ function clrnorm(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractF
     data
 end
 
-rownorm!(X::Matrix{ElType}) where ElType <: AbstractFloat = X ./= sum(X, 2)
+rownorm!(X::Matrix{ElType}) where ElType <: AbstractFloat = X ./= sum(X, dims=2)
 
 function rownorm!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
     """Specialized in-place version for sparse matrices"""
@@ -244,9 +242,9 @@ function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_
 
     if filter_data
         unfilt_dims = size(data)
-        col_mask = (var(data, 1)[:] .> 0.0)[:]
+        col_mask = (var(data, dims=1)[:] .> 0.0)[:]
         data = data[:, col_mask]
-        row_mask = (sum(data, 2)[:] .> 0)[:]
+        row_mask = (sum(data, dims=2)[:] .> 0)[:]
         data = data[row_mask, :]
         if has_meta
             meta_data = meta_data[row_mask, :]
@@ -256,7 +254,6 @@ function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_
             header = header[col_mask]
         end
     end
-
 
     if verbose
         println("\t-> discarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
@@ -287,7 +284,7 @@ function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_
         if startswith(norm, "binned_nz")
             # to make sure, non-absences that become zero after
             # pre-normalization are not considered as absences
-            nz_mask = issparse(data) ? BitMatrix(0, 0) : data .!= 0
+            nz_mask = issparse(data) ? BitMatrix(undef, (0, 0)) : data .!= 0
 
             if endswith(norm, "rows")
                 rownorm!(data)
@@ -340,7 +337,7 @@ function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_
         data = convert(SparseMatrixCSC{T}, data)
     else
         if issparse(data)
-            data = full(data)
+            data = Matrix(data)
         end
         data = convert(Matrix{T}, data)
     end

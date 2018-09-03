@@ -230,8 +230,8 @@ function unchecked_statistics(result::FWResult)
     else
         n_unf = length(unf_states_dict)
         n_unchecked, n_checked = [map(s -> length(getfield(s, fld)), values(unf_states_dict)) for fld in [:unchecked_vars, :state_results]]
-        mean_n_unchecked = round(mean(n_unchecked), 3)
-        mean_frac_unchecked = round(mean(n_unchecked ./ (n_unchecked .+ n_checked)), 3)
+        mean_n_unchecked = round(mean(n_unchecked), digits=3)
+        mean_frac_unchecked = round(mean(n_unchecked ./ (n_unchecked .+ n_checked)), digits=3)
         n_unf, mean_n_unchecked, mean_frac_unchecked
     end
 end

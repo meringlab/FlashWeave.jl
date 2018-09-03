@@ -1,5 +1,6 @@
 using FlashWeave
-using Base.Test
+using Test
+using SparseArrays
 
 vec1 = [0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1]
 vec2 = [0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1]

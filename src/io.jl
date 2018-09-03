@@ -1,37 +1,38 @@
 # note: needed lots of @eval and Base.invokelatest hacks for conditional
 # module loading
 
-const valid_net_formats = (".edgelist", ".gml", ".jld2", ".jld")
-const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2", ".jld")
+const valid_net_formats = (".edgelist", ".gml", ".jld2")
+const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2")
 
-isjld(ext::AbstractString) = ext in (".jld2", ".jld")
+isjld(ext::AbstractString) = ext == ".jld2"
 isdlm(ext::AbstractString) = ext in (".tsv", ".csv")
 isbiom(ext::AbstractString) = ext == ".biom"
 isedgelist(ext::AbstractString) = ext == ".edgelist"
 isgml(ext::AbstractString) = ext == ".gml"
+isdefaultkey(key::AbstractString) = key in ("otu_data", "otu_header", "meta_data", "meta_header")
 
 
 """
     load_data(data_path::AbstractString, meta_path::AbstractString) -> (AbstractMatrix{<:Real}, Vector{String}, AbstractMatrix{<:Real}, Vector{String})
 
-Load tables with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv', '.biom', '.jld' and '.jld2'.
+Load tables with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv', '.biom' and '.jld2'.
 
 - `data_path` - path to a file storing an OTU count table
 
 - `meta_data_path` - optional path to a file with meta variable information
 
-- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD/2 file, if a data item is absent the corresponding key should be 'nothing'
+- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file, if a data item is absent the corresponding key should be 'nothing'
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
 function load_data(data_path::AbstractString, meta_path=nothing; transposed::Bool=false,
-     otu_data_key::AbstractString="otu_data", meta_data_key=nothing,
-     otu_header_key::AbstractString="otu_header", meta_header_key=nothing)
+     otu_data_key::AbstractString="otu_data", meta_data_key="meta_data",
+     otu_header_key::AbstractString="otu_header", meta_header_key="meta_header")
      """Load OTU tables and meta data from various formats.
-     -- Set jld keys you don't want to use to 'nothing'
+     -- Set jld2 keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
     file_ext = splitext(data_path)[2]
-    transposed && file_ext == ".biom" && warn("'transposed' cannot be used with .biom files")
+    transposed && file_ext == ".biom" && @warn("'transposed' cannot be used with .biom files")
 
     if isdlm(file_ext)
         ld_results = load_dlm(data_path, meta_path, transposed=transposed)
@@ -50,7 +51,7 @@ end
 """
     save_network(net_path::AbstractString, net_result::FWResult) -> Void
 
-Save network results to disk. Available formats are '.tsv', '.csv', '.gml', '.jld' and '.jld2'.
+Save network results to disk. Available formats are '.tsv', '.csv', '.gml' and '.jld2'.
 
 - `net_path` - output path for the network
 
@@ -81,7 +82,7 @@ end
 """
     load_network(net_path::AbstractString) -> FWResult{Int}
 
-Load network results from disk. Available formats are '.tsv', '.csv', '.gml', '.jld' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters ("Mode") are only available when loading from JLD/2.
+Load network results from disk. Available formats are '.tsv', '.csv', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters are only available when loading from JLD2.
 
 - `net_path` - path from which to load the network results
 """
@@ -111,13 +112,13 @@ function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_h
                              (otu_header_key, "otu_header_key"),
                              (meta_data_key, "meta_data_key"),
                              (meta_header_key, "meta_header_key")]
-         key != nothing && !haskey(d, key) && error("key '$key' not found in input file. Please make sure to provide the appropriate $key_desc when using non-standard input files for FlashWeave or set $key_desc to 'nothing'. Keys present in input file: $(join(keys(d), ", "))")
+         key != nothing && !haskey(d, key) && !(key in ["meta_data_key", "meta_header_key"]) && error("key '$key' not found in input file. Please make sure to provide the appropriate $key_desc when using non-standard input files for FlashWeave or set $key_desc to 'nothing'. Keys present in input file: $(join(keys(d), ", "))")
      end
 
      data = d[otu_data_key]
      header = d[otu_header_key]
 
-     if meta_data_key != nothing
+     if meta_data_key != nothing && haskey(d, meta_data_key)
          meta_data = d[meta_data_key]
          meta_header = d[meta_header_key]
      else
@@ -171,7 +172,7 @@ function load_biom_json(data_path)
 
     if json_struc["matrix_type"] == "sparse"
         otu_table = otu_table'
-        otu_table = sparse(otu_table[:, 1] + 1, otu_table[:, 2] + 1, otu_table[:, 3])'
+        otu_table = sparse(otu_table[:, 1] .+ 1, otu_table[:, 2] .+ 1, otu_table[:, 3])'
     end
 
     header = [x["id"] for x in json_struc["rows"]]
@@ -183,7 +184,7 @@ function load_biom_hdf5(data_path)
     f = h5open(data_path, "r")
     m, n = read(attrs(f)["shape"])
     colptr, rowval, nzval = [read(f, "sample/matrix/$key") for key in ["indptr", "indices", "data"]]
-    otu_table = SparseMatrixCSC(m, n, colptr + 1, rowval + 1, Vector{Int}(nzval))'
+    otu_table = SparseMatrixCSC(m, n, colptr .+ 1, rowval .+ 1, Vector{Int}(nzval))'
     header = read(f, "observation/ids")
     close(f)
 
@@ -227,7 +228,7 @@ function save_rejections(rej_path, net_result)
                     rej_set = rej_info[1]
                     num_tests, frac_tested = rej_info[3]
 
-                    line_items = [string(var_A) * " <-> " * string(var_B), join(rej_set, ","), round(stat, 5), pval, num_tests, round(frac_tested, 3)]
+                    line_items = [string(var_A) * " <-> " * string(var_B), join(rej_set, ","), round(stat, digits=5), pval, num_tests, round(frac_tested, digits=3)]
                     write(f, join(line_items, "\t"), "\n")
                 end
             end
@@ -355,17 +356,6 @@ function parse_gml_field(in_f::IO)
         end
     end
 
-    # field_type = info_pairs[1][1]
-
-    # if field_type == "node"
-    #     @NT(ent=field_type, id=parse(Int, info_pairs[2][2]), label=info_pairs[3][2],
-    #         mv=parse(Bool, info_pairs[4][2]))
-    # elseif field_type == "edge"
-    #     @NT(ent=field_type, source=parse(Int, info_pairs[2][2]), target=info_pairs[3][2],
-    #         weight=parse(Float64, info_pairs[4][2]))
-    # else
-    #     error("$field_type is not a valid field.")
-    # end
     info_pairs
 end
 
@@ -381,26 +371,23 @@ function read_gml(in_path::AbstractString)
         line = readline(in_f)
         line = readline(in_f)
 
-        node_info = parse_gml_field(in_f)#[("node", "")]# @NT(ent="node")
+        node_info = parse_gml_field(in_f)
         while node_info[1][1] == "node"
-            #println(node_info)
             node_id = parse(Int, node_info[2][2])
             node_dict[node_id] = node_info
             node_info = parse_gml_field(in_f)
         end
-        #println(node_info)
 
         n_nodes = maximum(keys(node_dict))
-        header = fill("", n_nodes)#Vector{String}(n_nodes)
-        meta_mask = falses(n_nodes)#BitVector(n_nodes)
+        header = fill("", n_nodes)
+        meta_mask = falses(n_nodes)
         for (node_id, n_inf) in node_dict
-            header[node_id] = n_inf[3][2][2:end-1]#node_info.label
+            header[node_id] = n_inf[3][2][2:end-1]
             meta_mask[node_id] = Bool(parse(Int, n_inf[4][2]))
         end
 
-        edge_info = node_info#[("edge", "")]#@NT(ent="edge")
+        edge_info = node_info
         while !isempty(edge_info) && edge_info[1][1] == "edge"
-            #println(edge_info)
             push!(srcs, parse(Int, edge_info[2][2]))
             push!(dsts, parse(Int, edge_info[3][2]))
             push!(ws, parse(Float64, edge_info[4][2]))
@@ -409,6 +396,7 @@ function read_gml(in_path::AbstractString)
 
         header, meta_mask
     end
+
     G = SimpleWeightedGraph(srcs, dsts, ws)
     net_result = FWResult(G; variable_ids=header, meta_variable_mask=meta_mask)
 end
