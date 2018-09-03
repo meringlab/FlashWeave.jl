@@ -276,9 +276,10 @@ meta data table as an input (instead of a data matrix).
 
 
 """
-function learn_network(data_path::AbstractString, meta_data_path=nothing;  otu_data_key::AbstractString="otu_data",
-    otu_header_key::AbstractString="otu_header", meta_data_key=nothing,
-    meta_header_key=nothing, verbose::Bool=true,
+function learn_network(data_path::AbstractString, meta_data_path=nothing;
+    otu_data_key::AbstractString="otu_data",
+    otu_header_key::AbstractString="otu_header", meta_data_key="meta_data",
+    meta_header_key="meta_header", verbose::Bool=true,
     transposed::Bool=false, kwargs...)
 
     verbose && println("\n### Loading data ###\n")

@@ -9,6 +9,7 @@ isdlm(ext::AbstractString) = ext in (".tsv", ".csv")
 isbiom(ext::AbstractString) = ext == ".biom"
 isedgelist(ext::AbstractString) = ext == ".edgelist"
 isgml(ext::AbstractString) = ext == ".gml"
+isdefaultkey(key::AbstractString) = key in ("otu_data", "otu_header", "meta_data", "meta_header")
 
 
 """
@@ -25,8 +26,8 @@ Load tables with OTU count and optionally meta data from disc. Available formats
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
 function load_data(data_path::AbstractString, meta_path=nothing; transposed::Bool=false,
-     otu_data_key::AbstractString="otu_data", meta_data_key=nothing,
-     otu_header_key::AbstractString="otu_header", meta_header_key=nothing)
+     otu_data_key::AbstractString="otu_data", meta_data_key="meta_data",
+     otu_header_key::AbstractString="otu_header", meta_header_key="meta_header")
      """Load OTU tables and meta data from various formats.
      -- Set jld2 keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
@@ -111,13 +112,13 @@ function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_h
                              (otu_header_key, "otu_header_key"),
                              (meta_data_key, "meta_data_key"),
                              (meta_header_key, "meta_header_key")]
-         key != nothing && !haskey(d, key) && error("key '$key' not found in input file. Please make sure to provide the appropriate $key_desc when using non-standard input files for FlashWeave or set $key_desc to 'nothing'. Keys present in input file: $(join(keys(d), ", "))")
+         key != nothing && !haskey(d, key) && !(key in ["meta_data_key", "meta_header_key"]) && error("key '$key' not found in input file. Please make sure to provide the appropriate $key_desc when using non-standard input files for FlashWeave or set $key_desc to 'nothing'. Keys present in input file: $(join(keys(d), ", "))")
      end
 
      data = d[otu_data_key]
      header = d[otu_header_key]
 
-     if meta_data_key != nothing
+     if meta_data_key != nothing && haskey(d, meta_data_key)
          meta_data = d[meta_data_key]
          meta_header = d[meta_header_key]
      else
