@@ -1,18 +1,18 @@
+using FlashWeave
 using Test
 using SimpleWeightedGraphs
 using LightGraphs
 using FileIO
-using SparseArrays, DelimitedFiles, Statistics, Distributed
+using SparseArrays, DelimitedFiles, Statistics, Distributed, Logging
 
 nprocs() == 1 && addprocs(1)
-
 @everywhere using FlashWeave
-
 
 
 data_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv")
 data = Matrix{Float64}(readdlm(data_path, '\t')[2:end, 2:end])
 data_sp = sparse(data)
+header = ["X" * string(i) for i in 1:size(data, 2)]
 
 adj_exp_dict = load(joinpath("data", "learning_expected.jld2"))
 
@@ -21,8 +21,19 @@ exp_dict = Dict(key=>SimpleWeightedGraph(adj_mat) for (key, adj_mat) in adj_exp_
 rtol = 1e-2
 atol = 0.0
 
-function make_network(data, test_name, make_sparse=false, prec=64, verbose=false; kwargs...)
-    data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=false, make_sparse=make_sparse, prec=prec)
+macro silence_stdout(expr)
+    quote
+        orig_stdout = stdout; p1, p2 = redirect_stdout()
+        res = $(esc(expr))
+        close(p1), close(p2)
+        redirect_stdout(orig_stdout)
+        res
+    end
+end
+
+
+function make_network(data, test_name, make_sparse=false, prec=64, verbose=true; kwargs...)
+    data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=true, make_sparse=make_sparse, prec=prec)
     kwargs_dict = Dict(kwargs)
     lgl_res = FlashWeave.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
     lgl_res.graph
@@ -89,6 +100,12 @@ function compare_graph_results(g1::SimpleWeightedGraph, g2::SimpleWeightedGraph;
 end
 
 
+@testset "il output" begin
+    @test @silence_stdout isa(learn_network(data, sensitive=true, heterogeneous=false,
+                        max_k=3, header=header, verbose=true, time_limit=1e-10,
+                        update_interval=1.0, conv=10.0), FlashWeave.FWResult)
+end
+
 @testset "LGL_backend" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
         @testset "$test_name" begin
@@ -108,7 +125,9 @@ end
                                 @testset "parallel $parallel" begin
                                     is_il = endswith(parallel, "_il")
                                     time_limit = is_il ? 30.0 : 0.0
-                                    pred_graph = make_network(data, test_name, make_sparse, 64,
+
+
+                                    pred_graph = @silence_stdout make_network(data, test_name, make_sparse, 64,
                                         max_k=max_k, parallel=parallel, time_limit=time_limit)
 
                                     # special case for conditional mi
@@ -142,7 +161,7 @@ end
     for (test_name, make_sparse) in [("mi_nz", true), ("fz", false)]
         for make_sparse in [true, false]
             @testset "$(test_name)_$(make_sparse)_single" begin
-                pred_graph = make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single", time_limit=0.0)
+                pred_graph = @silence_stdout make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single", time_limit=0.0)
                 exp_graph = exp_dict["exp_$(test_name)_maxk3"]
                 @test compare_graph_results(exp_graph, pred_graph, rtol=1e-2, atol=0.0)
             end
@@ -151,7 +170,6 @@ end
 end
 
 
-header = ["X" * string(i) for i in 1:size(data, 2)]
 @testset "learn_network" begin
     approx_nbr_diff = 0
     approx_weight_meandiff = 0.05
@@ -170,8 +188,10 @@ header = ["X" * string(i) for i in 1:size(data, 2)]
                 het_str = heterogeneous ? "_nz" : ""
                 test_name = sens_str * het_str
                 exp_graph = exp_dict["exp_$(test_name)_maxk3"]
-                pred_graph = graph(learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
-                                   max_k=3, header=header, verbose=false))
+
+                pred_netw = @silence_stdout learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
+                                   max_k=3, header=header, verbose=true)
+                pred_graph = graph(pred_netw)
 
                 @testset "edge_identity" begin
                     @test compare_graph_results(exp_graph, pred_graph,
@@ -179,6 +199,10 @@ header = ["X" * string(i) for i in 1:size(data, 2)]
                                                 approx=true,
                                                 approx_nbr_diff=approx_nbr_diff,
                                                 approx_weight_meandiff=approx_weight_meandiff)
+                end
+
+                @testset "show" begin
+                    @silence_stdout show(pred_netw)
                 end
             end
         end
@@ -192,8 +216,9 @@ header = ["X" * string(i) for i in 1:size(data, 2)]
                                                         [("_meta.tsv", "_meta_transposed.tsv"),("","")])
             @testset "$data_format" begin
                 path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]
-                pred_graphs = [graph(learn_network(path_pairs[i], path_pairs[i_meta], sensitive=true,
-                                                   heterogeneous=false, max_k=3, verbose=false, transposed=transp))
+                pred_graphs = [graph(@silence_stdout learn_network(path_pairs[i], path_pairs[i_meta],
+                                                                   sensitive=true, heterogeneous=false,
+                                                                   max_k=3, verbose=true, transposed=transp))
                                for (i, i_meta, transp) in [(1, 3, false), (2, 4, true)]]
 
                 for pred_graph in pred_graphs
@@ -207,6 +232,7 @@ header = ["X" * string(i) for i in 1:size(data, 2)]
         end
     end
 end
+
 
 # to create expected output
 

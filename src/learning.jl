@@ -3,13 +3,13 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
     output_folder::AbstractString, edge_rule::AbstractString)  where {ElType<:Real}
 
-    !isempty(tmp_folder) && @warn("tmp_folder currently not implemented")
+    !isempty(tmp_folder) && @warn "tmp_folder currently not implemented"
 
     if edge_rule != "OR"
         if edge_rule == "AND"
-            @warn("AND rule currently disabled (insufficiently tested)")
+            @warn "AND rule currently disabled (insufficiently tested)"
         else
-            warn("edge_rule $(edge_rule) not a valid option, setting it to OR")
+            @warn "edge_rule $(edge_rule) not a valid option, setting it to OR"
         end
 
         edge_rule = "OR"
@@ -26,18 +26,16 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     end
 
     if time_limit != 0.0 && !endswith(parallel, "_il")
-        @warn("Using time_limit without interleaved parallelism is not advised.")
+        @warn "Using time_limit without interleaved parallelism is not advised."
     elseif parallel == "multi_il" && time_limit == 0.0 && feed_forward
-        @warn("Specify 'time_limit' when using interleaved parallelism to potentially increase speed.")
+        @warn "Specify 'time_limit' when using interleaved parallelism to potentially increase speed."
     end
 
     disc_type = Int32
     cont_type = Float32
 
     if isdiscrete(test_name)
-        if verbose
-            println("Computing levels..")
-        end
+        verbose && println("Computing levels..")
         levels = get_levels(data)
         cor_mat = zeros(cont_type, 0, 0)
     else
@@ -79,9 +77,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
     tmp_folder::AbstractString="") where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
-    if verbose
-        println("Computing univariate associations..")
-    end
+    verbose && println("Computing univariate associations..")
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
                                           levels=levels, parallel=parallel, workers_local=workers_all_local(),
@@ -95,9 +91,9 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
         nbr_nums = map(length, values(all_univar_nbrs))
         println(summarystats(nbr_nums), "\n")
         if mean(nbr_nums) > size(data, 2) * 0.2
-            @warn("The univariate network is exceptionally dense, computations may be very slow.
+            @warn "The univariate network is exceptionally dense, computations may be very slow.
                  Check if appropriate normalization was used (employ niche-mode if not yet the case)
-                 and try using the AND rule to gain speed.")
+                 and try using the AND rule to gain speed."
         end
     end
 
@@ -116,12 +112,10 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
         cor_mat = zeros(cont_type, size(data, 2), size(data, 2))
     end
 
-    if verbose
-        println("\nStarting conditioning search..")
-    end
+    verbose && println("\nStarting conditioning search..")
 
     if nonsparse_cond && !endswith(parallel, "il")
-        @warn("nonsparse_cond currently not implemented")
+        @warn "nonsparse_cond currently not implemented"
     end
 
     if parallel == "single"
@@ -418,7 +412,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
        verbose && println("\n### Normalizing ###\n")
        input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose)
     else
-       @warn("Skipping normalization, only experts should choose this option.")
+       @warn "Skipping normalization, only experts should choose this option."
        input_data = data
     end
 
@@ -432,7 +426,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
 
     net_result = FWResult(lgl_results, header, meta_mask, params_dict)
 
-    verbose && println("\nFinished inference. Total time taken: ", round(time_taken, digits=3), "s")
+    verbose && println("\nFinished inference. Total time taken: $(round(time_taken, digits=3))s")
 
     net_result
 end
