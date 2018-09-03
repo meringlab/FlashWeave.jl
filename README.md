@@ -106,7 +106,7 @@ Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaP
 
 ## Citing ##
 
-To cite FlashWeave, please refer to the preprint on bioRxiv:
+To cite FlashWeave, please refer to our preprint on [bioRxiv](https://www.biorxiv.org/content/early/2018/08/13/390195):
 
 ```
 Tackmann, Janko, Joao Frederico Matias Rodrigues, and Christian von Mering. "Rapid inference 
