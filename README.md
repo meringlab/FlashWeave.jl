@@ -88,7 +88,7 @@ julia> learn_network(...
 
 and network learning will be parallelized in a shared-memory, multi-process fashion.
 
-If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` can be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package, installable via ```Pkg.add("ClusterManagers")```). Details differ depending on the setup (queueing system, resource requirements etc.), but a simple example for a Sun Grid Engine (SGE) system would be:
+If you want to run FlashWeave remotely on a computing cluster, a ```ClusterManager``` can be used (for example from the [ClusterManagers.jl](https://github.com/JuliaParallel/ClusterManagers.jl) package, installable via ```]``` and then ```add ClusterManagers```). Details differ depending on the setup (queueing system, resource requirements etc.), but a simple example for a Sun Grid Engine (SGE) system would be:
 
 ```julia
 julia> using ClusterManagers
@@ -102,10 +102,6 @@ julia> ## addprocs_sge(5, queue="<your queue>", qsub_env="<your environment>", r
 ```
 
 Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaParallel/ClusterManagers.jl) for further details.
-
-## Versioning and API ##
-
-FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to change.
 
 ## Citing ##
 
@@ -131,3 +127,7 @@ Example BibTeX entry:
 	journal = {bioRxiv}
 }
 ```
+
+## Versioning and API ##
+
+FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to change.
