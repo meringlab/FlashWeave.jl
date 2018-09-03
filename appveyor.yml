@@ -5,7 +5,7 @@ environment:
 branches:
   only:
     - master
-    - /release-.*/
+    - v07fixes
 
 notifications:
   - provider: Email
