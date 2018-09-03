@@ -3,7 +3,7 @@
 [![Project Status: Active - The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![Build Status](https://travis-ci.org/meringlab/FlashWeave.jl.svg?branch=master)](https://travis-ci.org/meringlab/FlashWeave.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/vdesge86ssj91htc?svg=true)](https://ci.appveyor.com/project/jtackm/flashweave-jl)
-[![Coverage Status](https://coveralls.io/repos/github/meringlab/FlashWeave.jl/badge.svg?branch=master)](https://coveralls.io/github/meringlab/FlashWeave.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/meringlab/FlashWeave.jl/badge.svg?branch=v07fixes&service=github)](https://coveralls.io/github/meringlab/FlashWeave.jl?branch=v07fixes)
 
 FlashWeave predicts ecological interactions between microbes from large-scale compositional abundance data (i.e. OTU tables constructed from sequencing data) through statistical co-occurrence or co-abundance. It reports direct associations, with adjustment for bystander effects and other confounders, and can furthermore integrate environmental or technical factors into the analysis of microbial systems.
 
