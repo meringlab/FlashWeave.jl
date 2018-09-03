@@ -82,7 +82,7 @@ end
 """
     load_network(net_path::AbstractString) -> FWResult{Int}
 
-Load network results from disk. Available formats are '.tsv', '.csv', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters ("Mode") are only available when loading from JLD2.
+Load network results from disk. Available formats are '.tsv', '.csv', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters are only available when loading from JLD2.
 
 - `net_path` - path from which to load the network results
 """
@@ -356,17 +356,6 @@ function parse_gml_field(in_f::IO)
         end
     end
 
-    # field_type = info_pairs[1][1]
-
-    # if field_type == "node"
-    #     @NT(ent=field_type, id=parse(Int, info_pairs[2][2]), label=info_pairs[3][2],
-    #         mv=parse(Bool, info_pairs[4][2]))
-    # elseif field_type == "edge"
-    #     @NT(ent=field_type, source=parse(Int, info_pairs[2][2]), target=info_pairs[3][2],
-    #         weight=parse(Float64, info_pairs[4][2]))
-    # else
-    #     error("$field_type is not a valid field.")
-    # end
     info_pairs
 end
 
@@ -382,26 +371,23 @@ function read_gml(in_path::AbstractString)
         line = readline(in_f)
         line = readline(in_f)
 
-        node_info = parse_gml_field(in_f)#[("node", "")]# @NT(ent="node")
+        node_info = parse_gml_field(in_f)
         while node_info[1][1] == "node"
-            #println(node_info)
             node_id = parse(Int, node_info[2][2])
             node_dict[node_id] = node_info
             node_info = parse_gml_field(in_f)
         end
-        #println(node_info)
 
         n_nodes = maximum(keys(node_dict))
-        header = fill("", n_nodes)#Vector{String}(n_nodes)
-        meta_mask = falses(n_nodes)#BitVector(n_nodes)
+        header = fill("", n_nodes)
+        meta_mask = falses(n_nodes)
         for (node_id, n_inf) in node_dict
-            header[node_id] = n_inf[3][2][2:end-1]#node_info.label
+            header[node_id] = n_inf[3][2][2:end-1]
             meta_mask[node_id] = Bool(parse(Int, n_inf[4][2]))
         end
 
-        edge_info = node_info#[("edge", "")]#@NT(ent="edge")
+        edge_info = node_info
         while !isempty(edge_info) && edge_info[1][1] == "edge"
-            #println(edge_info)
             push!(srcs, parse(Int, edge_info[2][2]))
             push!(dsts, parse(Int, edge_info[3][2]))
             push!(ws, parse(Float64, edge_info[4][2]))
@@ -410,6 +396,7 @@ function read_gml(in_path::AbstractString)
 
         header, meta_mask
     end
+
     G = SimpleWeightedGraph(srcs, dsts, ws)
     net_result = FWResult(G; variable_ids=header, meta_variable_mask=meta_mask)
 end

@@ -309,7 +309,7 @@ Learn an interaction network from a data table (including OTUs and optionally me
 
 - `data` - data table with information on OTU counts and (optionally) meta variables
 
-- `header` - names of variable-column s in `data`
+- `header` - names of variable columns in `data`
 
 - `meta_mask` - true/false mask indicating which variables are meta variables
 
@@ -343,7 +343,7 @@ Learn an interaction network from a data table (including OTUs and optionally me
 
 - `track_rejections` - store for each discarded edge, which variable set lead to its exclusion (can be memory intense for large networks)
 
-- verbose` - print progress information
+- `verbose` - print progress information
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 

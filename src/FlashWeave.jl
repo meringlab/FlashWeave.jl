@@ -18,8 +18,6 @@ using JSON, HDF5, FileIO
 import Base.show, Base.names, Base.==
 
 
-
-
 include("types.jl")
 include("io.jl")
 include("misc.jl")
