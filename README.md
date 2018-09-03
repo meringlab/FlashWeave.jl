@@ -106,3 +106,28 @@ Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaP
 ## Versioning and API ##
 
 FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to change.
+
+## Citing ##
+
+To cite FlashWeave, please refer to the preprint on BioRxiv:
+
+```
+Tackmann, Janko, Joao Frederico Matias Rodrigues, and Christian von Mering. "Rapid inference 
+of direct interactions in large-scale ecological networks from heterogeneous microbial
+sequencing data." bioRxiv (2018): 390195.
+```
+
+Example BibTeX entry:
+
+```
+@article {tackmann2018rapid,
+	author = {Tackmann, Janko and Rodrigues, Joao Frederico Matias and von Mering, Christian},
+	title = {Rapid inference of direct interactions in large-scale ecological networks from heterogeneous microbial sequencing data},
+	year = {2018},
+	doi = {10.1101/390195},
+	publisher = {Cold Spring Harbor Laboratory},
+	URL = {https://www.biorxiv.org/content/early/2018/08/13/390195},
+	eprint = {https://www.biorxiv.org/content/early/2018/08/13/390195.full.pdf},
+	journal = {bioRxiv}
+}
+```
