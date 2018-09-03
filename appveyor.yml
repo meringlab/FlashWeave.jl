@@ -6,11 +6,6 @@ nvironment:
 platform:
   - x64 # 64-bit
 
-# This is left as an example for the next big version switch.
-#matrix:
-#  allow_failures:
-#  - julia_version: latest
-
 branches:
   only:
     - v07fixes
