@@ -1,4 +1,4 @@
-nvironment:
+environment:
   matrix:
   - julia_version: 0.7
   - julia_version: 1.0
