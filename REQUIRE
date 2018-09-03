@@ -7,6 +7,5 @@ SimpleWeightedGraphs
 DataStructures
 JLD2
 FileIO
-Iterators
 HDF5
 JSON
