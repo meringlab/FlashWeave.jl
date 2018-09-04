@@ -15,7 +15,7 @@ using StatsBase, Distributions, Combinatorics
 using JSON, HDF5, FileIO
 
 # utilities
-import Base.show, Base.names, Base.==
+import Base: show, names, ==
 
 
 include("types.jl")

@@ -190,7 +190,7 @@ end
                 exp_graph = exp_dict["exp_$(test_name)_maxk3"]
 
                 pred_netw = @silence_stdout learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
-                                   max_k=3, header=header, verbose=true)
+                                   max_k=3, header=header, track_rejections=true, verbose=true)
                 pred_graph = graph(pred_netw)
 
                 @testset "edge_identity" begin

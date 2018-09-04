@@ -57,7 +57,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
             n_obs_min = 20
         end
 
-        verbose && println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
+        verbose && println("Automatically setting 'n_obs_min' to $n_obs_min for enhanced reliability.")
     end
 
     if n_obs_min > size(data, 1)
@@ -71,7 +71,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
 
     if verbose && is_zero_adjusted(test_name)
         n_unrel = sum(sum(data .!= 0, dims=1) .< n_obs_min)
-        n_unrel > 0 && @warn "$n_unrel variables have insufficient observations (< 'n_obs_min') and will not be used for interaction prediction"
+        n_unrel > 0 && @warn "$n_unrel variables have insufficient observations (< $n_obs_min ('n_obs_min')) and will not be used for interaction prediction"
     end
 
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule

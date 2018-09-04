@@ -250,8 +250,7 @@ function show(io::IO, result::FWResult{T}) where T<:Integer
     println(io, "Network:")
     n_meta_vars = sum(result.meta_variable_mask)
     n_vars = nv(G)
-    println(io, "$(ne(G)) interactions between $n_vars variables ($(n_vars - n_meta_vars) OTUs
-     and $(n_meta_vars) MVs)\n")
+    println(io, "$(ne(G)) interactions between $n_vars variables ($(n_vars - n_meta_vars) OTUs and $(n_meta_vars) MVs)\n")
 
     println(io, "Unfinished variables:")
     n_unf, mean_n_unchecked, mean_frac_unchecked = unchecked_statistics(result)
