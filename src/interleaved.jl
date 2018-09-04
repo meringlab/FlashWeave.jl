@@ -14,9 +14,7 @@ end
 function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_rule::String, nonsparse_cond::Bool,
      shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
 
-    if nonsparse_cond
-        @warn "nonsparse_cond currently not implemented"
-    end
+    nonsparse_cond && @warn "nonsparse_cond currently not implemented"
 
     converged = false
     while true
@@ -31,8 +29,8 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
             if prev_state.phase == 'C'
                 converged = true
             elseif converged
-                prev_state = HitonState('C', prev_state.state_results, prev_state.inter_results, prev_state.unchecked_vars,
-                                        prev_state.state_rejections)
+                prev_state = HitonState('C', prev_state.state_results, prev_state.inter_results,
+                                        prev_state.unchecked_vars, prev_state.state_rejections)
             end
 
             if edge_rule == "AND"

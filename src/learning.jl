@@ -60,7 +60,14 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         verbose && println("Automatically setting 'n_obs_min' to $n_obs_min to enhance reliability.")
     end
 
-    n_obs_min > size(data, 1) && error("dataset has insufficient observations (< 'n_obs_min'), try using a smaller 'max_k' parameter")
+    if n_obs_min > size(data, 1)
+        error_msg = ""
+        if max_k > 0
+            error_msg *= ". Try using a smaller 'max_k' parameter (at the cost of more indirect associations)."
+        end
+
+        error("dataset has insufficient number of observations, need at least $n_obs_min ('n_obs_min') for reliable tests$error_msg")
+    end
 
     if verbose && is_zero_adjusted(test_name)
         n_unrel = sum(sum(data .!= 0, dims=1) .< n_obs_min)
@@ -91,9 +98,14 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
         nbr_nums = map(length, values(all_univar_nbrs))
         println(summarystats(nbr_nums), "\n")
         if mean(nbr_nums) > size(data, 2) * 0.2
-            @warn "The univariate network is exceptionally dense, computations may be very slow.
-                 Check if appropriate normalization was used (employ niche-mode if not yet the case)
-                 and try using the AND rule to gain speed."
+            warn_msg = ""
+            if !is_zero_adjusted(test_name)
+                warn_msg *= "Use 'heterogenenous=true' (if appropriate for your data) to increase speed. "
+            end
+            if iscontinuous(test_name)
+                warn_msg *= "Consider setting 'sensitive=false'."
+            end
+            @warn "The univariate network is exceptionally dense, computations may be slow. $warn_msg"
         end
     end
 

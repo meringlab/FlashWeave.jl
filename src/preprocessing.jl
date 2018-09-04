@@ -23,7 +23,7 @@ function adaptive_pseudocount(x1::ElType, s1::Vector{ElType}, s2::Vector{ElType}
     k, Nprod1_log = pseudocount_vars_from_sample(s1)
     n, Nprod2_log = pseudocount_vars_from_sample(s2)
     p = length(s1)
-    #@assert n < p && k < p "samples with all zero abundances are not allowed"
+    @assert n < p && k < p "samples with all zero abundances are not allowed"
     x2_log = (1 / (n-p)) * ((k-p)*log(x1) + Nprod1_log - Nprod2_log)
     return exp(x2_log)
 end

@@ -163,7 +163,7 @@ function print_network_stats(graph::LightGraphs.Graph)
     println(summarystats(deg))
     deg_median = median(deg)
     if deg_median > 20
-        warn("The network seems unusually dense (current median degree $deg_median across all nodes) which can lead to slow speed. For possible causes see <>.")
+        @warn "The network seems unusually dense (current median degree $deg_median across all nodes) which can lead to slow speed. For possible causes see <>."
     end
 end
 
@@ -179,7 +179,7 @@ function maxweight(weight1::Float64, weight2::Float64, e1::Int, e2::Int, header:
     else
         if sign1 * sign2 < 0
             e1w, e2w = isempty(header) ? (e1, e2) : (header[e1], header[e2])
-            warn("Opposite signs for edge $e1w <-> $e2w detected. Arbitarily choosing one.")
+            @warn "Opposite signs for edge $e1w <-> $e2w detected. Arbitarily choosing one."
             return weight1
         else
             return max(abs(weight1), abs(weight2)) * sign1

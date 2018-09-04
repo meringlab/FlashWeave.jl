@@ -298,7 +298,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
                 end
                 test_fraction = num_tests / num_tests_total
 
-                max_tests > 0 && num_tests >= max_tests && warn("Maximum number of tests for variable pair $X / $Y at $num_tests out of $num_tests_total tests (fraction: $(round(test_fraction, digits=3)), size of Z: $(length(Z_total))).")
+                max_tests > 0 && num_tests >= max_tests && @warn "Maximum number of tests for variable pair $X / $Y at $num_tests out of $num_tests_total tests (fraction: $(round(test_fraction, digits=3)), size of Z: $(length(Z_total)))."
 
                 return test_result, Zs, num_tests, test_fraction
 
