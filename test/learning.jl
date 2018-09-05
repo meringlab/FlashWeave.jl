@@ -262,18 +262,11 @@ end
 end
 
 
-@testset "il output" begin
-    @test @silence_stdout isa(learn_network(data, sensitive=true, heterogeneous=false,
-                        max_k=10, header=header, verbose=true, time_limit=1e-10,
-                        update_interval=1.0, conv=10.0), FlashWeave.FWResult)
-end
-
-
 @testset "convergence" begin
-    @test @silence_stdout isa(make_network(data, "fz_nz", true, 64, true, false,
-                                           convergence_threshold=Inf,
-                                           max_k=3, parallel="single_il", time_limit=1e-8,
-                                           update_interval=0.1), FlashWeave.LGLResult)
+    @test @silence_stdout isa(show(FlashWeave.FWResult(make_network(data, "fz", true, 64, true, false,
+                                               convergence_threshold=Inf,
+                                               max_k=3, parallel="single_il", time_limit=1e-8,
+                                               update_interval=0.001))), Nothing)
 end
 
 
