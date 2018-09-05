@@ -2,7 +2,7 @@
 language: julia
 os:
   - linux
-  # - osx
+  - osx
 julia:
   # - 0.7
   - 1.0
@@ -12,11 +12,8 @@ addons:
   apt:
     packages:
     - hdf5-tools
-
-# uncomment the following lines to override the default test script
-#script:
-#  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-#  - julia -e 'Pkg.clone(pwd()); Pkg.build("Cauocc"); Pkg.test("Cauocc"; coverage=true)'
+before_script:
+    - if [ $TRAVIS_OS_NAME = osx ]; then brew install gcc; brew link --overwrite gcc; brew install hdf5; fi
 after_success:
   # push coverage results to Coveralls
     - julia -e 'using Pkg; Pkg.add("Coverage"); cd(Pkg.dir("FlashWeave")); using Coverage; Coveralls.submit(process_folder())'
