@@ -33,13 +33,8 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
                                         prev_state.unchecked_vars, prev_state.state_rejections)
             end
 
-            if edge_rule == "AND"
-                blacklist = skip_nbrs
-                whitelist = Set{Int}()
-            else
-                blacklist = Set{Int}()
-                whitelist = skip_nbrs
-            end
+            blacklist = Set{Int}()
+            whitelist = skip_nbrs
 
             nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs,
                                     prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
@@ -114,10 +109,6 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
     # this graph is just used for efficiently keeping track of graph stats during the run
     graph = Graph(n_vars)
 
-    if edge_rule == "AND"
-        blacklist_graph = Graph(n_vars)
-    end
-
     if !isempty(output_folder)
         output_graph = SimpleWeightedGraph(n_vars)
         !isdir(output_folder) && mkdir(output_folder)
@@ -144,7 +135,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                 end
 
                 if feed_forward
-                    skip_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, target_var)) : Set(neighbors(graph, target_var))
+                    skip_nbrs = Set(neighbors(graph, target_var))
                 else
                     skip_nbrs= Set{Int}()
                 end
@@ -173,14 +164,6 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                     end
                 end
 
-                if feed_forward && edge_rule == "AND"
-                    for a_var in target_vars
-                        if !haskey(curr_state.state_results, a_var)
-                            add_edge!(blacklist_graph, target_var, a_var)
-                        end
-                    end
-                end
-
                 remaining_jobs -= 1
 
                 # kill workers if not needed anymore
@@ -204,7 +187,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                 next_var = pop!(waiting_vars)
 
                 if feed_forward
-                    var_nbrs = edge_rule == "AND" ? Set(neighbors(blacklist_graph, next_var)) : Set(neighbors(graph, next_var))
+                    var_nbrs = Set(neighbors(graph, next_var))
                 else
                     var_nbrs = Set{Int}()
                 end
