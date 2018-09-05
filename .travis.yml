@@ -4,7 +4,6 @@ os:
   - linux
   - osx
 julia:
-  # - 0.7
   - 1.0
 notifications:
   email: false
@@ -16,6 +15,4 @@ before_script:
     - if [ $TRAVIS_OS_NAME = osx ]; then brew install gcc; brew link --overwrite gcc; brew install hdf5; fi
 after_success:
   # push coverage results to Coveralls
-    - julia -e 'using Pkg; Pkg.add("Coverage"); cd(Pkg.dir("FlashWeave")); using Coverage; Coveralls.submit(process_folder())'
-  # push coverage results to Codecov
-  # - julia -e 'cd(Pkg.dir("FlashWeave")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+    - julia -e 'using Pkg; Pkg.add("Coverage"); cd(Pkg.dir("FlashWeave")); using Coverage; Coveralls.submit(process_folder()); Codecov.submit(process_folder())'
