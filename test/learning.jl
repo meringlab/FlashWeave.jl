@@ -230,7 +230,7 @@ end
                 end
 
                 @testset "show" begin
-                    @silence_stdout show(pred_netw)
+                    @test @silence_stdout isa(show(pred_netw), Nothing)
                 end
             end
         end

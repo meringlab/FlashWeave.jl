@@ -7,8 +7,6 @@ import Base: AbstractChannel, put!, push!, pop!, take!, wait, fetch, eltype, sho
 Constructs a `Channel` with an internal buffer that can hold a maximum of `sz` objects
 of type `T`.
 [`put!`](@ref) calls on a full StackChannel block until an object is removed with [`take!`](@ref).
-`Channel(0)` constructs an unbuffered StackChannel. `put!` blocks until a matching `take!` is called.
-And vice-versa.
 Other constructors:
 * `Channel(Inf)`: equivalent to `Channel{Any}(typemax(Int))`
 * `Channel(sz)`: equivalent to `Channel{Any}(sz)`
@@ -22,27 +20,21 @@ mutable struct StackChannel{T} <: AbstractChannel{T}
     data::Vector{T}
     sz_max::Int                          # maximum size of StackChannel
 
-    # Used when sz_max == 0, i.e., an unbuffered StackChannel.
-    waiters::Int
-    takers::Vector{Task}
-    putters::Vector{Task}
 
     function StackChannel{T}(sz::Float64) where T
         if sz == Inf
             StackChannel{T}(typemax(Int))
-        else
+        elseif sz > 0
             StackChannel{T}(convert(Int, sz))
+        else
+            error("sz must be > 0")
         end
     end
     function StackChannel{T}(sz::Integer) where T
-        if sz < 0
-            throw(ArgumentError("Channel size must be either 0, a positive integer or Inf"))
+        if sz < 1
+            throw(ArgumentError("Channel size must a positive integer or Inf"))
         end
-        ch = new(Condition(), Condition(), :open, nothing, Vector{T}(), sz, 0)
-        if sz == 0
-            ch.takers = Vector{Task}()
-            ch.putters = Vector{Task}()
-        end
+        ch = new(Condition(), Condition(), :open, nothing, Vector{T}(), sz)
         return ch
     end
 end
@@ -96,7 +88,6 @@ end
 
 closed_exception() = InvalidStateException("Channel is closed.", :closed)
 
-isbuffered(c::StackChannel) = c.sz_max==0 ? false : true
 
 function check_channel_state(c::StackChannel)
     if !isopen(c)
@@ -207,12 +198,10 @@ end
 """
     put!(c::StackChannel, v)
 Append an item `v` to the StackChannel `c`. Blocks if the StackChannel is full.
-For unbuffered StackChannels, blocks until a [`take!`](@ref) is performed by a different
-task.
 """
 function put!(c::StackChannel, v)
     check_channel_state(c)
-    isbuffered(c) ? put_buffered(c,v) : put_unbuffered(c,v)
+    put_buffered(c,v)
 end
 
 function put_buffered(c::StackChannel, v)
@@ -226,45 +215,25 @@ function put_buffered(c::StackChannel, v)
     v
 end
 
-function put_unbuffered(c::StackChannel, v)
-    if length(c.takers) == 0
-        push!(c.putters, current_task())
-        c.waiters > 0 && notify(c.cond_take, nothing, false, false)
-
-        try
-            wait()
-        catch ex
-            filter!(x->x!=current_task(), c.putters)
-            rethrow(ex)
-        end
-    end
-    taker = pop!(c.takers)
-    yield(taker, v) # immediately give taker a chance to run, but don't block the current task
-    return v
-end
-
 push!(c::StackChannel, v) = put!(c, v)
 
 """
     fetch(c::StackChannel)
 Wait for and get the first available item from the StackChannel. Does not
-remove the item. `fetch` is unsupported on an unbuffered (0-size) StackChannel.
+remove the item.
 """
-fetch(c::StackChannel) = isbuffered(c) ? fetch_buffered(c) : fetch_unbuffered(c)
+fetch(c::StackChannel) = fetch_buffered(c)
 function fetch_buffered(c::StackChannel)
     wait(c)
     c.data[1]
 end
-fetch_unbuffered(c::StackChannel) = throw(ErrorException("`fetch` is not supported on an unbuffered StackChannel."))
 
 
 """
     take!(c::StackChannel)
 Remove and return a value from a [`Channel`](@ref). Blocks until data is available.
-For unbuffered StackChannels, blocks until a [`put!`](@ref) is performed by a different
-task.
 """
-take!(c::StackChannel) = isbuffered(c) ? take_buffered(c) : take_unbuffered(c)
+take!(c::StackChannel) = take_buffered(c)
 function take_buffered(c::StackChannel)
     wait(c)
     v = pop!(c.data)
@@ -274,38 +243,15 @@ end
 
 pop!(c::StackChannel) = take!(c)
 
-# 0-size StackChannel
-function take_unbuffered(c::StackChannel{T}) where T
-    check_channel_state(c)
-    push!(c.takers, current_task())
-    try
-        if length(c.putters) > 0
-            let refputter = Ref(pop!(c.putters))
-                return Base.try_yieldto(refputter) do putter
-                    # if we fail to start putter, put it back in the queue
-                    putter === current_task || push!(c.putters, putter)
-                end::T
-            end
-        else
-            return wait()::T
-        end
-    catch ex
-        filter!(x->x!=current_task(), c.takers)
-        rethrow(ex)
-    end
-end
-
 """
     isready(c::StackChannel)
 Determine whether a [`Channel`](@ref) has a value stored to it. Returns
 immediately, does not block.
-For unbuffered StackChannels returns `true` if there are tasks waiting
-on a [`put!`](@ref).
 """
 isready(c::StackChannel) = n_avail(c) > 0
-n_avail(c::StackChannel) = isbuffered(c) ? length(c.data) : length(c.putters)
+n_avail(c::StackChannel) = length(c.data)
 
-wait(c::StackChannel) = isbuffered(c) ? wait_impl(c) : wait_unbuffered(c)
+wait(c::StackChannel) = wait_impl(c)
 function wait_impl(c::StackChannel)
     while !isready(c)
         check_channel_state(c)
@@ -314,25 +260,10 @@ function wait_impl(c::StackChannel)
     nothing
 end
 
-function wait_unbuffered(c::StackChannel)
-    c.waiters += 1
-    try
-        wait_impl(c)
-    finally
-        c.waiters -= 1
-    end
-    nothing
-end
 
 function notify_error(c::StackChannel, err)
     notify_error(c.cond_take, err)
     notify_error(c.cond_put, err)
-
-    # release tasks on a `wait()/yieldto()` call (on unbuffered StackChannels)
-    if !isbuffered(c)
-        waiters = filter!(t->(t.state == :runnable), vcat(c.takers, c.putters))
-        foreach(t->schedule(t, err; error=true), waiters)
-    end
 end
 notify_error(c::StackChannel) = notify_error(c, c.excp)
 

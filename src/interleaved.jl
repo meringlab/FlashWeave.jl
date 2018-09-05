@@ -64,7 +64,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         error("$parallel not a valid execution mode.")
     end
 
-    shared_job_q = RemoteChannel(() -> StackChannel{Tuple}(size(data, 2) * 2), 1)
+    shared_job_q = RemoteChannel(() -> StackChannel{Tuple}(size(data, 2) * 2))
     shared_result_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2)), 1)
 
     # initialize jobs
