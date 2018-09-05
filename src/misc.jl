@@ -75,16 +75,8 @@ signed_weight(test_result::TestResult, kind::AbstractString="stat") = signed_wei
 function signed_weight(stat::Float64, pval::Float64, kind::AbstractString="stat")
     if kind == "stat"
         weight = stat
-    elseif endswith(kind, "pval")
-        sign_factor = stat < 0.0 ? -1.0 : 1.0
-
-        if kind == "logpval"
-            weight = -log(pval)
-            weight = isinf(weight) ? inf_weight : weight
-        else
-            weight = pval
-        end
-        weight *= sign_factor
+    else
+        error("only 'stat' weights are currently supported")
     end
     weight
 end
@@ -105,7 +97,9 @@ function workers_all_local()
 end
 
 
-function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}, weight_type::String, test_name::String)
+function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}},
+                      univar_nbrs::OrderedDict{Int,Tuple{Float64,Float64}}, weight_type::String,
+                      test_name::String)
     # create weights
     nbr_dict = Dict{Int,Float64}()
     weight_kind = split(weight_type, "_")[2]
@@ -113,7 +107,7 @@ function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}}, univar_n
     if startswith(weight_type, "uni")
         nbr_dict = Dict([(nbr, signed_weight(univar_nbrs[nbr]..., weight_kind)) for nbr in keys(PC_dict)])
     else
-        if startswith(test_name, "mi")
+        if isdiscrete(test_name)
             nbr_dict = Dict{Int,Float64}()
             for nbr in keys(PC_dict)
                 edge_sign = sign(univar_nbrs[nbr][1])
@@ -168,7 +162,7 @@ function print_network_stats(graph::LightGraphs.Graph)
 end
 
 
-function maxweight(weight1::Float64, weight2::Float64, e1::Int, e2::Int, header::Vector{String}=String[])
+function maxweight(weight1::Float64, weight2::Float64, e1::Int, e2::Int, header=nothing)
     sign1 = sign(weight1)
     sign2 = sign(weight2)
 
@@ -178,7 +172,7 @@ function maxweight(weight1::Float64, weight2::Float64, e1::Int, e2::Int, header:
         return weight1
     else
         if sign1 * sign2 < 0
-            e1w, e2w = isempty(header) ? (e1, e2) : (header[e1], header[e2])
+            e1w, e2w = header != nothing ? (e1, e2) : (header[e1], header[e2])
             @warn "Opposite signs for edge $e1w <-> $e2w detected. Arbitarily choosing one."
             return weight1
         else
@@ -197,7 +191,9 @@ function SimpleWeightedGraph_nodemax(i::AbstractVector{T}, j::AbstractVector{T},
 end
 
 
-function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String; edge_merge_fun=maxweight, max_var::Int=-1, header::Vector{String}=String[])
+function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_rule::String;
+    edge_merge_fun=maxweight, max_var::Int=-1, header=nothing)
+
     if max_var < 0
         max_val_key = maximum(map(x -> !isempty(x) ? maximum(keys(x)) : 0, values(weights_dict)))
         max_key_key = maximum(keys(weights_dict))
@@ -208,7 +204,6 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     dsts = Int[]
     ws = Float64[]
 
-    trans_nodes = !isempty(header)
     prev_edges = Set{Tuple{Int,Int}}()
     for node1 in keys(weights_dict)
         for node2 in keys(weights_dict[node1])

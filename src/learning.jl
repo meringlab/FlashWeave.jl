@@ -1,17 +1,12 @@
 function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit::AbstractFloat, parallel::String,
     feed_forward::Bool, max_k::Integer, n_obs_min::Integer, hps::Integer, fast_elim::Bool,
     recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
-    output_folder::AbstractString, edge_rule::AbstractString)  where {ElType<:Real}
+    edge_rule::AbstractString)  where {ElType<:Real}
 
     !isempty(tmp_folder) && @warn "tmp_folder currently not implemented"
 
     if edge_rule != "OR"
-        if edge_rule == "AND"
-            @warn "AND rule currently disabled (insufficiently tested)"
-        else
-            @warn "edge_rule $(edge_rule) not a valid option, setting it to OR"
-        end
-
+        @warn "edge_rule $(edge_rule) not a valid option, setting it to OR"
         edge_rule = "OR"
     end
 
@@ -86,7 +81,8 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
     # precompute univariate associations and sort variables (fewest neighbors first)
     verbose && println("Computing univariate associations..")
 
-    all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps, n_obs_min=n_obs_min, FDR=FDR,
+    all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps,
+                                          n_obs_min=n_obs_min, FDR=FDR,
                                           levels=levels, parallel=parallel, workers_local=workers_all_local(),
                                           cor_mat=cor_mat, correct_reliable_only=correct_reliable_only,
                                           chunk_size=chunk_size, tmp_folder=tmp_folder)
@@ -200,12 +196,12 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(10e6), convergence_threshold::AbstractFloat=0.01,
     FDR::Bool=true, parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
-    verbose::Bool=true, update_interval::AbstractFloat=30.0, output_folder::String="",
-    output_interval::Real=update_interval*10, edge_merge_fun=maxweight, chunk_size::Union{Int,Nothing}=nothing,
+    verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
+    chunk_size::Union{Int,Nothing}=nothing,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
-    header::AbstractVector{String}=String[], recursive_pcor::Bool=true, cache_pcor::Bool=false,
-    correct_reliable_only::Bool=true, feed_forward::Bool=true, track_rejections::Bool=false,
-    all_univar_nbrs=nothing) where {ElType<:Real}
+    header=nothing, meta_variable_mask=nothing, recursive_pcor::Bool=true,
+    cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
+    track_rejections::Bool=false, all_univar_nbrs=nothing) where {ElType<:Real}
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
@@ -214,14 +210,16 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule =
                                                                               prepare_lgl(data, test_name,
                                                                                           time_limit, parallel,
-                                                                                          feed_forward, max_k, n_obs_min, hps,
+                                                                                          feed_forward, max_k,
+                                                                                          n_obs_min, hps,
                                                                                           fast_elim,
                                                                                           recursive_pcor, verbose,
-                                                                                          tmp_folder, output_folder,
+                                                                                          tmp_folder,
                                                                                           edge_rule)
 
-    hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha, :hps => hps, :n_obs_min => n_obs_min,
-                        :max_tests => max_tests, :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
+    hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha,
+                        :hps => hps, :n_obs_min => n_obs_min, :max_tests => max_tests,
+                        :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
                         :weight_type => weight_type, :debug => debug, :time_limit => time_limit,
                         :track_rejections => track_rejections, :cache_pcor => cache_pcor)
 
@@ -234,10 +232,12 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
     end
 
-    interleaved_kwargs = Dict(:update_interval => update_interval, :convergence_threshold => convergence_threshold,
-                                  :feed_forward => feed_forward, :edge_rule => edge_rule, :edge_merge_fun => edge_merge_fun,
-                                  :workers_local => workers_all_local(), :output_folder => output_folder,
-                                  :output_interval => output_interval)
+    interleaved_kwargs = Dict(:update_interval => update_interval,
+                              :convergence_threshold => convergence_threshold,
+                              :feed_forward => feed_forward, :edge_rule => edge_rule,
+                              :edge_merge_fun => edge_merge_fun,
+                              :workers_local => workers_all_local(),
+                              :variable_ids => header, :meta_variable_mask => meta_variable_mask)
 
     nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data,
                                                                       all_univar_nbrs, levels,
@@ -245,16 +245,18 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                                                                       recursive_pcor,
                                                                       cont_type, time_limit, nonsparse_cond,
                                                                       verbose, track_rejections, hiton_kwargs,
-                                                                       interleaved_kwargs)
+                                                                      interleaved_kwargs)
 
     verbose && println("\nPostprocessing..")
 
     weights_dict = Dict{Int,Dict{Int,Float64}}()
     for target_var in keys(nbr_dict)
-        weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var], weight_type, test_name)
+        weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var],
+                                                weight_type, test_name)
     end
 
-    graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, max_var=size(data, 2), header=header)
+    graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, max_var=size(data, 2),
+                                 header=header)
 
     verbose && println("Complete.")
 
@@ -353,8 +355,6 @@ Learn an interaction network from a data table (including OTUs and optionally me
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 
-- `output_folder` - if feed-forward heuristic is active, periodically save the latest network in this directory
-
 - `prec` - precision in bits to use for calculations (16, 32, 64 or 128)
 
 - `make_sparse` - use a sparse data representation (should be left at `true` in almost all cases)
@@ -366,7 +366,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
     conv::AbstractFloat=0.01, header=nothing, meta_mask=nothing,
     feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
-    transposed::Bool=false, output_folder::AbstractString="", prec::Integer=32, make_sparse::Bool=true,
+    transposed::Bool=false, prec::Integer=32, make_sparse::Bool=true,
     max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1, cache_pcor::Bool=false,
     time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0) where {ElType<:Real}
 
@@ -415,7 +415,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
     params_dict = Dict(:test_name=>test_name, :parallel=>parallel_mode, :max_k=>max_k,
                        :alpha=>alpha, :convergence_threshold=>conv, :feed_forward=>feed_forward,
                        :track_rejections=>track_rejections, :verbose=>verbose,
-                       :header=>header, :output_folder=>output_folder,
+                       :header=>header,
                        :max_tests=>max_tests, :hps=>hps, :FDR=>FDR, :n_obs_min=>n_obs_min,
                        :cache_pcor=>cache_pcor, :time_limit=>time_limit,
                        :update_interval=>update_interval)

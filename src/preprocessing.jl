@@ -207,7 +207,7 @@ rownorm!(X::Matrix{ElType}) where ElType <: AbstractFloat = X ./= sum(X, dims=2)
 
 function rownorm!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
     """Specialized in-place version for sparse matrices"""
-    sum_vec = sum(X, 2)
+    sum_vec = sum(X, dims=2)
     rows = rowvals(X)
 
     for i in 1:size(X, 2)
@@ -388,6 +388,7 @@ function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString=
                     "tss"=>"rows", "tss-nonzero-binned"=>"binned_nz_rows")
 
     @assert isempty(norm_mode) || haskey(mode_map, norm_mode) "$norm_mode not a valid normalization mode"
+    @assert xor(test_name == "", norm_mode == "") "provide exactly one out of 'test_name' and 'norm_mode'"
 
     T = try
             eval(Symbol("Float$prec"))

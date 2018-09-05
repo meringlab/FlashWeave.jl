@@ -24,19 +24,27 @@ atol = 0.0
 macro silence_stdout(expr)
     quote
         orig_stdout = stdout; p1, p2 = redirect_stdout()
-        res = $(esc(expr))
-        close(p1), close(p2)
-        redirect_stdout(orig_stdout)
+        res = try
+            $(esc(expr))
+        finally
+            close(p1), close(p2)
+            redirect_stdout(orig_stdout)
+        end
         res
     end
 end
 
 
-function make_network(data, test_name, make_sparse=false, prec=64, verbose=true; kwargs...)
-    data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=true, make_sparse=make_sparse, prec=prec)
-    kwargs_dict = Dict(kwargs)
+function make_network(data, test_name, make_sparse=false, prec=64, verbose=true, return_graph=true; kwargs...)
+    data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=true,
+                                                         make_sparse=make_sparse, prec=prec)
+    #kwargs_dict = Dict(kwargs)
     lgl_res = FlashWeave.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
-    lgl_res.graph
+    if return_graph
+        lgl_res.graph
+    else
+        lgl_res
+    end
 end
 
 
@@ -99,12 +107,32 @@ function compare_graph_results(g1::SimpleWeightedGraph, g2::SimpleWeightedGraph;
     end
 end
 
+T_var = 1
+T_nbrs = nothing
+data_bin = FlashWeave.preprocess_data_default(data, "mi", verbose=false,
+                                              make_sparse=true, prec=64)[1]
+@testset "univar nbrs" begin
+    nbrs_single = nothing
+    nbrs_remote = nothing
 
-@testset "il output" begin
-    @test @silence_stdout isa(learn_network(data, sensitive=true, heterogeneous=false,
-                        max_k=3, header=header, verbose=true, time_limit=1e-10,
-                        update_interval=1.0, conv=10.0), FlashWeave.FWResult)
+    nbrs_dicts = []
+    for (test_desc, parallel, wl) in [("single", "single", true),
+                                      ("remote", "multi", false)]
+        @testset "$test_desc" begin
+            nbrs = FlashWeave.pw_univar_neighbors(data_bin, parallel="single", workers_local=wl,
+                                                  levels=Int[], cor_mat=zeros(0, 0))
+            @test isa(nbrs, Dict)
+            push!(nbrs_dicts, nbrs)
+        end
+    end
+
+    @testset "single == remote" begin
+        @test nbrs_dicts[1] == nbrs_dicts[2]
+    end
+
+    global T_nbrs = nbrs_dicts[1][T_var]
 end
+
 
 @testset "LGL_backend" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
@@ -231,6 +259,27 @@ end
             end
         end
     end
+end
+
+
+@testset "il output" begin
+    @test @silence_stdout isa(learn_network(data, sensitive=true, heterogeneous=false,
+                        max_k=10, header=header, verbose=true, time_limit=1e-10,
+                        update_interval=1.0, conv=10.0), FlashWeave.FWResult)
+end
+
+
+@testset "convergence" begin
+    @test @silence_stdout isa(make_network(data, "fz_nz", true, 64, true, false,
+                                           convergence_threshold=Inf,
+                                           max_k=3, parallel="single_il", time_limit=1e-8,
+                                           update_interval=0.1), FlashWeave.LGLResult)
+end
+
+
+@testset "hiton msg" begin
+    @test @silence_stdout isa(FlashWeave.si_HITON_PC(T_var, data_bin, Int[], zeros(0, 0),
+                              univar_nbrs=T_nbrs, debug=2), FlashWeave.HitonState)
 end
 
 

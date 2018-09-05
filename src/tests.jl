@@ -535,12 +535,6 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
                     end
                 end
             end
-
-        elseif startswith(parallel, "threads")
-            Threads.@threads for work_item in work_items
-                pw_univar_kernel!(work_item[1], work_item[2], data, stats, pvals, test_obj, hps, n_obs_min,
-                                  correct_reliable_only)
-            end
         end
     end
 

@@ -29,8 +29,6 @@ meta_header_key = "meta_header"
 
 
 @testset "table data" begin
-    tmp_path = tempname()
-
     for (data_format, data_suff, meta_suff) in zip(["tsv", "tsv_rownames", "csv", "biom_json", "biom_hdf5", "jld2"],
                                                    [".tsv", "_ids.tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2"],
                                                    ["_meta.tsv", "_meta.csv", "_meta.csv", "_meta.tsv", "_meta.tsv", ""])

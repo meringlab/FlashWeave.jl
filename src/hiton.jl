@@ -109,15 +109,16 @@ function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMa
 
         debug > 0 && println("\tTesting candidate $candidate ($cand_index out of $(length(candidates))) conditioned on $accepted, current set size: $(length(accepted))")
 
-        candidate_in_list = candidate_in_blackwhite_lists!(candidate, accepted, accepted_dict, whitelist, blacklist, debug)
+        candidate_in_list = candidate_in_blackwhite_lists!(candidate, accepted, accepted_dict, whitelist,
+                                                           blacklist, debug)
 
         if !candidate_in_list
             if phase == 'E'
                 deleteat!(accepted, findall(in(candidate), accepted))
             end
 
-            check_candidate!(candidate, T, data, accepted, accepted_dict, test_obj, max_k, alpha, hps, n_obs_min, max_tests, debug,
-                 rej_dict, track_rejections, z, phase, fast_elim)
+            check_candidate!(candidate, T, data, accepted, accepted_dict, test_obj, max_k, alpha, hps,
+                             n_obs_min, max_tests, debug, rej_dict, track_rejections, z, phase, fast_elim)
         end
 
         if stop_reached(start_time, time_limit) && cand_index < length(candidates)
@@ -287,7 +288,8 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
     if debug > 0
         println("UNIVARIATE")
-        println("\tFirst up to 200 neighbors:", collect(zip(test_variables, univar_nbrs))[1:200])
+        uni_printinf = collect(zip(test_variables, univar_nbrs))
+        println("\tFirst up to 200 neighbors:", uni_printinf[1:min(200, length(uni_printinf))])
     end
 
     # if conditioning should be performed
@@ -319,9 +321,11 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
                 end
 
                 TPC_dict, candidates_unchecked = interleaving_phase(T, candidates, data_prep, test_obj, max_k,
-                                                                    alpha, hps, n_obs_min, max_tests, prev_TPC_dict, candidates_unchecked,
-                                                                     time_limit, start_time, debug, whitelist, blacklist,
-                                                                    rej_dict, track_rejections, z, add_initial_candidate=prev_state.phase=='S',
+                                                                    alpha, hps, n_obs_min, max_tests,
+                                                                    prev_TPC_dict, candidates_unchecked,
+                                                                    time_limit, start_time, debug, whitelist,
+                                                                    blacklist, rej_dict, track_rejections, z,
+                                                                    add_initial_candidate=prev_state.phase=='S',
                                                                     univar_nbrs=univar_nbrs)
 
                 if !isempty(candidates_unchecked)

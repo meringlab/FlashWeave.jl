@@ -1,18 +1,6 @@
-function save_latest_graph(output_graph, output_folder, temp_output_type, verbose)
-    if temp_output_type == "single"
-        curr_out_path = joinpath(output_folder, "latest_network.edgelist")
-    else
-        curr_out_path = joinpath(output_folder, "tmp_network_" * string(now())[1:end-4] * ".edgelist")
-    end
-
-    verbose && println("Writing temporary graph to $curr_out_path")
-
-    FlashWeave.Io.write_edgelist(curr_out_path, output_graph)
-end
-
-
-function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_rule::String, nonsparse_cond::Bool,
-     shared_job_q::RemoteChannel, shared_result_q::RemoteChannel, GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
+function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_rule::String,
+     nonsparse_cond::Bool, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel,
+     GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
 
     nonsparse_cond && @warn "nonsparse_cond currently not implemented"
 
@@ -43,6 +31,7 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
         catch exc
             println("Exception occurred! ", exc)
             println(catch_stacktrace())
+            throw(exc)
         end
 
     end
@@ -50,13 +39,13 @@ end
 
 
 function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType},
-        all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, levels::Vector{DiscType}, cor_mat::Matrix{ContType}, GLL_args::Dict{Symbol,Any};
-        update_interval::Real=30.0, output_folder::String="", output_interval::Real=update_interval*10,
-        temp_output_type::String="single",
+        all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, levels::Vector{DiscType},
+        cor_mat::Matrix{ContType}, GLL_args::Dict{Symbol,Any};
+        update_interval::Real=30.0, variable_ids=nothing, meta_variable_mask=nothing,
         convergence_threshold::AbstractFloat=0.01,
         conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi_il",
-        edge_rule::String="OR", edge_merge_fun=maxweight, nonsparse_cond::Bool=false, verbose::Bool=true, workers_local::Bool=true,
-        feed_forward::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+        edge_rule::String="OR", edge_merge_fun=maxweight, nonsparse_cond::Bool=false, verbose::Bool=true,
+        workers_local::Bool=true, feed_forward::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     test_name = GLL_args[:test_name]
     weight_type = GLL_args[:weight_type]
@@ -109,16 +98,10 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
     # this graph is just used for efficiently keeping track of graph stats during the run
     graph = Graph(n_vars)
 
-    if !isempty(output_folder)
-        output_graph = SimpleWeightedGraph(n_vars)
-        !isdir(output_folder) && mkdir(output_folder)
-    end
-
     edge_set = Set{Tuple{Int,Int}}()
     kill_signals_sent = 0
     start_time = time()
     last_update_time = start_time
-    last_output_time = start_time
     check_convergence = false
     converged = false
 
@@ -150,18 +133,6 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
                 for nbr in keys(curr_state.state_results)
                     add_edge!(graph, target_var, nbr)
-                end
-
-                # update output graph if requested
-                if !isempty(output_folder)
-                    for nbr in keys(curr_state.state_results)
-                        weight = make_single_weight(curr_state.state_results[nbr]..., all_univar_nbrs[target_var][nbr]..., weight_type, test_name)
-
-                        rev_weight = has_edge(output_graph, target_var, nbr) ? output_graph.weights[target_var, nbr] : NaN64
-                        sym_weight = edge_merge_fun(weight, rev_weight)
-                        output_graph.weights[target_var, nbr] = sym_weight
-                        output_graph.weights[nbr, target_var] = sym_weight
-                    end
                 end
 
                 remaining_jobs -= 1
@@ -219,12 +190,6 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
             last_update_time = curr_time
         end
 
-        if !isempty(output_folder) && curr_time - last_output_time > output_interval
-            save_latest_graph(output_graph, output_folder, temp_output_type, verbose)
-            last_output_time = curr_time
-        end
-
-
         if convergence_threshold != 0.0 && !converged
             if !check_convergence && remaining_jobs / jobs_total <= conv_check_start
                 check_convergence = true
@@ -246,10 +211,6 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                     if conv_level < convergence_threshold
                         converged = true
                         verbose && println("\tCONVERGED! Waiting for the remaining processes to finish their current load.")
-                        if !isempty(output_folder)
-                            save_latest_graph(output_graph, output_folder, temp_output_type, verbose)
-                            last_output_time = curr_time
-                        end
                     end
 
                     last_conv_time = curr_time - start_time

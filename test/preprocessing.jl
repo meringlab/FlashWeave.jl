@@ -27,29 +27,38 @@ function compare_nz_vecs(fznz_vec, minz_vec, verbose=false)
     end
 end
 
-@testset "TSS" begin
-    data_norm, mask = FlashWeave.preprocess_data(data, "rows"; make_sparse=false, verbose=false)
-    @test all(isapprox.(sum(data_norm, dims=2), 1))
-    data_norm_sparse, mask = FlashWeave.preprocess_data(data, "rows"; make_sparse=true, verbose=false)
-    @test all(data_norm .== data_norm_sparse)
-end
 
 @testset "norm per test type" begin
-    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
-        @testset "$test_name" begin
-            data_norm, mask = normalize_data(data, test_name=test_name, verbose=false)
+    for norm_pair in [("clr-adapt", "fz"), ("clr-nonzero", "fz_nz"),
+                                   ("clr-nonzero-binned", "mi_nz"), ("pres-abs", "mi"),
+                                   ("tss", ""), ("tss-nonzero-binned", "")]
+        data_norm_exp = exp_dict[norm_pair[1]]
+        for (i, norm_desc) in enumerate(norm_pair)
+            norm_mode = test_name = ""
+            if norm_desc != ""
+                @testset "$norm_desc" begin
+                    if i == 1
+                        norm_mode = norm_desc
+                    else
+                        test_name = norm_desc
+                    end
+                    data_norms = [normalize_data(curr_data, norm_mode=norm_mode, test_name=test_name,
+                                                 verbose=false)[1]
+                                  for curr_data in (data, data_sparse)]
 
-            @testset "dense" begin
-                @test data_norm == exp_dict[test_name]
-            end
+                    @testset "dense" begin
+                        @test data_norms[1] == data_norm_exp
+                    end
 
-            data_norm_sparse, mask = normalize_data(data_sparse, test_name=test_name, verbose=false)
-            @testset "sparse" begin
-                @test data_norm_sparse == exp_dict[test_name]
+                    @testset "sparse" begin
+                        @test data_norms[2] == data_norm_exp
+                    end
+                end
             end
         end
     end
 end
+
 
 @testset "filter data" begin
     @testset "zero counts" begin
@@ -108,11 +117,17 @@ end
 
 # to create expected output
 
-# data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
+# data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 #
 # exp_dict = Dict{String,Any}()
-# for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
-#     exp_dict[test_name] = normalize_data(data, test_name=test_name, verbose=false)
+# for (norm_mode, test_name) in [("clr-adapt", "fz"), ("clr-nonzero", "fz_nz"),
+#                   ("clr-nonzero-binned", "mi_nz"), ("pres-abs", "mi"),
+#                   ("tss", ""), ("tss-nonzero-binned", "")]
+#     data_norm = normalize_data(data, norm_mode=norm_mode, verbose=false)[1]
+#     if test_name != ""
+#         @assert normalize_data(data, test_name=test_name, verbose=false)[1] == data_norm
+#     end
+#     exp_dict[norm_mode] = data_norm
 # end
 #
 # save(joinpath("data", "preprocessing_expected.jld2"), "exp_dict", exp_dict)

@@ -254,10 +254,9 @@ function save_unfinished_variable_info(unf_path, net_result)
 end
 
 
-
 function write_edgelist(out_path::AbstractString, net_result::FWResult)
     G = graph(net_result)
-    meta_mask = net_result.meta_variable_mask
+    meta_mask = meta_variable_mask(net_result)
     header = names(net_result)
 
     open(out_path, "w") do out_f
