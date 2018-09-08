@@ -3,7 +3,6 @@
 [![Project Status: Active - The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![Build Status](https://travis-ci.org/meringlab/FlashWeave.jl.svg?branch=master)](https://travis-ci.org/meringlab/FlashWeave.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/vdesge86ssj91htc?svg=true)](https://ci.appveyor.com/project/jtackm/flashweave-jl)
-[![Coverage Status](https://coveralls.io/repos/github/meringlab/FlashWeave.jl/badge.svg?branch=master)](https://coveralls.io/github/meringlab/FlashWeave.jl?branch=master)
 [![codecov](https://codecov.io/gh/meringlab/FlashWeave.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/meringlab/FlashWeave.jl)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
@@ -110,7 +109,7 @@ Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaP
 To cite FlashWeave, please refer to our [preprint on bioRxiv](https://www.biorxiv.org/content/early/2018/08/13/390195):
 
 ```
-Tackmann, Janko, Joao Frederico Matias Rodrigues, and Christian von Mering. "Rapid inference 
+Tackmann, Janko, Joao Frederico Matias Rodrigues, and Christian von Mering. "Rapid inference
 of direct interactions in large-scale ecological networks from heterogeneous microbial
 sequencing data." bioRxiv (2018): 390195.
 ```
