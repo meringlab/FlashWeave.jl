@@ -171,8 +171,8 @@ function load_biom_json(data_path)
     otu_table = Matrix{Int}(hcat(json_struc["data"]...))
 
     if json_struc["matrix_type"] == "sparse"
-        otu_table = otu_table'
-        otu_table = sparse(otu_table[:, 1] .+ 1, otu_table[:, 2] .+ 1, otu_table[:, 3])'
+        otu_table = permutedims(otu_table)
+        otu_table = permutedims(sparse(otu_table[:, 1] .+ 1, otu_table[:, 2] .+ 1, otu_table[:, 3]))
     end
 
     header = [x["id"] for x in json_struc["rows"]]
@@ -184,7 +184,7 @@ function load_biom_hdf5(data_path)
     f = h5open(data_path, "r")
     m, n = read(attrs(f)["shape"])
     colptr, rowval, nzval = [read(f, "sample/matrix/$key") for key in ["indptr", "indices", "data"]]
-    otu_table = SparseMatrixCSC(m, n, colptr .+ 1, rowval .+ 1, Vector{Int}(nzval))'
+    otu_table = permutedims(SparseMatrixCSC(m, n, colptr .+ 1, rowval .+ 1, Vector{Int}(nzval)))
     header = read(f, "observation/ids")
     close(f)
 
@@ -199,7 +199,7 @@ function load_biom(data_path, meta_path=nothing)
         try
             load_biom_json(data_path)
         catch
-            error("file $data_path is not valid .biom")
+            error("Error in 'load_biom'. File $data_path seems not to be valid .biom")
         end
     end
 
