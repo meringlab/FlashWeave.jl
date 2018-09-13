@@ -56,9 +56,8 @@ function clr!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
 end
 
 
-function clr!(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false)
-    where ElType <: AbstractFloat
-    
+function clr!(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false) where ElType <: AbstractFloat
+
     if !ignore_zeros
         X .+= pseudo_count
         center_fun = geomean
