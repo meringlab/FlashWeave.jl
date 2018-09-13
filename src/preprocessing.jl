@@ -317,8 +317,8 @@ function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_
         else
             discretize_meta!(meta_data, norm, n_bins)
         end
-        data = hcat(data, convert(typeof(data), meta_data))
         meta_mask = vcat(falses(size(data, 2)), trues(size(meta_data, 2)))
+        data = hcat(data, convert(typeof(data), meta_data))
 
         if !isempty(header)
             append!(header, meta_header)
