@@ -7,3 +7,4 @@
 
 ## bug fixes
 - fix meta_mask bug in data normalization
+- fix performance regression in clr transform of sparse matrices

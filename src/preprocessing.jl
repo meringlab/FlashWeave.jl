@@ -1,6 +1,6 @@
 function mapslices_sparse_nz(f, A::SparseMatrixCSC, dim::Integer=1)
     if dim == 1
-        A = A'
+        A = permutedims(A)
     end
     result_vec = zeros(eltype(A), size(A, 2))
     for j in 1:size(A, 2)
@@ -56,7 +56,9 @@ function clr!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
 end
 
 
-function clr!(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false) where ElType <: AbstractFloat
+function clr!(X::Matrix{ElType}; pseudo_count::ElType=1e-5, ignore_zeros::Bool=false)
+    where ElType <: AbstractFloat
+    
     if !ignore_zeros
         X .+= pseudo_count
         center_fun = geomean
