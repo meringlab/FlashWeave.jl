@@ -353,60 +353,29 @@ function add_pwresults_to_matrix!(X, Ys, test_results, stats, pvals, n_vars,
 end
 
 
-function pw_univar_kernel!(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
+function pw_univar_kernel(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{ElType},
+    test_obj::AbstractTest, hps::Integer, n_obs_min::Integer) where ElType <: Real
+    if needs_nz_view(X, data, test_obj)
+        sub_data = @view data[data[:, X] .!= 0, :]
+    else
+        sub_data = data
+    end
+
+    if isdiscrete(test_obj)
+        test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
+    else
+        test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
+    end
+end
+
+
+function pw_univar_kernel!(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{ElType},
             stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
             test_obj::AbstractTest, hps::Integer, n_obs_min::Integer,
             correct_reliable_only::Bool=false) where ElType <: Real
-    n_vars = size(data, 2)
-
-    if needs_nz_view(X, data, test_obj)
-        sub_data = @view data[data[:, X] .!= 0, :]
-    else
-        sub_data = data
-    end
-
-    Ys = collect(Ys_slice)
-
-    if isdiscrete(test_obj)
-        test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
-    else
-        test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
-    end
-
-    # for (Y, test_res) in zip(Ys, test_results)
-    #     pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
-    #
-    #     if correct_reliable_only && !test_res.suff_power
-    #         curr_stat = curr_pval = NaN64
-    #     else
-    #         curr_stat = test_res.stat
-    #         curr_pval = test_res.pval
-    #     end
-    #
-    #     stats[pair_index] = curr_stat
-    #     pvals[pair_index] = curr_pval
-    # end
-    add_pwresults_to_matrix!(X, Ys, test_results, stats, pvals, n_vars,
+    test_results = pw_univar_kernel(X, Ys, data, test_obj, hps, n_obs_min)
+    add_pwresults_to_matrix!(X, Ys, test_results, stats, pvals, size(data, 2),
                              correct_reliable_only)
-end
-
-function pw_univar_kernel(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
-            test_obj::AbstractTest, hps::Integer, n_obs_min::Integer) where ElType <: Real
-    n_vars = size(data, 2)
-
-    if needs_nz_view(X, data, test_obj)
-        sub_data = @view data[data[:, X] .!= 0, :]
-    else
-        sub_data = data
-    end
-
-    Ys = collect(Ys_slice)
-
-    if isdiscrete(test_obj)
-        test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
-    else
-        test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
-    end
 end
 
 
@@ -452,7 +421,7 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
         chunk_size::Union{Int,Nothing}=nothing, tmp_folder::AbstractString="",
         correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true,
-        pmap_batch_size::Integer=1) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+        pmap_batch_size=nothing) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     target_vars = collect(1:size(data, 2))
 
@@ -475,6 +444,10 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
         end
 
         work_items = collect(work_chunker(n_vars, chunk_size))
+    end
+
+    if pmap_batch_size == nothing
+        pmap_batch_size = Int(ceil(size(data, 2)/ (nprocs() * 2)))
     end
 
     pvals = fill(NaN64, n_pairs)
