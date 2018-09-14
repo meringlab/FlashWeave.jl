@@ -451,7 +451,8 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
         levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
         chunk_size::Union{Int,Nothing}=nothing, tmp_folder::AbstractString="",
-        correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+        correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true,
+        pmap_batch_size::Integer=1) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     target_vars = collect(1:size(data, 2))
 
@@ -471,10 +472,6 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
     else
         if chunk_size == nothing
             chunk_size = max(10000, Int(ceil(length(combinations(1:n_vars, 2)) / 1e5)))
-            #if chunk_size > n_pairs
-            #    chunk_size = n_pairs
-            #    @warn "chunk_size is smaller than number of variable pairs, setting it to $n_pairs"
-            #end
         end
 
         work_items = collect(work_chunker(n_vars, chunk_size))
@@ -485,7 +482,8 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
 
     if startswith(parallel, "single")
         for (X, Ys_slice) in work_items
-            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_obj, hps, n_obs_min, correct_reliable_only)
+            pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_obj, hps, n_obs_min,
+                              correct_reliable_only)
         end
 
     else
@@ -505,7 +503,8 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
                         pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats,
                                                             shared_pvals, test_obj, hps,
                                                             n_obs_min, correct_reliable_only),
-                                                            wp, work_items)
+                                                            wp, work_items,
+                                                            batch_size=pmap_batch_size)
                     end
                 else
                     @sync @distributed for work_item in work_items
@@ -518,14 +517,16 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
                 stats = shared_stats.s
                 pvals = shared_pvals.s
 
-            # otherwise make workers store test results remotely and gather them in the end via network
+            # otherwise make workers store test results remotely and gather them
+            # in the end via network
             else
                 if use_pmap
                     wp = CachingPool(workers())
                     test_result_chunks = let data=data, test_obj=test_obj
                         pmap(work_item -> pw_univar_kernel(work_item..., data,
                                                            test_obj, hps, n_obs_min),
-                                                           work_items)
+                                                           work_items,
+                                                           batch_size=pmap_batch_size)
                     end
                 else
                     shared_job_q = RemoteChannel(() -> Channel{Tuple{Int,Int,UnitRange{Int}}}(length(work_items)), 1)
