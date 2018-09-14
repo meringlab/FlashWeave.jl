@@ -75,7 +75,7 @@ end
 
 function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String, alpha::AbstractFloat, hps::Integer,
     n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
-    correct_reliable_only::Bool, verbose::Bool, chunk_size::Union{Int,Nothing}=nothing,
+    correct_reliable_only::Bool, verbose::Bool,
     tmp_folder::AbstractString="") where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
@@ -85,7 +85,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
                                           n_obs_min=n_obs_min, FDR=FDR,
                                           levels=levels, parallel=parallel, workers_local=workers_all_local(),
                                           cor_mat=cor_mat, correct_reliable_only=correct_reliable_only,
-                                          chunk_size=chunk_size, tmp_folder=tmp_folder)
+                                          tmp_folder=tmp_folder)
     var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
     target_vars = [nbr_size_pair[1] for nbr_size_pair in sort(var_nbr_sizes, by=x -> x[2])]
 
@@ -192,12 +192,13 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
 end
 
 
-function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3, alpha::AbstractFloat=0.01,
-    hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(10e6), convergence_threshold::AbstractFloat=0.01,
+function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3,
+    alpha::AbstractFloat=0.01,
+    hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(10e6),
+    convergence_threshold::AbstractFloat=0.01,
     FDR::Bool=true, parallel::String="single", fast_elim::Bool=true, no_red_tests::Bool=true,
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
     verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
-    chunk_size::Union{Int,Nothing}=nothing,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
     header=nothing, meta_variable_mask=nothing, recursive_pcor::Bool=true,
     cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
@@ -227,7 +228,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
         target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min,
                                                               FDR, levels, parallel, cor_mat,
                                                               correct_reliable_only, verbose,
-                                                              chunk_size, tmp_folder)
+                                                              tmp_folder)
     else
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
     end

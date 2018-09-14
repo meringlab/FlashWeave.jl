@@ -379,48 +379,13 @@ function pw_univar_kernel!(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix
 end
 
 
-function pw_univar_worker(data::AbstractMatrix{ElType}, test_obj::AbstractTest,
-                          hps::Integer, n_obs_min::Integer, shared_job_q::RemoteChannel,
-                          shared_result_q::RemoteChannel) where ElType <: Real
-    while true
-        try
-            X, i, Ys_slice = take!(shared_job_q)
-
-            # if kill signal
-            if X == -1
-                return
-            end
-
-            if needs_nz_view(X, data, test_obj)
-                sub_data = @view data[data[:, X] .!= 0, :]
-            else
-                sub_data = data
-            end
-
-            Ys = collect(Ys_slice)
-
-            if isdiscrete(test_obj)
-                test_results = test(X, Ys, sub_data, test_obj, hps, n_obs_min)
-            else
-                test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
-            end
-
-            put!(shared_result_q, (i, test_results))
-
-        catch exc
-            println("Exception occurred! ", exc)
-            println(catch_stacktrace())
-        end
-    end
-end
-
-
 function pw_univar_neighbors(data::AbstractMatrix{ElType};
         test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
-        levels::AbstractVector{DiscType}=DiscType[], parallel::String="single", workers_local::Bool=true,
+        levels::AbstractVector{DiscType}=DiscType[], parallel::String="single",
+        workers_local::Bool=true,
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
-        chunk_size::Union{Int,Nothing}=nothing, tmp_folder::AbstractString="",
-        correct_reliable_only::Bool=true, use_pmap::Bool=false, shuffle_jobs::Bool=true,
+        tmp_folder::AbstractString="",
+        correct_reliable_only::Bool=true, shuffle_jobs::Bool=true,
         pmap_batch_size=nothing) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     target_vars = collect(1:size(data, 2))
@@ -436,20 +401,11 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
 
     nz = is_zero_adjusted(test_obj)
 
-    if use_pmap && chunk_size == nothing
-        work_items = [(X, X+1:n_vars) for X in 1:n_vars-1]
-    else
-        if chunk_size == nothing
-            chunk_size = max(10000, Int(ceil(length(combinations(1:n_vars, 2)) / 1e5)))
-        end
-
-        work_items = collect(work_chunker(n_vars, chunk_size))
-    end
-
     if pmap_batch_size == nothing
-        pmap_batch_size = Int(ceil(size(data, 2)/ (nprocs() * 2)))
+        pmap_batch_size = Int(ceil(n_vars / (nprocs() * 3)))
     end
 
+    work_items = [(X, X+1:n_vars) for X in 1:n_vars-1]
     pvals = fill(NaN64, n_pairs)
     stats = fill(NaN64, n_pairs)
 
@@ -464,76 +420,37 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
             shuffle!(work_items)
         end
 
-        if startswith(parallel, "multi")
-            # if worker processes are on the same machine, use local memory sharing via shared arrays
-            if workers_local
-                shared_pvals = SharedArray{Float64}(pvals)
-                shared_stats = SharedArray{Float64}(stats)
+        # if worker processes are on the same machine, use local memory sharing via shared arrays
+        if workers_local
+            shared_pvals = SharedArray{Float64}(pvals)
+            shared_stats = SharedArray{Float64}(stats)
 
-                if use_pmap
-                    wp = CachingPool(workers())
-                    let data=data, test_obj=test_obj
-                        pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats,
-                                                            shared_pvals, test_obj, hps,
-                                                            n_obs_min, correct_reliable_only),
-                                                            wp, work_items,
-                                                            batch_size=pmap_batch_size)
-                    end
-                else
-                    @sync @distributed for work_item in work_items
-                        pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats,
-                                          shared_pvals, test_obj, hps,
-                                          n_obs_min, correct_reliable_only)
-                    end
-                end
+            wp = CachingPool(workers())
+            let data=data, test_obj=test_obj
+                pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats,
+                                                    shared_pvals, test_obj, hps,
+                                                    n_obs_min, correct_reliable_only),
+                                                    wp, work_items,
+                                                    batch_size=pmap_batch_size)
+            end
 
-                stats = shared_stats.s
-                pvals = shared_pvals.s
+            stats = shared_stats.s
+            pvals = shared_pvals.s
 
-            # otherwise make workers store test results remotely and gather them
-            # in the end via network
-            else
-                if use_pmap
-                    wp = CachingPool(workers())
-                    test_result_chunks = let data=data, test_obj=test_obj
-                        pmap(work_item -> pw_univar_kernel(work_item..., data,
-                                                           test_obj, hps, n_obs_min),
-                                                           work_items,
-                                                           batch_size=pmap_batch_size)
-                    end
-                else
-                    shared_job_q = RemoteChannel(() -> Channel{Tuple{Int,Int,UnitRange{Int}}}(length(work_items)), 1)
-                    shared_result_q = RemoteChannel(() -> Channel{Tuple{Int,Vector{TestResult}}}(length(work_items)), 1)
+        # otherwise make workers store test results remotely and gather them
+        # in the end via network
+        else
+            wp = CachingPool(workers())
+            test_result_chunks = let data=data, test_obj=test_obj
+                pmap(work_item -> pw_univar_kernel(work_item..., data,
+                                                   test_obj, hps, n_obs_min),
+                                                   work_items,
+                                                   batch_size=pmap_batch_size)
+            end
 
-                    worker_returns = [@spawnat wid pw_univar_worker(data, test_obj, hps, n_obs_min,
-                                      shared_job_q, shared_result_q) for wid in workers()]
-
-                    for (i, (X, Y_slice)) in enumerate(work_items)
-                        put!(shared_job_q, (X, i, Y_slice))
-                    end
-
-                    remaining_jobs = queued_jobs = length(work_items)
-                    n_workers = length(workers())
-
-                    test_result_chunks = Array{Vector{TestResult}}(undef, remaining_jobs)
-                    while remaining_jobs > 0
-                        work_i, job_result = take!(shared_result_q)
-                        test_result_chunks[work_i] = job_result
-
-                        remaining_jobs -= 1
-                        queued_jobs -= 1
-
-                        if remaining_jobs < n_workers
-                            put!(shared_job_q, (-1, 0, 0:1))
-                        end
-                    end
-                end
-
-                for ((X, Ys), test_results) in zip(work_items, test_result_chunks)
-                    add_pwresults_to_matrix!(X, Ys, test_results, stats, pvals, n_vars,
-                                             correct_reliable_only)
-                end
-
+            for ((X, Ys), test_results) in zip(work_items, test_result_chunks)
+                add_pwresults_to_matrix!(X, Ys, test_results, stats, pvals, n_vars,
+                                         correct_reliable_only)
             end
         end
     end
