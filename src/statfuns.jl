@@ -346,8 +346,10 @@ end
 """Accelerated version of that found in MultipleTesting.jl"""
 function benjamini_hochberg!(pvals::AbstractVector{T}; alpha::AbstractFloat=0.01,
         m=length(pvals)) where T <: AbstractFloat
+    isempty(pvals) && return
 
     sorted_pval_pairs = filter(x -> x[2] < alpha, collect(enumerate(pvals)))
+    isempty(sorted_pval_pairs) && return
     sort!(sorted_pval_pairs, by=x->x[2])
 
     n_filt = length(sorted_pval_pairs)

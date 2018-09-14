@@ -334,6 +334,25 @@ function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}
 end
 
 
+function add_pwresults_to_matrix!(X, Ys, test_results, stats, pvals, n_vars,
+    correct_reliable_only)
+
+    for (Y, test_res) in zip(Ys, test_results)
+        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+
+        if correct_reliable_only && !test_res.suff_power
+            curr_stat = curr_pval = NaN64
+        else
+            curr_stat = test_res.stat
+            curr_pval = test_res.pval
+        end
+
+        stats[pair_index] = curr_stat
+        pvals[pair_index] = curr_pval
+    end
+end
+
+
 function pw_univar_kernel!(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
             stats::AbstractVector{Float64}, pvals::AbstractVector{Float64},
             test_obj::AbstractTest, hps::Integer, n_obs_min::Integer,
@@ -354,19 +373,21 @@ function pw_univar_kernel!(X::Int, Ys_slice::AbstractVector{Int}, data::Abstract
         test_results = test(X, Ys, sub_data, test_obj, n_obs_min)
     end
 
-    for (Y, test_res) in zip(Ys, test_results)
-        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
-
-        if correct_reliable_only && !test_res.suff_power
-            curr_stat = curr_pval = NaN64
-        else
-            curr_stat = test_res.stat
-            curr_pval = test_res.pval
-        end
-
-        stats[pair_index] = curr_stat
-        pvals[pair_index] = curr_pval
-    end
+    # for (Y, test_res) in zip(Ys, test_results)
+    #     pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
+    #
+    #     if correct_reliable_only && !test_res.suff_power
+    #         curr_stat = curr_pval = NaN64
+    #     else
+    #         curr_stat = test_res.stat
+    #         curr_pval = test_res.pval
+    #     end
+    #
+    #     stats[pair_index] = curr_stat
+    #     pvals[pair_index] = curr_pval
+    # end
+    add_pwresults_to_matrix!(X, Ys, test_results, stats, pvals, n_vars,
+                             correct_reliable_only)
 end
 
 function pw_univar_kernel(X::Int, Ys_slice::AbstractVector{Int}, data::AbstractMatrix{ElType},
@@ -445,11 +466,15 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
 
     nz = is_zero_adjusted(test_obj)
 
-    if chunk_size == nothing
-        chunk_size = max(500, Int(ceil(length(combinations(1:n_vars, 2)) / 1e5)))
-    end
+    if use_pmap && chunk_size == nothing
+        work_items = [(X, X+1:n_vars) for X in 1:n_vars-1]
+    else
+        if chunk_size == nothing
+            chunk_size = max(10000, Int(ceil(length(combinations(1:n_vars, 2)) / 1e5)))
+        end
 
-    work_items = collect(work_chunker(n_vars, chunk_size))
+        work_items = collect(work_chunker(n_vars, chunk_size))
+    end
 
     pvals = fill(NaN64, n_pairs)
     stats = fill(NaN64, n_pairs)
@@ -471,11 +496,17 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
                 shared_stats = SharedArray{Float64}(stats)
 
                 if use_pmap
-                    pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats, shared_pvals, test_obj, hps,
-                                      n_obs_min, correct_reliable_only), work_items)
+                    wp = CachingPool(workers())
+                    let data=data, test_obj=test_obj
+                        pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats,
+                                                            shared_pvals, test_obj, hps,
+                                                            n_obs_min, correct_reliable_only),
+                                                            wp, work_items)
+                    end
                 else
                     @sync @distributed for work_item in work_items
-                        pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats, shared_pvals, test_obj, hps,
+                        pw_univar_kernel!(work_item[1], work_item[2], data, shared_stats,
+                                          shared_pvals, test_obj, hps,
                                           n_obs_min, correct_reliable_only)
                     end
                 end
@@ -486,13 +517,18 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
             # otherwise make workers store test results remotely and gather them in the end via network
             else
                 if use_pmap
-                    all_test_results = pmap(work_item -> pw_univar_kernel(work_item..., data, test_obj, hps, n_obs_min),
-                                            work_items)
+                    wp = CachingPool(workers())
+                    test_result_chunks = let data=data, test_obj=test_obj
+                        pmap(work_item -> pw_univar_kernel(work_item..., data,
+                                                           test_obj, hps, n_obs_min),
+                                                           work_items)
+                    end
                 else
                     shared_job_q = RemoteChannel(() -> Channel{Tuple{Int,Int,UnitRange{Int}}}(length(work_items)), 1)
                     shared_result_q = RemoteChannel(() -> Channel{Tuple{Int,Vector{TestResult}}}(length(work_items)), 1)
 
-                    worker_returns = [@spawnat wid pw_univar_worker(data, test_obj, hps, n_obs_min, shared_job_q, shared_result_q) for wid in workers()]
+                    worker_returns = [@spawnat wid pw_univar_worker(data, test_obj, hps, n_obs_min,
+                                      shared_job_q, shared_result_q) for wid in workers()]
 
                     for (i, (X, Y_slice)) in enumerate(work_items)
                         put!(shared_job_q, (X, i, Y_slice))
@@ -501,7 +537,7 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
                     remaining_jobs = queued_jobs = length(work_items)
                     n_workers = length(workers())
 
-                    test_result_chunks = Array{Vector{TestResult}}(remaining_jobs)
+                    test_result_chunks = Array{Vector{TestResult}}(undef, remaining_jobs)
                     while remaining_jobs > 0
                         work_i, job_result = take!(shared_result_q)
                         test_result_chunks[work_i] = job_result
@@ -513,27 +549,13 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
                             put!(shared_job_q, (-1, 0, 0:1))
                         end
                     end
-                    all_test_results = vcat(test_result_chunks...)
                 end
 
-                i = 0
-                for (X, Ys_slice) in work_items
-                    for Y in Ys_slice
-                        i += 1
-                        test_res = all_test_results[i]
-                        pair_index = sum(n_vars-1:-1:n_vars-X) - n_vars + Y
-
-                        if correct_reliable_only && !test_res.suff_power
-                            curr_stat = curr_pval = NaN64
-                        else
-                            curr_stat = test_res.stat
-                            curr_pval = test_res.pval
-                        end
-
-                        stats[pair_index] = curr_stat
-                        pvals[pair_index] = curr_pval
-                    end
+                for ((X, Ys), test_results) in zip(work_items, test_result_chunks)
+                    add_pwresults_to_matrix!(X, Ys, test_results, stats, pvals, n_vars,
+                                             correct_reliable_only)
                 end
+
             end
         end
     end

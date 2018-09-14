@@ -116,10 +116,10 @@ data_bin = FlashWeave.preprocess_data_default(data, "mi", verbose=false,
     nbrs_remote = nothing
 
     nbrs_dicts = []
-    for (test_desc, parallel, wl) in [("single", "single", true),
-                                      ("remote", "multi", false)]
+    for (test_desc, parallel, wl) in [("smoke single", "single", true),
+                                      ("smoke remote", "multi", false)]
         @testset "$test_desc" begin
-            nbrs = FlashWeave.pw_univar_neighbors(data_bin, parallel="single", workers_local=wl,
+            nbrs = FlashWeave.pw_univar_neighbors(data_bin, parallel=parallel, workers_local=wl,
                                                   levels=Int[], cor_mat=zeros(0, 0))
             @test isa(nbrs, Dict)
             push!(nbrs_dicts, nbrs)
