@@ -471,6 +471,10 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
     else
         if chunk_size == nothing
             chunk_size = max(10000, Int(ceil(length(combinations(1:n_vars, 2)) / 1e5)))
+            if chunk_size > n_pairs
+                chunk_size = n_pairs
+                warn("chunk_size is smaller than number of variable pairs, setting it to $n_pairs")
+            end
         end
 
         work_items = collect(work_chunker(n_vars, chunk_size))
