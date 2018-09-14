@@ -119,10 +119,15 @@ data_bin = FlashWeave.preprocess_data_default(data, "mi", verbose=false,
     for (test_desc, parallel, wl) in [("smoke single", "single", true),
                                       ("smoke remote", "multi", false)]
         @testset "$test_desc" begin
-            nbrs = FlashWeave.pw_univar_neighbors(data_bin, parallel=parallel, workers_local=wl,
-                                                  levels=Int[], cor_mat=zeros(0, 0))
-            @test isa(nbrs, Dict)
-            push!(nbrs_dicts, nbrs)
+            for use_pmap in [true, false]
+                @testset "pmap $use_pmap" begin
+                    nbrs = FlashWeave.pw_univar_neighbors(data_bin, parallel=parallel,
+                                                          workers_local=wl,
+                                                          levels=Int[], cor_mat=zeros(0, 0))
+                    @test isa(nbrs, Dict)
+                    !use_pmap && push!(nbrs_dicts, nbrs)
+                end
+            end
         end
     end
 
