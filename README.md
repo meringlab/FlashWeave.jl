@@ -10,7 +10,7 @@ FlashWeave predicts ecological interactions between microbes from large-scale co
 
 ## Installation ##
 
-To install Julia, please follow instructions on https://github.com/JuliaLang/julia. The prefered way is to obtain a binary from https://julialang.org/downloads/. Make sure you install Julia 1.0, the version currently supported by FlashWeave.
+To install Julia, please follow instructions on https://github.com/JuliaLang/julia. The preferred way is to obtain a binary from https://julialang.org/downloads/. Make sure you install Julia 1.0, the version currently supported by FlashWeave.
 
 In an interactive Julia session, you can then install FlashWeave after typing `]` via
 
@@ -51,7 +51,8 @@ julia> ## or: save_network("/my/example/network_output.gml", netw_results)
 For output of additional information (such as discarding sets, if available) in separate files you can specify the "detailed" flag:
 
 ```julia
-julia> save_network("/my/example/network_output.jld2", netw_results, detailed=true)
+julia> save_network("/my/example/network_output.edgelist", netw_results, detailed=true)
+julia> # for .jld2, additional information is always saved if available
 ```
 
 A convenient loading function is available:
