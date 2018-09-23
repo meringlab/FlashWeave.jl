@@ -357,6 +357,23 @@ function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::Abstra
 end
 
 
+function check_convert_sparse(data, make_sparse, norm_str, prec)
+    T = try
+            eval(Symbol("Float$prec"))
+        catch UndefVarError
+            error("'$prec' not a valid precision")
+    end
+
+    if make_sparse && (norm_str == "clr_adapt"  || norm_str == "fz")
+        @warn "Adaptive CLR is inefficient with sparse data, using dense format."
+        make_sparse = false
+    end
+
+    MatType = make_sparse ? SparseMatrixCSC{T, Int64} : Matrix{T}
+    data = convert(MatType, data)
+    data, make_sparse
+end
+
 """
     normalize_data(data::AbstractMatrix{<:Real}) -> AbstractMatrix OR (AbstractMatrix{<:Real}, Vector{String})
 
@@ -380,7 +397,7 @@ Normalize data using various forms of clr transform and discretization. This sho
 """
 function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString="", norm_mode::AbstractString="",
     header::Vector{String}=String[], meta_mask::BitVector=falses(size(data, 2)),
-    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true) where ElType <: Real
+    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true, make_sparse::Bool=true) where ElType <: Real
     @assert xor(isempty(test_name), isempty(norm_mode)) "provide either test_name and norm_mode (but not both)"
     #@assert !xor(isempty(meta_mask), isempty(header)) "provide both meta_mask and header (or none)"
 
@@ -391,16 +408,6 @@ function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString=
     @assert isempty(norm_mode) || haskey(mode_map, norm_mode) "$norm_mode not a valid normalization mode"
     @assert xor(test_name == "", norm_mode == "") "provide exactly one out of 'test_name' and 'norm_mode'"
 
-    T = try
-            eval(Symbol("Float$prec"))
-        catch UndefVarError
-            error("'$prec' not a valid precision")
-    end
-
-    # currently need sparse 64 precision indices due to performance bug
-    MatType = issparse(data) ? SparseMatrixCSC{T, Int64} : Matrix{T}
-    data = convert(MatType, data)
-
     if !isempty(test_name)
         preproc_fun = preprocess_data_default
         norm_str = test_name
@@ -409,6 +416,8 @@ function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString=
         norm_str = mode_map[norm_mode]
     end
 
+    data, make_sparse = check_convert_sparse(data, make_sparse, norm_str, prec)
+
     norm_results = preproc_fun(data, norm_str; meta_mask=meta_mask, header=header,
-                               verbose=verbose, filter_data=filter_data, prec=prec, make_sparse=issparse(data))
+                               verbose=verbose, filter_data=filter_data, prec=prec, make_sparse=make_sparse)
 end

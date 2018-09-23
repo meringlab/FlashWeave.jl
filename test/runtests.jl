@@ -6,8 +6,14 @@ println("Preparing tests")
 
 nprocs() == 1 && addprocs(1)
 
+test_modules = ["io.jl", "preprocessing.jl", "contingency.jl", "statfuns.jl", "tests.jl",
+                "misc.jl", "learning.jl"]
 
-for test_module in sort(filter(x -> endswith(x, ".jl") && x != "runtests.jl", readdir(pwd())))
+@testset "all modules in testset" begin
+    @test Set(test_modules) == Set(filter(x -> endswith(x, ".jl") && x != "runtests.jl", readdir(pwd())))
+end
+
+for test_module in test_modules
     println("\nTesting $test_module")
     if test_module == "learning.jl"
         println("(this can take a couple of minutes)")

@@ -1,5 +1,5 @@
 function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit::AbstractFloat, parallel::String,
-    feed_forward::Bool, max_k::Integer, n_obs_min::Integer, hps::Integer, fast_elim::Bool,
+    feed_forward::Bool, max_k::Integer, n_obs_min::Integer, hps::Integer, fast_elim::Bool, dense_cor::Bool,
     recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
     edge_rule::AbstractString)  where {ElType<:Real}
 
@@ -36,8 +36,9 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     else
         levels = disc_type[]
 
-        if recursive_pcor && !is_zero_adjusted(test_name)
-            cor_mat = convert(Matrix{cont_type}, cor(data))
+        if dense_cor && !is_zero_adjusted(test_name)
+            data_dense = issparse(data) ? Matrix(data) : data
+            cor_mat = convert(Matrix{cont_type}, cor(data_dense))
         else
             cor_mat = zeros(cont_type, 0, 0)
         end
@@ -200,7 +201,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     weight_type::String="cond_stat", edge_rule::String="OR", nonsparse_cond::Bool=false,
     verbose::Bool=true, update_interval::AbstractFloat=30.0, edge_merge_fun=maxweight,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
-    header=nothing, meta_variable_mask=nothing, recursive_pcor::Bool=true,
+    header=nothing, meta_variable_mask=nothing, dense_cor::Bool=true, recursive_pcor::Bool=true,
     cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
     track_rejections::Bool=false, all_univar_nbrs=nothing) where {ElType<:Real}
     """
@@ -213,7 +214,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
                                                                                           time_limit, parallel,
                                                                                           feed_forward, max_k,
                                                                                           n_obs_min, hps,
-                                                                                          fast_elim,
+                                                                                          fast_elim, dense_cor,
                                                                                           recursive_pcor, verbose,
                                                                                           tmp_folder,
                                                                                           edge_rule)
@@ -367,7 +368,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
     conv::AbstractFloat=0.01, header=nothing, meta_mask=nothing,
     feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
-    transposed::Bool=false, prec::Integer=32, make_sparse::Bool=true,
+    transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1, cache_pcor::Bool=false,
     time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0) where {ElType<:Real}
 
@@ -392,11 +393,6 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
     end
 
     check_data(data, header, meta_mask=meta_mask)
-
-    if !issparse(data) && make_sparse
-        verbose && println("\n### Converting data to sparse matrix ###\n")
-        data = sparse(data)
-    end
 
     n_mvs = sum(meta_mask)
     if verbose
@@ -423,7 +419,7 @@ function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
 
     if normalize
        verbose && println("\n### Normalizing ###\n")
-       input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose)
+       input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose, make_sparse=make_sparse)
     else
        @warn "Skipping normalization, only experts should choose this option."
        input_data = data

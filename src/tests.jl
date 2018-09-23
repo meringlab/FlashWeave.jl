@@ -409,6 +409,12 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
     pvals = fill(NaN64, n_pairs)
     stats = fill(NaN64, n_pairs)
 
+    # no need to start workers and send data if the correlation matrix
+    # was already precomputed
+    if test_name == "fz" && !isempty(cor_mat)
+        parallel = "single_il"
+    end
+
     if startswith(parallel, "single")
         for (X, Ys_slice) in work_items
             pw_univar_kernel!(X, Ys_slice, data, stats, pvals, test_obj, hps, n_obs_min,
