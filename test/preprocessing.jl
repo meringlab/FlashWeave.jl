@@ -28,6 +28,15 @@ function compare_nz_vecs(fznz_vec, minz_vec, verbose=false)
 end
 
 
+@testset "clr_adapt eps" begin
+    s1 = vcat([10000.0 for i in 1:10000], zeros(10))
+    s2 = vcat([100.0 for i in 1:10], zeros(10000))
+    s3 = collect(1:10010)
+    mat = permutedims(hcat(s1, s2, s3))
+    @test_throws AssertionError normalize_data(mat, test_name="fz", verbose=false)[1]
+end
+
+
 @testset "norm per test type" begin
     for norm_pair in [("clr-adapt", "fz"), ("clr-nonzero", "fz_nz"),
                                    ("clr-nonzero-binned", "mi_nz"), ("pres-abs", "mi"),

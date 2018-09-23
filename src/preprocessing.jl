@@ -11,18 +11,24 @@ function mapslices_sparse_nz(f, A::SparseMatrixCSC, dim::Integer=1)
 end
 
 
-function pseudocount_vars_from_sample(s::Vector{ElType}) where ElType <: AbstractFloat
+function pseudocount_vars_from_sample(s::AbstractVector{ElType}) where ElType <: AbstractFloat
     z_mask = s .== 0
     k = sum(z_mask)
     Nprod = sum(log.(s[.!z_mask]))
-    return k, Nprod
+    p = length(s)
+    return k, Nprod, p
 end
 
 
-function adaptive_pseudocount(x1::ElType, s1::Vector{ElType}, s2::Vector{ElType})::ElType where ElType <: AbstractFloat
-    k, Nprod1_log = pseudocount_vars_from_sample(s1)
-    n, Nprod2_log = pseudocount_vars_from_sample(s2)
-    p = length(s1)
+function adaptive_pseudocount(x1::ElType, s1::AbstractVector{ElType}, s2::AbstractVector{ElType}) where ElType <: AbstractFloat
+    k, Nprod1_log, p = pseudocount_vars_from_sample(s1)
+    adaptive_pseudocount(x1, k, Nprod1_log, p, s2)
+end
+
+
+function adaptive_pseudocount(x1::ElType, k::Integer, Nprod1_log::AbstractFloat, p::Integer,
+    s2::AbstractVector{ElType}) where ElType <: AbstractFloat
+    n, Nprod2_log, _ = pseudocount_vars_from_sample(s2)
     @assert n < p && k < p "samples with all zero abundances are not allowed"
     x2_log = (1 / (n-p)) * ((k-p)*log(x1) + Nprod1_log - Nprod2_log)
     return exp(x2_log)
@@ -31,10 +37,13 @@ end
 
 function adaptive_pseudocount!(X::Matrix{ElType}) where ElType <: AbstractFloat
     max_depth_index = findmax(sum(X, dims=2))[2][1]
-    max_depth_sample::Vector{ElType} = X[max_depth_index, :]
+    max_depth_sample = view(X, max_depth_index, :)
     min_abund = minimum(X[X .!= 0])
     base_pcount = min_abund >= 1 ? 1.0 : min_abund / 10
-    pseudo_counts = [adaptive_pseudocount(base_pcount, max_depth_sample, X[x, :]) for x in 1:size(X, 1)]
+    max_depth_pvars = pseudocount_vars_from_sample(max_depth_sample)
+    pseudo_counts = [adaptive_pseudocount(base_pcount, max_depth_pvars..., view(X, x, :)) for x in 1:size(X, 1)]
+
+    @assert all(pseudo_counts .> 0) "adaptive pseudo-counts for some samples were lower than machine precision, try making sample sums more homogeneous by excluding low-count or high-count samples"
 
     for i in 1:size(X, 1)
         s_vec = @view X[i, :]
@@ -365,7 +374,7 @@ function check_convert_sparse(data, make_sparse, norm_str, prec)
     end
 
     if make_sparse && (norm_str == "clr_adapt"  || norm_str == "fz")
-        @warn "Adaptive CLR is inefficient with sparse data, using dense format."
+        @warn "Adaptive CLR is inefficient with sparse data, using dense format"
         make_sparse = false
     end
 
