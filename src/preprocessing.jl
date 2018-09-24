@@ -42,13 +42,18 @@ function adaptive_pseudocount!(X::Matrix{ElType}) where ElType <: AbstractFloat
     base_pcount = min_abund >= 1 ? 1.0 : min_abund / 10
     max_depth_pvars = pseudocount_vars_from_sample(max_depth_sample)
     pseudo_counts = [adaptive_pseudocount(base_pcount, max_depth_pvars..., view(X, x, :)) for x in 1:size(X, 1)]
-
-    @assert all(pseudo_counts .> 0) "adaptive pseudo-counts for some samples were lower than machine precision, try making sample sums more homogeneous by excluding low-count or high-count samples"
+    pcount_z_mask = pseudo_counts .== 0
+    if any(pcount_z_mask)
+        @warn "adaptive pseudo-counts for $(sum(pcount_z_mask)) samples were lower than machine precision due to insufficient counts, removing them"
+        X = X[.!pcount_z_mask, :]
+        pseudo_counts = pseudo_counts[.!pcount_z_mask]
+    end
 
     for i in 1:size(X, 1)
         s_vec = @view X[i, :]
         s_vec[s_vec .== 0] .= pseudo_counts[i]
     end
+    X
 end
 
 function clr!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
@@ -84,8 +89,9 @@ end
 
 
 function adaptive_clr!(X::Matrix{ElType}) where ElType <: AbstractFloat
-    adaptive_pseudocount!(X)
+    X = adaptive_pseudocount!(X)
     clr!(X, pseudo_count=0.0, ignore_zeros=false)
+    X
 end
 
 
@@ -199,7 +205,7 @@ function clrnorm(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractF
         clr!(data, pseudo_count=clr_pseudo_count)
     elseif norm == "clr_adapt"
         data = convert(Matrix{Float64}, data)
-        adaptive_clr!(data)
+        data = adaptive_clr!(data)
     elseif norm == "clr_nz"
         if issparse(data)
             data = convert(SparseMatrixCSC{Float64}, data)

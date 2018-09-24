@@ -33,7 +33,9 @@ end
     s2 = vcat([100.0 for i in 1:10], zeros(10000))
     s3 = collect(1:10010)
     mat = permutedims(hcat(s1, s2, s3))
-    @test_throws AssertionError normalize_data(mat, test_name="fz", verbose=false)[1]
+    mat_norm = normalize_data(mat, test_name="fz", verbose=false)[1]
+    @test all(isfinite.(mat_norm))
+    @test size(mat_norm, 1) == 2
 end
 
 
