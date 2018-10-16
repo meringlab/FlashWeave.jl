@@ -1,8 +1,8 @@
 module FlashWeave
 
 # stdlib
-using Distributed, SparseArrays, Statistics, DelimitedFiles, Random,
-      SharedArrays, LinearAlgebra, Dates
+using Distributed, SparseArrays, Statistics, DelimitedFiles, Random
+using SharedArrays, LinearAlgebra, Dates
 
 # data structures
 using DataStructures
