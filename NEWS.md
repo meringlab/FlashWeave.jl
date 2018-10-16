@@ -1,7 +1,11 @@
-# Latest
+# Master
+
+no changes
+
+
+# v0.13.0 (latest)
 
 ## general
-
 - make Travis CI handle osx (fix HDF5 compilation)
 - remove several unmaintained backend options (temporary output, AND rule, pvalue weights)
 - make adaptive CLR normalized matrices always dense to avoid inefficiencies
