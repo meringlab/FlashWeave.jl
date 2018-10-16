@@ -2,8 +2,10 @@
 
 no changes
 
+# v0.13.1 (latest)
+- fix stdlib dependency issue
 
-# v0.13.0 (latest)
+# v0.13.0
 
 ## general
 - make Travis CI handle osx (fix HDF5 compilation)
