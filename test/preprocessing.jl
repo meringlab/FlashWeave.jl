@@ -18,7 +18,7 @@ function compare_nz_vecs(fznz_vec, minz_vec, verbose=false)
     else
         fznz_pos_mask = fznz_vec_red .> mean(fznz_vec_red)
         minz_pos_mask = minz_vec_red .== 2
-        if !all(fznz_pos_mask .== minz_pos_mask)
+        if fznz_pos_mask != minz_pos_mask
             verbose && println("Above mean elements do not fit")
             return false
         else

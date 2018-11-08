@@ -276,7 +276,7 @@ function factors_to_ints(x::AbstractVector)
     end
 end
 
-factors_to_ints(X::AbstractMatrix) = hcat(mapslices(factors_to_ints, X, 1)...)
+factors_to_ints(X::AbstractMatrix) = mapslices(factors_to_ints, X; dims=1)
 
 function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::AbstractFloat=1e-5,
     n_bins::Integer=3, rank_method::String="tied",
@@ -305,8 +305,8 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
         #meta_data, meta_header = onehot(meta_data, meta_header)
     end
 
-    if !(eltype(data) <: Integer)
-        data = M{Int}(data)
+    if !(eltype(data) <: AbstractFloat)
+        data = M{Float64}(data)
     end
 
     if filter_data

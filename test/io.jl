@@ -37,10 +37,10 @@ meta_header_fact = meta_header_fact[:]
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             data_ld = load_data(data_path, meta_path, meta_data_key=meta_data_key, meta_header_key=meta_header_key)
-            @test all(data_ld[1] .== data)
-            @test all(data_ld[2] .== header)
-            @test all(data_ld[3] .== meta_data)
-            @test all(data_ld[4] .== meta_header)
+            @test data_ld[1] == data
+            @test data_ld[2] == header
+            @test data_ld[3] == meta_data
+            @test data_ld[4] == meta_header
         end
     end
 end
@@ -56,10 +56,10 @@ end
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             data_ld = load_data(data_path, meta_path, transposed=true, meta_data_key=meta_data_key,
                                 meta_header_key=meta_header_key)
-            @test all(data_ld[1] .== data)
-            @test all(data_ld[2] .== header)
-            @test all(data_ld[3] .== meta_data)
-            @test all(data_ld[4] .== meta_header)
+            @test data_ld[1] == data
+            @test data_ld[2] == header
+            @test data_ld[3] == meta_data
+            @test data_ld[4] == meta_header
         end
     end
 end
@@ -70,10 +70,10 @@ end
     data_path, meta_path = [path_prefix * suff for suff in ("_ids.tsv", "_meta_oneHotTest.tsv")]
     data_ld = load_data(data_path, meta_path, meta_data_key=meta_data_key,
                         meta_header_key=meta_header_key)
-    @test all(data_ld[1] .== data)
-    @test all(data_ld[2] .== header)
-    @test all(data_ld[3] .== meta_data_fact)
-    @test all(data_ld[4] .== meta_header_fact)
+    @test data_ld[1] == data
+    @test data_ld[2] == header
+    @test data_ld[3] == meta_data_fact
+    @test data_ld[4] == meta_header_fact
 end
 
 

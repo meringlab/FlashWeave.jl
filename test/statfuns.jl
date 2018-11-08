@@ -64,7 +64,7 @@ end
 
     pvals_fdr_pred = copy(pvals)
     FlashWeave.benjamini_hochberg!(pvals_fdr_pred)
-    @test all((pvals_fdr_pred .< 0.01) .== (pvals_fdr .< 0.01))
+    @test (pvals_fdr_pred .< 0.01) == (pvals_fdr .< 0.01)
     sig_mask = pvals_fdr_pred .< 0.01
     @test isapprox(pvals_fdr_pred[sig_mask], pvals_fdr[sig_mask], rtol=1e-6)
 

@@ -37,7 +37,7 @@ function compare_cond_ctabs(ctab1, ctab2)
         for j in 1:comp_dim
             if !(j in used_js)
                 slice2 = ctab2[:, :, j]
-                if all(slice1 .== slice2)
+                if slice1 == slice2
                     found_hit = true
                     push!(used_js, j)
                     break
@@ -57,8 +57,8 @@ for sparsity_mode in ["dense", "sparse"]
         ts_data = sparsity_mode == "dense" ? data_contingency : sparse(data_contingency)
 
         @testset "2-way" begin
-            @test all(@inferred(FlashWeave.contingency_table(1, 2, ts_data, "mi"))[1:2, 1:2] .== ctab12)
-            @test all(@inferred(FlashWeave.contingency_table(2, 3, ts_data, "mi"))[1:2, 1:3] .== ctab23)
+            @test @inferred(FlashWeave.contingency_table(1, 2, ts_data, "mi"))[1:2, 1:2] == ctab12
+            @test @inferred(FlashWeave.contingency_table(2, 3, ts_data, "mi"))[1:2, 1:3] == ctab23
         end
 
         @testset "3-way" begin
