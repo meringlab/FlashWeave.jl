@@ -7,7 +7,7 @@ using SparseArrays, DelimitedFiles, Statistics
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_sparse = sparse(data)
 
-exp_dict = load(joinpath("data", "preprocessing_expected.jld2"))["exp_dict"]
+exp_dict = load(joinpath("data", "preprocessing_expected.jld2"), "exp_dict")
 
 function compare_nz_vecs(fznz_vec, minz_vec, verbose=false)
     fznz_vec_red = fznz_vec[fznz_vec .!= 0]
@@ -119,11 +119,43 @@ end
 
 
 @testset "mi_nz fits fz_nz" begin
-    data_norm_fznz, mask = FlashWeave.preprocess_data_default(data, "fz_nz", make_sparse=false,
-     verbose=false)
-    data_norm_minz, mask = FlashWeave.preprocess_data_default(data, "mi_nz", make_sparse=false, disc_method="mean",
-    verbose=false)
+    data_norm_fznz, _, mask = FlashWeave.preprocess_data_default(data, "fz_nz", make_sparse=false,
+                                                                 verbose=false)
+    data_norm_minz, _, mask = FlashWeave.preprocess_data_default(data, "mi_nz", make_sparse=false,
+                                                                 disc_method="mean", verbose=false)
     @test all([compare_nz_vecs(data_norm_fznz[:, i], data_norm_minz[:, i]) for i in size(data_norm_fznz, 2)])
+end
+
+
+@testset "meta data" begin
+    @testset "one-hot" begin
+        data_threecat, header_threecat = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny.tsv"), '\t', header=true)
+        header_threecat = Vector{String}(header_threecat[:])
+        meta_data_threecat, meta_header_threecat = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny_meta_oneHotTest.tsv"), '\t', header=true)
+        meta_header_threecat = Vector{String}(meta_header_threecat[:])
+        data_conc = hcat(data_threecat, meta_data_threecat)
+        header_conc = vcat(header_threecat, meta_header_threecat)
+        meta_mask = BitVector(vcat(zeros(length(header_threecat)), ones(length(meta_header_threecat))))
+        for test_name in ["fz", "mi", "fz_nz", "mi_nz"]
+            @testset "$test_name" begin
+                for make_onehot in [true, false]
+                    @testset "$make_onehot" begin
+                        data_norm, header_norm, meta_mask_norm, row_mask = FlashWeave.preprocess_data_default(data_conc, test_name, make_sparse=false,
+                        verbose=false, header=header_conc, meta_mask=meta_mask, make_onehot=make_onehot)
+
+                        if make_onehot
+                            @test data_norm[:, meta_mask_norm] == exp_dict["meta_tiny_oneHotTest"].meta_data[row_mask, :]
+                            @test header_norm[meta_mask_norm] == exp_dict["meta_tiny_oneHotTest"].meta_header
+                        else
+                            # smoke test for onehot == false
+                            @test sum(meta_mask_norm) == sum(meta_mask)
+                            @test size(data_norm, 2) == length(header_norm)
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 # to create expected output

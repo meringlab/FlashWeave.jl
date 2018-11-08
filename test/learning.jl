@@ -249,7 +249,6 @@ end
                                                         [("_meta.tsv", "_meta_transposed.tsv"),("","")])
             @testset "$data_format" begin
                 path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]
-                println(path_pairs)
                 pred_graphs = [graph(@silence_stdout learn_network(path_pairs[i], path_pairs[i_meta],
                                                                    sensitive=true, heterogeneous=false,
                                                                    max_k=3, verbose=true, transposed=transp))

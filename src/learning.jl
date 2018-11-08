@@ -361,6 +361,8 @@ Learn an interaction network from a data table (including OTUs and optionally me
 
 - `make_sparse` - use a sparse data representation (should be left at `true` in almost all cases)
 
+- `make_onehot` - create one-hot encodings for meta data variables with more than two categories (should be left at `true` in almost all cases)
+
 - `update_interval` - if `verbose=true`, determines the interval (seconds) at which network stat updates are printed
 
 """
@@ -369,8 +371,8 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     conv::AbstractFloat=0.01, header=nothing, meta_mask=nothing,
     feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
-    max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1, cache_pcor::Bool=false,
-    time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0)
+    make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,
+    cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0)
 
     start_time = time()
 

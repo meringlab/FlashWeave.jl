@@ -1,6 +1,18 @@
+function factors_to_ints(x::AbstractVector)
+    try
+        Vector{Int}(x)
+    catch MethodError
+        factor_map = Dict([(xi, fi) for (fi, xi) in enumerate(sort(unique(x)))])
+        Int[factor_map[xi] for xi in x]
+    end
+end
+
+factors_to_ints(X::AbstractMatrix) = mapslices(factors_to_ints, X; dims=1)
+
+
 needs_onehot(x::AbstractVector, categories=unique(x)) = length(categories) > 2
 
-function onehot(x::AbstractVector, var_name::AbstractString, check::Bool=true)
+function onehot(x::AbstractVector, var_name="", check::Bool=true)
     categories = sort(unique(x))
     if !check || needs_onehot(x, categories)
         cols_enc = Vector{Int}[]
@@ -8,21 +20,28 @@ function onehot(x::AbstractVector, var_name::AbstractString, check::Bool=true)
 
         for category in categories
             push!(cols_enc, Vector{Int}(x .== category))
-            push!(vnames_enc, var_name * "_" * string(category))
+            if var_name != ""
+                push!(vnames_enc, var_name * "_" * string(category))
+            end
         end
     else
-        cols_enc, vnames_enc = [x], [var_name]
+        cols_enc, vnames_enc = [factors_to_ints(x)], [var_name]
     end
 
     hcat(cols_enc...), vnames_enc
 end
 
-function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}, check::Bool=true)
-     enc_results = [onehot(X[:, i], vnames[i], check) for i in 1:size(X, 2)]
-     M = issparse(X) ? SparseMatrixCSC{Int} : Matrix{Int}
-     X_enc = hcat(map(first, enc_results)...) |> M
-     vnames_enc = vcat(map(x->x[2], enc_results)...) |> Vector{String}
-     X_enc, vnames_enc
+function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=String[], check::Bool=true)
+    enc_results = [onehot(X[:, i], isempty(vnames) ? "" : vnames[i], check) for i in 1:size(X, 2)]
+    M = issparse(X) ? SparseMatrixCSC{Int} : Matrix{Int}
+    X_enc = hcat(map(first, enc_results)...) |> M
+
+    if !isempty(vnames)
+        vnames_enc = vcat(map(x->x[2], enc_results)...) |> Vector{String}
+    else
+        vnames_enc = vnames
+    end
+    X_enc, vnames_enc
 end
 
 
@@ -267,22 +286,12 @@ end
 presabs_norm!(X::SparseMatrixCSC{ElType}) where ElType <: Real = map!(sign, X.nzval, X.nzval)
 presabs_norm!(X::Matrix{ElType}) where ElType <: Real = map!(sign, X, X)
 
-function factors_to_ints(x::AbstractVector)
-    try
-        Vector{Int}(x)
-    catch MethodError
-        factor_map = Dict([(xi, fi) for (fi, xi) in enumerate(sort(unique(x)))])
-        Int[factor_map[xi] for xi in x]
-    end
-end
-
-factors_to_ints(X::AbstractMatrix) = mapslices(factors_to_ints, X; dims=1)
 
 function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::AbstractFloat=1e-5,
     n_bins::Integer=3, rank_method::String="tied",
     disc_method::String="median", verbose::Bool=true, meta_mask::BitVector=falses(size(data, 2)),
     make_sparse::Bool=issparse(data),
-    prec::Integer=32, filter_data=true, header::Vector{String}=String[])
+    prec::Integer=32, filter_data=true, header::Vector{String}=String[], make_onehot::Bool=true)
 
     verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     has_meta = any(meta_mask)
@@ -296,13 +305,17 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
         if !isempty(header)
             meta_header = header[meta_mask]
             header = header[nometa_mask]
+        else
+            meta_header = nothing
         end
 
-        # convert string factor columns to integers
-        meta_data = factors_to_ints(meta_data)
-
-        # one-hot encode meta data
-        #meta_data, meta_header = onehot(meta_data, meta_header)
+        # one-hot encode meta data and convert string factors to ints
+        if make_onehot
+            meta_data, meta_header = onehot(meta_data, meta_header)
+        else
+            @warn "Skipping one-hot encoding, only experts should choose this option."
+            meta_data = factors_to_ints(meta_data)
+        end
     end
 
     if !(eltype(data) <: AbstractFloat)
@@ -322,6 +335,8 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
         if !isempty(header)
             header = header[col_mask]
         end
+    else
+        row_mask = nothing
     end
 
     if verbose
@@ -337,7 +352,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
 
     elseif norm == "binary"
         presabs_norm!(data)
-        data = issparse(data) ? SparseMatrixCSC{Int}(data) : Matrix{Int}(data)
+        data = M{Int}(data)
 
         unreduced_vars = size(data, 2)
         bin_mask =  (get_levels(data) .== 2)[:]
@@ -399,29 +414,18 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
     target_base_type_str = iscontinuousnorm(norm) ? "Float" : "Int"
     T = eval(Symbol("$target_base_type_str$prec"))
 
-    if make_sparse
-        if !issparse(data)
-            data = sparse(data)
-        end
-        data = convert(SparseMatrixCSC{T}, data)
-    else
-        if issparse(data)
-            data = Matrix(data)
-        end
-        data = convert(Matrix{T}, data)
-    end
+    # need two-step conversion because direct 64+Dense -> 32+sparse currently
+    # does not work
+    M_out = make_sparse ? SparseMatrixCSC : Matrix
+    data = data |> M{T} |> M_out{T}
 
-    if !isempty(header)
-        return data, header, meta_mask
-    else
-        return data, meta_mask
-    end
+    (data=data, header=header, meta_mask=meta_mask, obs_filter_mask=row_mask)
 end
 
 
-function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::AbstractString; verbose::Bool=true,
+function preprocess_data_default(data::AbstractMatrix, test_name::AbstractString; verbose::Bool=true,
      make_sparse::Bool=issparse(data), meta_mask::BitVector=falses(size(data, 2)), prec::Integer=32,
-     header::Vector{String}=String[], preprocess_kwargs...) where ElType <: Real
+     header::Vector{String}=String[], preprocess_kwargs...)
     default_norm_dict = Dict("mi" => "binary",
                              "mi_nz" => "binned_nz_clr",
                              "fz" => "clr_adapt",
@@ -468,12 +472,14 @@ Normalize data using various forms of clr transform and discretization. This sho
 - `verbose` - print progress information
 
 - `prec` - precision in bits to use for calculations (16, 32, 64 or 128)
+
+- `make_sparse`, `make_onehot` - see docstring for "learn_network()"
+
 """
 function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm_mode::AbstractString="",
     header::Vector{String}=String[], meta_mask::BitVector=falses(size(data, 2)),
-    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true, make_sparse::Bool=true)
+    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true, make_sparse::Bool=true, make_onehot::Bool=true)
     @assert xor(isempty(test_name), isempty(norm_mode)) "provide either test_name and norm_mode (but not both)"
-    #@assert !xor(isempty(meta_mask), isempty(header)) "provide both meta_mask and header (or none)"
 
     mode_map = Dict("clr-adapt"=>"clr_adapt", "clr-nonzero"=>"clr_nz",
                     "clr-nonzero-binned"=>"binned_nz_clr", "pres-abs"=>"binary",
@@ -493,5 +499,6 @@ function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm
     data, make_sparse = check_convert_sparse(data, make_sparse, norm_str, prec)
 
     norm_results = preproc_fun(data, norm_str; meta_mask=meta_mask, header=header,
-                               verbose=verbose, filter_data=filter_data, prec=prec, make_sparse=make_sparse)
+                               verbose=verbose, filter_data=filter_data, prec=prec, make_sparse=make_sparse,
+                               make_onehot=make_onehot)
 end

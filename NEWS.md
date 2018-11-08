@@ -1,6 +1,8 @@
 # Master
 
 - allow string factors in meta data
+- make one-hot encoding the default for meta data variables with more than two
+categories, this avoids unreliable tests and improves interpretability (can be switched off with "make_onehot = false")
 
 # v0.13.1 (latest)
 - fix stdlib dependency issue
