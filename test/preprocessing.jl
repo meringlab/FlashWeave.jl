@@ -144,8 +144,14 @@ end
                         verbose=false, header=header_conc, meta_mask=meta_mask, make_onehot=make_onehot)
 
                         if make_onehot
-                            @test data_norm[:, meta_mask_norm] == exp_dict["meta_tiny_oneHotTest"].meta_data[row_mask, :]
+                            # skip the continuous column for identity test
+                            @test data_norm[:, meta_mask_norm][:, 1:end-1] == exp_dict["meta_tiny_oneHotTest"].meta_data[row_mask, 1:end-1]
                             @test header_norm[meta_mask_norm] == exp_dict["meta_tiny_oneHotTest"].meta_header
+
+                            # check the continuous meta data column
+                            if startswith(test_name, "mi")
+                                @test length(unique(data_norm[:, end])) == 2
+                            end
                         else
                             # smoke test for onehot == false
                             @test sum(meta_mask_norm) == sum(meta_mask)

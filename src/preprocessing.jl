@@ -1,20 +1,35 @@
 function factors_to_ints(x::AbstractVector)
-    try
-        Vector{Int}(x)
-    catch MethodError
+    # need more complicated check because x can be AbstractVector{Any}
+    if isa(x[1], AbstractString)
         factor_map = Dict([(xi, fi) for (fi, xi) in enumerate(sort(unique(x)))])
         Int[factor_map[xi] for xi in x]
+    else
+        x
     end
 end
 
-factors_to_ints(X::AbstractMatrix) = mapslices(factors_to_ints, X; dims=1)
+
+function factors_to_ints(X::AbstractMatrix)
+    M = issparse(X) ? SparseMatrixCSC : Matrix
+    M{Float64}(mapslices(factors_to_ints, X; dims=1))
+end
 
 
-needs_onehot(x::AbstractVector, categories=unique(x)) = length(categories) > 2
+function check_onehot(x::AbstractVector)
+    # check if proper floating point vector
+    if isa(x[1], AbstractFloat) && any(!iszero(xi % 1) for xi in x)
+        return false, []
+    # otherwise check number of categories
+    else
+        categories = sort(unique(x))
+        length(categories) > 2, categories
+    end
+end
+
 
 function onehot(x::AbstractVector, var_name="", check::Bool=true)
-    categories = sort(unique(x))
-    if !check || needs_onehot(x, categories)
+    needs_onehot, categories = check_onehot(x)
+    if !check || needs_onehot
         cols_enc = Vector{Int}[]
         vnames_enc = String[]
 
@@ -31,10 +46,13 @@ function onehot(x::AbstractVector, var_name="", check::Bool=true)
     hcat(cols_enc...), vnames_enc
 end
 
-function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=String[], check::Bool=true)
+
+function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=String[],
+    check::Bool=true)
+
     enc_results = [onehot(X[:, i], isempty(vnames) ? "" : vnames[i], check) for i in 1:size(X, 2)]
-    M = issparse(X) ? SparseMatrixCSC{Int} : Matrix{Int}
-    X_enc = hcat(map(first, enc_results)...) |> M
+    M = issparse(X) ? SparseMatrixCSC : Matrix
+    X_enc = hcat(map(first, enc_results)...) |> M{Float64}
 
     if !isempty(vnames)
         vnames_enc = vcat(map(x->x[2], enc_results)...) |> Vector{String}
@@ -43,7 +61,6 @@ function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=Stri
     end
     X_enc, vnames_enc
 end
-
 
 
 function mapslices_sparse_nz(f, A::SparseMatrixCSC, dim::Integer=1)
@@ -397,9 +414,9 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
 
     if has_meta
         if issparse(meta_data)
-            meta_data = discretize_meta(meta_data, norm, n_bins)
+            meta_data = discretize_meta(meta_data, norm, 2)
         else
-            discretize_meta!(meta_data, norm, n_bins)
+            discretize_meta!(meta_data, norm, 2)
         end
         meta_mask = vcat(falses(size(data, 2)), trues(size(meta_data, 2)))
         data = hcat(data, convert(typeof(data), meta_data))
