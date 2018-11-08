@@ -1,6 +1,6 @@
 # Master
 
-no changes
+- allow string factors in meta data
 
 # v0.13.1 (latest)
 - fix stdlib dependency issue

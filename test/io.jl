@@ -1,9 +1,9 @@
 using Test
 using FlashWeave
 using SimpleWeightedGraphs
-using SparseArrays, DelimitedFiles
+using SparseArrays, DelimitedFiles, FileIO
 
-net_result = load_network(joinpath("data", "io_expected.jld2"))
+net_result = load_network(joinpath("data", "io_expected_networks.jld2"))
 
 @testset "networks" begin
     tmp_path = tempname()
@@ -26,6 +26,8 @@ meta_data, meta_header = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_ti
 meta_header = Vector{String}(meta_header[:])
 meta_data_key = "meta_data"
 meta_header_key = "meta_header"
+meta_data_fact, meta_header_fact = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny_meta_oneHotTest.tsv"), '\t', header=true)
+meta_header_fact = meta_header_fact[:]
 
 
 @testset "table data" begin
@@ -60,6 +62,18 @@ end
             @test all(data_ld[4] .== meta_header)
         end
     end
+end
+
+
+@testset "string factors" begin
+    path_prefix = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
+    data_path, meta_path = [path_prefix * suff for suff in ("_ids.tsv", "_meta_oneHotTest.tsv")]
+    data_ld = load_data(data_path, meta_path, meta_data_key=meta_data_key,
+                        meta_header_key=meta_header_key)
+    @test all(data_ld[1] .== data)
+    @test all(data_ld[2] .== header)
+    @test all(data_ld[3] .== meta_data_fact)
+    @test all(data_ld[4] .== meta_header_fact)
 end
 
 

@@ -136,27 +136,35 @@ function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_h
  end
 
 
-hasrowids(data::AbstractMatrix) = data[1, 1] == "" || isa(data[2, 1], AbstractString)
+hasrowids(data::AbstractMatrix, header::AbstractVector) =
+    header[1] == "" || length(unique(data[:, 1])) == size(data, 1)
 
-# this could eventually replaced with FileIO
-function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool=false)
+# this could eventually be replaced with FileIO
+function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool=false, type_data::Bool=true)
     sep = splitext(data_path)[2] == ".tsv" ? '\t' : ','
-    data = readdlm(data_path, sep)
 
+    # to support 'transposed', we separate the header later instead of using
+    # the flag here
+    data_raw = readdlm(data_path, sep)
+    
     if transposed
         # hacky transpose for string data
-        data = permutedims(data, (2,1))
+        data_raw = permutedims(data_raw, (2,1))
     end
 
-    if hasrowids(data)
-        data = data[:, 2:end]
+    header_raw = data_raw[1, :]
+    data_raw = data_raw[2:end, :]
+
+    if hasrowids(data_raw, header_raw)
+        data_raw = data_raw[:, 2:end]
+        header_raw = header_raw[2:end]
     end
 
-    header = Vector{String}(data[1, :])[:]
-    data = Matrix{Float64}(data[2:end, :])
+    header = Vector{String}(header_raw)[:]
+    data = type_data ? Matrix{Float64}(data_raw) : data_raw
 
     if meta_path != nothing
-        meta_data, meta_header = load_dlm(meta_path, transposed=transposed)
+        meta_data, meta_header = load_dlm(meta_path, transposed=transposed, type_data=false)
     else
         meta_data = meta_header = nothing
     end
@@ -204,7 +212,7 @@ function load_biom(data_path, meta_path=nothing)
     end
 
     if meta_path != nothing
-        meta_data, meta_header = load_dlm(meta_path)
+        meta_data, meta_header = load_dlm(meta_path, type_data=false)
     else
         meta_data = meta_header = nothing
     end

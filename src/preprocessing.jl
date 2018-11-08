@@ -1,3 +1,32 @@
+needs_onehot(x::AbstractVector, categories=unique(x)) = length(categories) > 2
+
+function onehot(x::AbstractVector, var_name::AbstractString, check::Bool=true)
+    categories = sort(unique(x))
+    if !check || needs_onehot(x, categories)
+        cols_enc = Vector{Int}[]
+        vnames_enc = String[]
+
+        for category in categories
+            push!(cols_enc, Vector{Int}(x .== category))
+            push!(vnames_enc, var_name * "_" * string(category))
+        end
+    else
+        cols_enc, vnames_enc = [x], [var_name]
+    end
+
+    hcat(cols_enc...), vnames_enc
+end
+
+function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}, check::Bool=true)
+     enc_results = [onehot(X[:, i], vnames[i], check) for i in 1:size(X, 2)]
+     M = issparse(X) ? SparseMatrixCSC{Int} : Matrix{Int}
+     X_enc = hcat(map(first, enc_results)...) |> M
+     vnames_enc = vcat(map(x->x[2], enc_results)...) |> Vector{String}
+     X_enc, vnames_enc
+end
+
+
+
 function mapslices_sparse_nz(f, A::SparseMatrixCSC, dim::Integer=1)
     if dim == 1
         A = permutedims(A)
@@ -238,13 +267,27 @@ end
 presabs_norm!(X::SparseMatrixCSC{ElType}) where ElType <: Real = map!(sign, X.nzval, X.nzval)
 presabs_norm!(X::Matrix{ElType}) where ElType <: Real = map!(sign, X, X)
 
+function factors_to_ints(x::AbstractVector)
+    try
+        Vector{Int}(x)
+    catch MethodError
+        factor_map = Dict([(xi, fi) for (fi, xi) in enumerate(sort(unique(x)))])
+        Int[factor_map[xi] for xi in x]
+    end
+end
 
-function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_count::AbstractFloat=1e-5, n_bins::Integer=3, rank_method::String="tied",
-    disc_method::String="median", verbose::Bool=true, meta_mask::BitVector=falses(size(data, 2)), make_sparse::Bool=issparse(data), factor_cols::Vector{Int}=Int[],
-    prec::Integer=32, filter_data=true, header::Vector{String}=String[]) where ElType <: Real
+factors_to_ints(X::AbstractMatrix) = hcat(mapslices(factors_to_ints, X, 1)...)
+
+function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::AbstractFloat=1e-5,
+    n_bins::Integer=3, rank_method::String="tied",
+    disc_method::String="median", verbose::Bool=true, meta_mask::BitVector=falses(size(data, 2)),
+    make_sparse::Bool=issparse(data),
+    prec::Integer=32, filter_data=true, header::Vector{String}=String[])
 
     verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     has_meta = any(meta_mask)
+    M = issparse(data) ? SparseMatrixCSC : Matrix
+
     if has_meta
         meta_data = data[:, meta_mask]
         nometa_mask = .!meta_mask
@@ -254,6 +297,16 @@ function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_
             meta_header = header[meta_mask]
             header = header[nometa_mask]
         end
+
+        # convert string factor columns to integers
+        meta_data = factors_to_ints(meta_data)
+
+        # one-hot encode meta data
+        #meta_data, meta_header = onehot(meta_data, meta_header)
+    end
+
+    if !(eltype(data) <: Integer)
+        data = M{Int}(data)
     end
 
     if filter_data
@@ -366,8 +419,14 @@ function preprocess_data(data::AbstractMatrix{ElType}, norm::String; clr_pseudo_
 end
 
 
-function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::AbstractString; verbose::Bool=true, make_sparse::Bool=issparse(data), meta_mask::BitVector=falses(size(data, 2)), factor_cols::Vector{Int}=Int[], prec::Integer=32, header::Vector{String}=String[], preprocess_kwargs...) where ElType <: Real
-    default_norm_dict = Dict("mi" => "binary", "mi_nz" => "binned_nz_clr", "fz" => "clr_adapt", "fz_nz" => "clr_nz", "mi_expdz" => "binned_nz_clr")
+function preprocess_data_default(data::AbstractMatrix{ElType}, test_name::AbstractString; verbose::Bool=true,
+     make_sparse::Bool=issparse(data), meta_mask::BitVector=falses(size(data, 2)), prec::Integer=32,
+     header::Vector{String}=String[], preprocess_kwargs...) where ElType <: Real
+    default_norm_dict = Dict("mi" => "binary",
+                             "mi_nz" => "binned_nz_clr",
+                             "fz" => "clr_adapt",
+                             "fz_nz" => "clr_nz",
+                             "mi_expdz" => "binned_nz_clr")
     preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, meta_mask=meta_mask, prec=prec, header=header, preprocess_kwargs...)
 end
 
@@ -410,9 +469,9 @@ Normalize data using various forms of clr transform and discretization. This sho
 
 - `prec` - precision in bits to use for calculations (16, 32, 64 or 128)
 """
-function normalize_data(data::AbstractMatrix{ElType}; test_name::AbstractString="", norm_mode::AbstractString="",
+function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm_mode::AbstractString="",
     header::Vector{String}=String[], meta_mask::BitVector=falses(size(data, 2)),
-    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true, make_sparse::Bool=true) where ElType <: Real
+    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true, make_sparse::Bool=true)
     @assert xor(isempty(test_name), isempty(norm_mode)) "provide either test_name and norm_mode (but not both)"
     #@assert !xor(isempty(meta_mask), isempty(header)) "provide both meta_mask and header (or none)"
 

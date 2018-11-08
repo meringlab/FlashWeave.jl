@@ -193,7 +193,7 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
 end
 
 
-function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Integer=3,
+function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     alpha::AbstractFloat=0.01,
     hps::Integer=5, n_obs_min::Integer=-1, max_tests::Integer=Int(10e6),
     convergence_threshold::AbstractFloat=0.01,
@@ -203,7 +203,7 @@ function LGL(data::AbstractMatrix{ElType}; test_name::String="mi", max_k::Intege
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
     header=nothing, meta_variable_mask=nothing, dense_cor::Bool=true, recursive_pcor::Bool=true,
     cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, all_univar_nbrs=nothing) where {ElType<:Real}
+    track_rejections::Bool=false, all_univar_nbrs=nothing)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
@@ -364,13 +364,13 @@ Learn an interaction network from a data table (including OTUs and optionally me
 - `update_interval` - if `verbose=true`, determines the interval (seconds) at which network stat updates are printed
 
 """
-function learn_network(data::AbstractArray{ElType}; sensitive::Bool=true,
+function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
     conv::AbstractFloat=0.01, header=nothing, meta_mask=nothing,
     feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1, cache_pcor::Bool=false,
-    time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0) where {ElType<:Real}
+    time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0)
 
     start_time = time()
 
