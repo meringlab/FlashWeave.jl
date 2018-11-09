@@ -3,7 +3,7 @@ language: julia
 os:
   - linux
   # - windows
-  - osx
+  # - osx
 julia:
   - 1.0
 notifications:
