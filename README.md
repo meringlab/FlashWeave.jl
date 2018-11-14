@@ -131,4 +131,4 @@ Example BibTeX entry:
 
 ## Versioning and API ##
 
-FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to change.
+FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to change. Note, that FlashWeave is currently in its experimental phase (version < v1.0), which means that breaking interface changes may occur in every minor version.
