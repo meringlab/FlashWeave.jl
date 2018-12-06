@@ -19,4 +19,4 @@ addons:
     #- if [ $TRAVIS_OS_NAME = osx ]; then brew install gcc; brew link --overwrite gcc; brew install hdf5; fi
 after_success:
   # push coverage results to Coveralls
-    - julia -e 'using Pkg; Pkg.add("Coverage"); cd(Pkg.dir("FlashWeave")); using Coverage; Codecov.submit(process_folder()); Coveralls.submit(process_folder())'
+    - julia --inline=no -e 'using Pkg; Pkg.add("Coverage"); cd(Pkg.dir("FlashWeave")); using Coverage; Codecov.submit(process_folder()); Coveralls.submit(process_folder())'
