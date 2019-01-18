@@ -73,7 +73,7 @@ Note, that this package is optimized for large-scale data sets. On small data (h
 
 ## Parallel computing ##
 
-FlashWeave leverages Julia's built-in [parallel infrastructure](https://docs.julialang.org/en/stable/manual/parallel-computing/). In the most simple case, you can start julia with several workers
+FlashWeave leverages Julia's built-in [parallel infrastructure](https://docs.julialang.org/en/v1/manual/parallel-computing/index.html). In the most simple case, you can start julia with several workers
 
 ```bash
 $ julia -p 4 # for 4 workers
