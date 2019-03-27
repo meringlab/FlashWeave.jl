@@ -5,6 +5,7 @@
 - make one-hot encoding the default for meta data variables with more than two
 categories, this avoids unreliable tests and improves interpretability (can be switched off with "make_onehot = false")
 - improve support for continuous meta data variables when using "fast=true"
+- support numeric OTU identifiers
 
 ### bug fixes
 - fix Travis CI osx handling
