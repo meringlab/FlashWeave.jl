@@ -57,7 +57,10 @@ function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=Stri
         num_enc = sum(enc_mask)
         enc_vnames = isempty(vnames) ? [] : vnames[enc_mask]
         enc_vname_str = isempty(enc_vnames) ? "" : " (" * join(enc_vnames, ", ") * ")"
-        num_enc > 0 && @warn "$num_enc factor variables with more than two categories were detected$(enc_vname_str), splitting them into separate dummy variables (One Hot)"
+
+        pl_str1 = num_enc == 1 ? "" : "s"
+        pl_str2 = num_enc == 1 ? "it" : "them"
+        num_enc > 0 && @warn "$num_enc factor variable$(pl_str1) with more than two categories were detected$(enc_vname_str), splitting $(pl_str2) into separate dummy variables (One Hot)"
     end
 
     M = issparse(X) ? SparseMatrixCSC : Matrix
