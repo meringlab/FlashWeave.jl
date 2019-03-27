@@ -1,4 +1,4 @@
-## Master
+# v0.14.0 (minor, latest)
 
 ### general
 - allow string factors in meta data
@@ -10,7 +10,7 @@ categories, this avoids unreliable tests and improves interpretability (can be s
 ### bug fixes
 - fix Travis CI osx handling
 
-## v0.13.1 (patch, latest)
+## v0.13.1 
 - fix stdlib dependency issue
 
 # v0.13.0
