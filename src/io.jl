@@ -146,7 +146,7 @@ function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool
     # to support 'transposed', we separate the header later instead of using
     # the flag here
     data_raw = readdlm(data_path, sep)
-    
+
     if transposed
         # hacky transpose for string data
         data_raw = permutedims(data_raw, (2,1))
@@ -160,7 +160,10 @@ function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool
         header_raw = header_raw[2:end]
     end
 
-    header = Vector{String}(header_raw)[:]
+    header = string.(header_raw)[:]
+    if all(endswith.(header, ".0"))
+        header = map(x -> x[1:end-2], header)
+    end
     data = type_data ? Matrix{Float64}(data_raw) : data_raw
 
     if meta_path != nothing

@@ -76,6 +76,13 @@ end
     @test data_ld[4] == meta_header_fact
 end
 
+@testset "numeric IDs" begin
+    data_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny_numIDs.tsv")
+    data_ld = load_data(data_path)
+    @test data_ld[1] == data
+    @test data_ld[2] == map(x -> x[3:end], header)
+end
+
 
 
 
