@@ -3,7 +3,6 @@
 [![Project Status: Active - The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![Build Status](https://travis-ci.org/meringlab/FlashWeave.jl.svg?branch=master)](https://travis-ci.org/meringlab/FlashWeave.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/vdesge86ssj91htc?svg=true)](https://ci.appveyor.com/project/jtackm/flashweave-jl)
-[![codecov](https://codecov.io/gh/meringlab/FlashWeave.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/meringlab/FlashWeave.jl)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 FlashWeave predicts ecological interactions between microbes from large-scale compositional abundance data (i.e. OTU tables constructed from sequencing data) through statistical co-occurrence or co-abundance. It reports direct associations, with adjustment for bystander effects and other confounders, and can furthermore integrate environmental or technical factors into the analysis of microbial systems.
@@ -74,7 +73,7 @@ Note, that this package is optimized for large-scale data sets. On small data (h
 
 ## Parallel computing ##
 
-FlashWeave leverages Julia's built-in [parallel infrastructure](https://docs.julialang.org/en/stable/manual/parallel-computing/). In the most simple case, you can start julia with several workers
+FlashWeave leverages Julia's built-in [parallel infrastructure](https://docs.julialang.org/en/v1/manual/parallel-computing/index.html). In the most simple case, you can start julia with several workers
 
 ```bash
 $ julia -p 4 # for 4 workers
@@ -132,4 +131,4 @@ Example BibTeX entry:
 
 ## Versioning and API ##
 
-FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to change.
+FlashWeave follows [semantic versioning](https://semver.org/). Stability guarantees are only provided for exported functions (official API), anything else should be considered untested and subject to change. Note, that FlashWeave is currently in its experimental phase (version < v1.0), which means that breaking interface changes may occur in every minor version.
