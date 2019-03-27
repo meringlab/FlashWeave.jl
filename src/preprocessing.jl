@@ -35,7 +35,7 @@ function onehot(x::AbstractVector, var_name="", check::Bool=true)
 
         for category in categories
             push!(cols_enc, Vector{Int}(x .== category))
-            if var_name != ""
+            if !isempty(var_name)
                 push!(vnames_enc, var_name * "_" * string(category))
             end
         end
@@ -47,10 +47,19 @@ function onehot(x::AbstractVector, var_name="", check::Bool=true)
 end
 
 
-function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=String[],
-    check::Bool=true)
+function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=String[];
+    check::Bool=true, verbose::Bool=true)
 
     enc_results = [onehot(X[:, i], isempty(vnames) ? "" : vnames[i], check) for i in 1:size(X, 2)]
+
+    if verbose
+        enc_mask = [size(X, 2) > 1 for (X, vn) in enc_results]
+        num_enc = sum(enc_mask)
+        enc_vnames = isempty(vnames) ? [] : vnames[enc_mask]
+        enc_vname_str = isempty(enc_vnames) ? "" : " (" * join(enc_vnames, ", ") * ")"
+        num_enc > 0 && @warn "$num_enc factor variables with more than two categories were detected$(enc_vname_str), splitting them into separate dummy variables (One Hot)"
+    end
+
     M = issparse(X) ? SparseMatrixCSC : Matrix
     X_enc = hcat(map(first, enc_results)...) |> M{Float64}
 
@@ -59,6 +68,7 @@ function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=Stri
     else
         vnames_enc = vnames
     end
+
     X_enc, vnames_enc
 end
 
@@ -312,7 +322,6 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
 
     verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     has_meta = any(meta_mask)
-    M = issparse(data) ? SparseMatrixCSC : Matrix
 
     if has_meta
         meta_data = data[:, meta_mask]
@@ -328,16 +337,15 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
 
         # one-hot encode meta data and convert string factors to ints
         if make_onehot
-            meta_data, meta_header = onehot(meta_data, meta_header)
+            meta_data, meta_header = onehot(meta_data, meta_header; verbose=verbose)
         else
             @warn "Skipping one-hot encoding, only experts should choose this option."
             meta_data = factors_to_ints(meta_data)
         end
     end
 
-    if !(eltype(data) <: AbstractFloat)
-        data = M{Float64}(data)
-    end
+    data, make_sparse = check_convert_sparse(data, make_sparse, norm, prec)
+    M = make_sparse ? SparseMatrixCSC : Matrix
 
     if filter_data
         unfilt_dims = size(data)
@@ -357,7 +365,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
     end
 
     if verbose
-        println("\t-> discarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
+        println("Discarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
         println("\nNormalization")
     end
 
@@ -441,14 +449,15 @@ end
 
 
 function preprocess_data_default(data::AbstractMatrix, test_name::AbstractString; verbose::Bool=true,
-     make_sparse::Bool=issparse(data), meta_mask::BitVector=falses(size(data, 2)), prec::Integer=32,
-     header::Vector{String}=String[], preprocess_kwargs...)
+     make_sparse::Bool=issparse(data), make_onehot::Bool=true, meta_mask::BitVector=falses(size(data, 2)),
+     prec::Integer=32, header::Vector{String}=String[], preprocess_kwargs...)
     default_norm_dict = Dict("mi" => "binary",
                              "mi_nz" => "binned_nz_clr",
                              "fz" => "clr_adapt",
                              "fz_nz" => "clr_nz",
                              "mi_expdz" => "binned_nz_clr")
-    preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse, meta_mask=meta_mask, prec=prec, header=header, preprocess_kwargs...)
+    preprocess_data(data, default_norm_dict[test_name]; verbose=verbose, make_sparse=make_sparse,
+    make_onehot=make_onehot, meta_mask=meta_mask, prec=prec, header=header, preprocess_kwargs...)
 end
 
 
@@ -512,8 +521,6 @@ function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm
         preproc_fun = preprocess_data
         norm_str = mode_map[norm_mode]
     end
-
-    data, make_sparse = check_convert_sparse(data, make_sparse, norm_str, prec)
 
     norm_results = preproc_fun(data, norm_str; meta_mask=meta_mask, header=header,
                                verbose=verbose, filter_data=filter_data, prec=prec, make_sparse=make_sparse,

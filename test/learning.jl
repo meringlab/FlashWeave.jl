@@ -251,7 +251,8 @@ end
                 path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]
                 pred_graphs = [graph(@silence_stdout learn_network(path_pairs[i], path_pairs[i_meta],
                                                                    sensitive=true, heterogeneous=false,
-                                                                   max_k=3, verbose=true, transposed=transp))
+                                                                   max_k=3, verbose=true, transposed=transp,
+                                                                   n_obs_min=0))
                                for (i, i_meta, transp) in [(1, 3, false), (2, 4, true)]]
 
                 for pred_graph in pred_graphs
@@ -260,6 +261,23 @@ end
                                                 approx=true,
                                                 approx_nbr_diff=approx_nbr_diff,
                                                 approx_weight_meandiff=approx_weight_meandiff)
+                end
+            end
+        end
+    end
+
+    @testset "smoke one hot" begin
+        path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
+        oh_paths = [path_trunk * suff for suff in (".tsv", "_meta_oneHotTest.tsv")]
+        for sensitive in (true, false)
+            for heterogeneous in (true, false)
+                @testset "het_$heterogeneous // sens_$sensitive" begin
+                    pred_graph = graph(@silence_stdout learn_network(oh_paths...,
+                                                                     sensitive=sensitive,
+                                                                     heterogeneous=heterogeneous,
+                                                                     max_k=3, verbose=true, transposed=false,
+                                                                     n_obs_min=0))
+                    @test @silence_stdout isa(show(pred_graph), Nothing)
                 end
             end
         end

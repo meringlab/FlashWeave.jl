@@ -1,4 +1,5 @@
-function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit::AbstractFloat, parallel::String,
+function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit::AbstractFloat,
+    parallel::String,
     feed_forward::Bool, max_k::Integer, n_obs_min::Integer, hps::Integer, fast_elim::Bool, dense_cor::Bool,
     recursive_pcor::Bool, verbose::Bool, tmp_folder::AbstractString,
     edge_rule::AbstractString)  where {ElType<:Real}
@@ -45,8 +46,8 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     end
 
 
-    if n_obs_min < 0 && is_zero_adjusted(test_name)
-        if test_name == "mi_nz"
+    if n_obs_min < 0# && is_zero_adjusted(test_name)
+        if isdiscrete(test_name)#test_name == "mi_nz"
             max_levels = maximum(levels) - 1
             n_obs_min = hps * max_levels^(max_k+2) + 1
         else
@@ -59,10 +60,10 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     if n_obs_min > size(data, 1)
         error_msg = ""
         if max_k > 0
-            error_msg *= ". Try using a smaller 'max_k' parameter (at the cost of more indirect associations)."
+            error_msg *= ". Try using a smaller 'max_k' parameter (at the cost of higher numbers of indirect associations)."
         end
 
-        error("dataset has insufficient number of observations, need at least $n_obs_min ('n_obs_min') for reliable tests$error_msg")
+        error("Dataset has an insufficient number of observations, need at least $n_obs_min ('n_obs_min') for reliable tests$error_msg")
     end
 
     if verbose && is_zero_adjusted(test_name)
