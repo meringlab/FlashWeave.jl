@@ -10,7 +10,7 @@ FlashWeave predicts ecological interactions between microbes from large-scale co
 
 ## Installation ##
 
-To install Julia, please follow instructions on https://github.com/JuliaLang/julia. The preferred way is to obtain a binary from https://julialang.org/downloads/. Make sure you install Julia 1.0, the version currently supported by FlashWeave.
+To install Julia, please follow instructions on https://github.com/JuliaLang/julia. The preferred way is to obtain a binary from https://julialang.org/downloads/. Make sure you install Julia 1.0 or above, the versions currently supported by FlashWeave.
 
 In an interactive Julia session, you can then install FlashWeave after typing `]` via
 
@@ -21,9 +21,7 @@ In an interactive Julia session, you can then install FlashWeave after typing `]
 
 ## Basic usage ##
 
-OTU tables can be provided in several formats: delimited formats (".csv", ".tsv"), [BIOM 1.0](http://biom-format.org/documentation/format_versions/biom-1.0.html) (".biom") or the high-performance formats [BIOM 2.0](http://biom-format.org/documentation/format_versions/biom-2.0.html) and [JLD2](https://github.com/simonster/JLD2.jl) (".jld2"). Meta data should be provided as delimited format (except for JLD2, see below). See the ```test/data/HMP_SRA_gut``` directory for examples. IMPORTANT NOTE: For delimited and JLD2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
-
-To learn an interaction network, you can do
+To learn an interaction network from an OTU table and (optionally) a meta data table, you can do
 
 ```julia
 julia> using FlashWeave # this has some pre-compilation delay the first time it's called, subsequent imports are fast
@@ -35,10 +33,6 @@ julia> netw_results = learn_network(data_path, meta_data_path, sensitive=true, h
 << summary statistics of the learned network >>
 
 julia> G = graph(netw_results) # weighted graph representing interactions + weights
-
-julia> # for JLD2, you can provide keys:
-julia> # data_path = "/my/example/data.jld2"
-julia> # netw_results = learn_network(data_path, otu_data_key="otu_data", otu_header_key="otu_header", meta_data_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
 
 Results can currently be saved in JLD2, fast for large networks, or as traditional [Graph Modelling Language](https://en.wikipedia.org/wiki/Graph_Modelling_Language) (".gml") or edgelist (".edgelist") formats:
@@ -60,11 +54,116 @@ A convenient loading function is available:
 julia> netw_results = load_network("/my/example/network_output.jld2")
  ```
 
-To get more information on a function, use `?`:
+To get more information on a function, you may type `?` into the prompt, followed by a function name:
+
+```
+julia> ?
+help> learn_network
+
+    learn_network(data::AbstractArray{<:Real}) -> FWResult{Int}
+
+Learn an interaction network from a data table (including OTUs and optionally meta variables).
+
+   Algorithmic parameters:
+
+    •    heterogeneous - enable heterogeneous mode for multi-habitat or -protocol data with at least thousands of samples (FlashWeaveHE)
+
+    •    sensitive - enable fine-grained associations (FlashWeave-S, FlashWeaveHE-S), sensitive=false results in the fast modes FlashWeave-F or FlashWeaveHE-F
+
+    •    max_k - maximum size of conditioning sets, high values can strongly increase runtime. max_k=0 results in no conditioning (univariate mode)
+
+    •    alpha - threshold used to determine statistical significance
+
+    •    conv - convergence threshold, i.e. if conv=0.01 assume convergence if the number of edges increased by only 1% after 100% more runtime (checked in
+        intervals)
+
+    •    feed_forward - enable feed-forward heuristic
+
+    •    max_tests - maximum number of conditional tests that should be performed on a variable pair before association is assumed
+
+    •    hps - reliability criterion for statistical tests when sensitive=false
+
+    •    FDR - perform False Discovery Rate correction (Benjamini-Hochberg method) on pairwise associations
+
+    •    n_obs_min - don't compute associations between variables having less reliable samples (i.e. non-zero if heterogeneous=true) than this number. -1:
+        automatically choose a threshold.
+
+    •    time_limit - if feed-forward heuristic is active, determines the interval (seconds) at which neighborhood information is updated
+
+  General parameters:
+
+    •    normalize - automatically choose and perform data normalization (based on sensitive and heterogeneous)
+
+    •    track_rejections - store for each discarded edge, which variable set lead to its exclusion (can be memory intense for large networks)
+
+    •    verbose - print progress information
+
+    •    transposed - if true, rows of data are variables and columns are samples
+
+    •    prec - precision in bits to use for calculations (16, 32, 64 or 128)
+
+    •    make_sparse - use a sparse data representation (should be left at true in almost all cases)
+
+    •    update_interval - if verbose=true, determines the interval (seconds) at which network stat updates are printed
+```
+
+## Input data formats ##
+
+### OTU tables ###
+
+OTU tables can be provided in several formats: 
+
+**delimited formats**: ".tsv" ([example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny.tsv)) or ".csv" ([example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny.csv))
+
+**BIOM**: BIOM 1.0 ([description](http://biom-format.org/documentation/format_versions/biom-1.0.html), [example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_json.biom)) or the more performant
+BIOM 2.0 ([description](http://biom-format.org/documentation/format_versions/biom-2.0.html), [example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_hdf5.biom))
+
+**JLD2**: a julia-specific, high-performance file format ([description](https://github.com/simonster/JLD2.jl), [example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_plus_meta.jld2))
+
+### Meta data tables ###
+
+Meta data should generally be provided as delimited format (see for instance [example1](https://github.com/meringlab/FlashWeave.jl/blob/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_meta.tsv) or [example2](https://github.com/meringlab/FlashWeave.jl/blob/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_meta_oneHotTest.tsv)), separately from the OTU table. Notably, this implies that FlashWeave does not yet support reading meta data directly from BIOM files, but requires a separate delimited meta data file (support will be added in an upcoming version).
+
+For JLD2, however, you can already provide HDF5 keys linked to meta data tables (and optionally headers):
 
 ```julia
-julia> ?learn_network
+julia> data_path = "/my/example/otu_and_meta_data.jld2"
+julia> netw_results = learn_network(data_path, otu_data_key="otu_data", otu_header_key="otu_header", meta_data_key="meta_data", meta_header_key="meta_header", sensitive=true, heterogeneous=false)
 ```
+
+See also the [test/data/HMP_SRA_gut](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut) directory for further examples of OTU and meta data tables.
+
+### Important notes ###
+
+#### Samples as columns ####
+For delimited and JLD2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
+
+#### One-hot encoding of meta variables ####
+Meta variables with more than two categories are automatically one-hot encoded by FlashWeave prior to network inference to increase the reliability and interpretability of statistical tests (the user will be notified if this happens). For instance, the meta variable
+
+| HABITAT       |
+| ------------- |
+| soil          |
+| soil          |
+| marine        |
+| river         |
+| marine        |
+
+will be split into three dummy variables in the following fashion
+
+| HABITAT_soil  | HABITAT_marine  | HABITAT_river  |
+| ------------- |:---------------:| --------------:|
+| 1             | 0		  | 0		   |
+| 1             | 0		  | 0		   |
+| 0             | 1		  | 0		   |
+| 0             | 0		  | 1		   |
+| 0             | 1		  | 0		   |
+
+Each dummy variable will be a separate node in the result network.
+
+#### Treatment of missing values ####
+
+FlashWeave currently does not support missing data, please remove all samples with missing entries (both in OTU and meta data tables) prior to running FlashWeave.
 
 ## Performance tips ##
 
