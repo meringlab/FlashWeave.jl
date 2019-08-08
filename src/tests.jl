@@ -200,9 +200,12 @@ function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Abs
 end
 
 
-function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5)
+function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5, levels::Vector{<:Integer}=Int[])
     """Convenience function for module tests"""
-    levels = get_levels(data)
+    if isempty(levels)
+        levels = get_levels(data)
+    end
+
     test_obj = MiTestCond(levels, is_zero_adjusted(test_name) ? Nz() : NoNz(), length(Zs))
 
     z = issparse(data) ? eltype(levels)[] : zeros(eltype(levels), size(data, 1))

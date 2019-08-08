@@ -46,8 +46,8 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     end
 
 
-    if n_obs_min < 0# && is_zero_adjusted(test_name)
-        if isdiscrete(test_name)#test_name == "mi_nz"
+    if n_obs_min < 0 & is_zero_adjusted(test_name)
+        if isdiscrete(test_name)
             max_levels = maximum(levels) - 1
             n_obs_min = hps * max_levels^(max_k+2) + 1
         else
