@@ -5,6 +5,20 @@ end
 sufficient_power(levels_x::Integer, levels_y::Integer, n_obs::Integer, hps::Integer) = (n_obs / (levels_x * levels_y)) > hps
 sufficient_power(levels_x::Integer, levels_y::Integer, levels_z::Integer, n_obs::Integer, hps::Integer) = (n_obs / (levels_x * levels_y * levels_z)) > hps
 
+"""Can't be used for MiTestCond since levels_z requires contingency table"""
+function sufficient_power(X, Y, data::AbstractMatrix{<:Real}, test_obj::Union{MiTest,FzTest,FzTestCond}, n_obs_min::Integer, hps::Integer=5)
+    n_obs = size(data, 1)
+    n_obs < n_obs_min && return false
+
+    if isdiscrete(test_obj)
+        @inbounds levels_x = test_obj.levels[X]
+        @inbounds levels_y = test_obj.levels[Y]
+        offset_x, offset_y = offset_levels(levels_x, levels_y)
+        !sufficient_power(levels_x-offset_x, levels_y-offset_y, n_obs, hps) && return false
+    end
+    true
+end
+
 ##################
 ### UNIVARIATE ###
 ##################
@@ -16,37 +30,48 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
     @inbounds levels_x = test_obj.levels[X]
     @inbounds levels_y = test_obj.levels[Y]
 
-    if !issparse(data)
-        contingency_table!(X, Y, data, test_obj.ctab)
-    else
-        contingency_table!(X, Y, data, test_obj)
-    end
-
-    if is_zero_adjusted(test_obj)
-        sub_ctab = nz_adjust_cont_tab(levels_x, levels_y, test_obj.ctab)
-        levels_x = size(sub_ctab, 1)
-        levels_y = size(sub_ctab, 2)
-    else
-        sub_ctab = test_obj.ctab
-    end
-
-    n_obs = sum(sub_ctab)
-
-    if n_obs < n_obs_min || !sufficient_power(levels_x, levels_y, n_obs, hps)
+    if !sufficient_power(X, Y, data, test_obj, n_obs_min, hps)
         mi_stat = 0.0
         df = 0
         pval = 1.0
         suff_power = false
     else
-        mi_stat = mutual_information(sub_ctab, levels_x, levels_y, test_obj.marg_i, test_obj.marg_j)
+        if is_zero_adjusted(test_obj)
+            offset_levels(levels_x, levels_y)
+        end
 
-        df = adjust_df(test_obj.marg_i, test_obj.marg_j, levels_x, levels_y)
-        pval = mi_pval(mi_stat, df, n_obs)
-        suff_power = true
+        if !issparse(data)
+            contingency_table!(X, Y, data, test_obj.ctab)
+        else
+            contingency_table!(X, Y, data, test_obj)
+        end
 
-        # use oddsratio of 2x2 contingency table to determine edge sign
-        mi_sign = oddsratio(sub_ctab) < 1.0 ? -1.0 : 1.0
-        mi_stat *= mi_sign
+        if is_zero_adjusted(test_obj)
+            sub_ctab = nz_adjust_cont_tab(levels_x, levels_y, test_obj.ctab)
+            levels_x = size(sub_ctab, 1)
+            levels_y = size(sub_ctab, 2)
+        else
+            sub_ctab = test_obj.ctab
+        end
+
+        n_obs = sum(sub_ctab)
+
+        if n_obs < n_obs_min || !sufficient_power(levels_x, levels_y, n_obs, hps)
+            mi_stat = 0.0
+            df = 0
+            pval = 1.0
+            suff_power = false
+        else
+            mi_stat = mutual_information(sub_ctab, levels_x, levels_y, test_obj.marg_i, test_obj.marg_j)
+
+            df = adjust_df(test_obj.marg_i, test_obj.marg_j, levels_x, levels_y)
+            pval = mi_pval(mi_stat, df, n_obs)
+            suff_power = true
+
+            # use oddsratio of 2x2 contingency table to determine edge sign
+            mi_sign = oddsratio(sub_ctab) < 1.0 ? -1.0 : 1.0
+            mi_stat *= mi_sign
+        end
     end
 
     TestResult(mi_stat, pval, df, suff_power)
@@ -83,7 +108,7 @@ end
 function test(X::Int, Y::Int, data::AbstractMatrix{<:Real}, test_obj::FzTest,
         n_obs_min::Integer=0, Y_adjusted::Bool=false)
 
-    if isempty(data)
+    if !sufficient_power(X, Y, data, test_obj, n_obs_min)
         p_stat = 0.0
         df = 0
         pval = 1.0
@@ -220,20 +245,17 @@ function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Abs
     test_obj::FzTestCond, n_obs_min::Integer)
     """Critical: expects zeros to be trimmed from both X and Y if nz is true"""
 
-    n_obs = size(data, 1)
-
-    if n_obs >= n_obs_min
-        p_stat = isempty(test_obj.cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, test_obj.cor_mat, test_obj.pcor_set_dict,
-            test_obj.cache_pcor)
-        pval = fz_pval(p_stat, n_obs, 0)
+    if sufficient_power(X, Y, data, test_obj, n_obs_min)
+        p_stat = isempty(test_obj.cor_mat) ? pcor(X, Y, Zs, data) : pcor_rec(X, Y, Zs, test_obj.cor_mat, test_obj.pcor_set_dict, test_obj.cache_pcor)
+        pval = fz_pval(p_stat, size(data, 1), 0)
+        suff_power = true
     else
         p_stat = 0.0
         pval = 1.0
+        suff_power = false
     end
 
-    df = 0
-
-    TestResult(p_stat, pval, df, n_obs >= n_obs_min)
+    TestResult(p_stat, pval, 0, suff_power)
 end
 
 # convenience function for module tests

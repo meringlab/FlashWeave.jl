@@ -328,10 +328,14 @@ function adjust_df(marg_i::AbstractMatrix{T}, marg_j::AbstractMatrix{T}, levels_
     df
 end
 
-
-function nz_adjust_cont_tab(levels_x::Integer, levels_y::Integer, ctab::AbstractArray{<:Integer})
+function offset_levels(levels_x::Integer, levels_y::Integer)
     offset_x = levels_x > 2 ? 2 : 1
     offset_y = levels_y > 2 ? 2 : 1
+    offset_x, offset_y
+end
+
+function nz_adjust_cont_tab(levels_x::Integer, levels_y::Integer, ctab::AbstractArray{<:Integer})
+    offset_x, offset_y = offset_levels(levels_x, levels_y)
 
     if ndims(ctab) == 2
         return @view ctab[offset_x:end, offset_y:end]
