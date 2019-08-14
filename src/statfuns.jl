@@ -207,7 +207,6 @@ end
 
 function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer, levels_y::Integer,
         levels_z::Integer, marg_i::AbstractMatrix{<:Integer}, marg_j::AbstractMatrix{<:Integer}, marg_k::AbstractVector{<:Integer})
-    """Note: returns mutual information * number of observations!"""
     fill!(marg_i, 0)
     fill!(marg_j, 0)
     fill!(marg_k, 0)
@@ -239,10 +238,6 @@ function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer
 end
 
 
-"""
-IMPORTANT NOTE: returns mutual information * number of observations!
-(avoids repeated calculation later)
-"""
 function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, levels_y::Integer,
         marg_i::AbstractVector{<:Integer}, marg_j::AbstractVector{<:Integer})
 
