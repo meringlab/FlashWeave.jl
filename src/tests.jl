@@ -65,12 +65,12 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
             mi_stat = mutual_information(sub_ctab, levels_x, levels_y, test_obj.marg_i, test_obj.marg_j)
 
             df = adjust_df(test_obj.marg_i, test_obj.marg_j, levels_x, levels_y)
-            pval = mi_pval(mi_stat, df, n_obs)
+            pval = mi_pval(abs(mi_stat), df, n_obs)
             suff_power = true
 
             # use oddsratio of 2x2 contingency table to determine edge sign
-            mi_sign = oddsratio(sub_ctab) < 1.0 ? -1.0 : 1.0
-            mi_stat *= mi_sign
+            #mi_sign = oddsratio(sub_ctab) < 1.0 ? -1.0 : 1.0
+            #mi_stat *= mi_sign
         end
     end
 
@@ -213,12 +213,12 @@ function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Abs
                                      test_obj.marg_k)
 
         df = adjust_df(test_obj.marg_i, test_obj.marg_j, levels_x, levels_y, levels_z)
-        pval = mi_pval(mi_stat, df, n_obs)
+        pval = mi_pval(abs(mi_stat), df, n_obs)
         suff_power = true
 
         # use oddsratio of 2x2 contingency table to determine edge sign
-        mi_sign = oddsratio(sub_ctab) < 1.0 ? -1.0 : 1.0
-        mi_stat *= mi_sign
+        #mi_sign = oddsratio(sub_ctab) < 1.0 ? -1.0 : 1.0
+        #mi_stat *= mi_sign
     end
 
     TestResult(mi_stat, pval, df, suff_power)

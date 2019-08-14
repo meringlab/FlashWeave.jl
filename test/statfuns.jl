@@ -1,5 +1,5 @@
 using FlashWeave
-using Test
+using Test, DelimitedFiles, Statistics
 
 ctab12 = [4 2; 2 4]
 ctab23 = [6 0 0; 0 5 1]
@@ -45,7 +45,7 @@ end
 @testset "mutual information" begin
     exp_mi_twoway = 0.05663301226513242
     @testset "twoway" begin
-        @test isapprox(@inferred(FlashWeave.mutual_information(ctab12)), exp_mi_twoway, rtol=1e-6)
+        @test isapprox(@inferred(abs(FlashWeave.mutual_information(ctab12))), exp_mi_twoway, rtol=1e-6)
     end
     @testset "threeway_Z1" begin
         @test isapprox(@inferred(FlashWeave.mutual_information(ctab12_3)), 0.0, rtol=1e-6)

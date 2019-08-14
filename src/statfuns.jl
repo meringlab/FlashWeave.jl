@@ -10,20 +10,6 @@ function fisher_z_transform(p::AbstractFloat, n::Integer, len_z::Integer)
     end
 end
 
-
-function oddsratio(ctab::AbstractArray{<:Integer}, nz::Bool=false)
-    offset = nz ? 1 : 0
-    if ndims(ctab) == 2
-        ondiag = (ctab[1 + offset, 1 + offset] * ctab[2 + offset, 2 + offset])
-        offdiag = (ctab[1 + offset, 2 + offset] * ctab[2 + offset, 1 + offset])
-        @inbounds return (ctab[1 + offset, 1 + offset] * ctab[2 + offset, 2 + offset]) / (ctab[1 + offset, 2 + offset] * ctab[2 + offset, 1 + offset])
-    else
-        @inbounds oddsratios_per_Zcombo = filter(!isnan, [oddsratio(ctab[:, :, i], false) for i in 1:size(ctab, 3)])
-        return isempty(oddsratios_per_Zcombo) ? NaN64 : median(oddsratios_per_Zcombo)
-    end
-end
-
-
 function fz_pval(stat::AbstractFloat, n::Int, len_z::Int)
     fz_stat = fisher_z_transform(stat, n, len_z)
     pval = ccdf(Normal(), abs(fz_stat)) * 2.0
@@ -206,7 +192,8 @@ end
 
 
 function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer, levels_y::Integer,
-        levels_z::Integer, marg_i::AbstractMatrix{<:Integer}, marg_j::AbstractMatrix{<:Integer}, marg_k::AbstractVector{<:Integer})
+        levels_z::Integer, marg_i::AbstractMatrix{<:Integer}, marg_j::AbstractMatrix{<:Integer},
+        marg_k::AbstractVector{<:Integer}; signed::Bool=true)
     fill!(marg_i, 0)
     fill!(marg_j, 0)
     fill!(marg_k, 0)
@@ -218,9 +205,8 @@ function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer
         marg_k[k] += ctab[i, j, k]
     end
 
-    mi_stat = 0.0
-    n_obs = sum(ctab)
-
+    mi_stat_pos = mi_stat_neg = 0.0
+    n_obs_pos = n_obs_neg = 0
 
     # compute mutual information
     @inbounds for i in 1:size(ctab, 1), j in 1:size(ctab, 2), k in 1:size(ctab, 3)
@@ -229,17 +215,31 @@ function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer
         marg_jk = marg_j[j, k]
 
         if cell_value != 0 && marg_ik != 0 && marg_jk != 0
-            inner_term = log((marg_k[k] * cell_value) / (marg_ik * marg_jk))
-            mi_stat += cell_value * inner_term
+            inner_term = log((marg_k[k] * cell_value) / (marg_ik * marg_jk)) * cell_value
+            if i == j
+                mi_stat_pos += inner_term
+                n_obs_pos += cell_value
+            else
+                mi_stat_neg += inner_term
+                n_obs_neg += cell_value
+            end
         end
     end
+    n_obs = n_obs_pos + n_obs_neg
+    mi_stat = (mi_stat_pos + mi_stat_neg) / n_obs
 
-    mi_stat / n_obs
+    # apply mutual information contribution by diag/offdiag entries (weighted by
+    # respective numbers of observations) for sign determination
+    if signed && mi_stat_neg * (n_obs_neg / n_obs) > mi_stat_pos * (n_obs_pos / n_obs)
+        mi_stat *= -1
+    end
+
+    mi_stat
 end
 
 
 function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, levels_y::Integer,
-        marg_i::AbstractVector{<:Integer}, marg_j::AbstractVector{<:Integer})
+        marg_i::AbstractVector{<:Integer}, marg_j::AbstractVector{<:Integer}; signed::Bool=true)
 
     fill!(marg_i, 0)
     fill!(marg_j, 0)
@@ -250,7 +250,8 @@ function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, 
         marg_j[j] += ctab[i, j]
     end
 
-    mi_stat = 0.0
+    mi_stat_pos = mi_stat_neg = 0.0
+    n_obs_pos = n_obs_neg = 0
     n_obs = sum(ctab)
 
     # compute mutual information
@@ -261,12 +262,27 @@ function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, 
             marg_jj = marg_j[j]
             if cell_value != 0 && marg_ii != 0 && marg_jj != 0
                 cell_mi = cell_value * log((n_obs * cell_value) / (marg_ii * marg_jj))
-                mi_stat += cell_mi
+
+                if i == j
+                    mi_stat_pos += cell_mi
+                    n_obs_pos += cell_value
+                else
+                    mi_stat_neg += cell_mi
+                    n_obs_neg += cell_value
+                end
             end
         end
     end
 
-    mi_stat / n_obs
+    mi_stat = (mi_stat_pos + mi_stat_neg) / n_obs
+
+    # apply mutual information contribution by diag/offdiag entries (weighted by
+    # respective numbers of observations) for sign determination
+    if signed && mi_stat_neg * (n_obs_neg / n_obs) > mi_stat_pos * (n_obs_pos / n_obs)
+        mi_stat *= -1
+    end
+
+    mi_stat
 end
 
 ## Convenience functions for mutual information
