@@ -137,7 +137,9 @@ function interleaving_phase(args...; add_initial_candidate::Bool=true,
     # set test stats of the initial candidate to its univariate association results
     if add_initial_candidate
         candidates = args[2]
-        TPC_dict[candidates[1]] = univar_nbrs[candidates[1]]
+        if haskey(TPC_dict, candidates[1])
+            TPC_dict[candidates[1]] = univar_nbrs[candidates[1]]
+        end
     end
 
     TPC_dict, candidates_unchecked
