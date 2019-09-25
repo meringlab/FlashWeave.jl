@@ -206,26 +206,25 @@ Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaP
 
 ## Citing ##
 
-To cite FlashWeave, please refer to our [preprint on bioRxiv](https://www.biorxiv.org/content/early/2018/08/13/390195):
+To cite FlashWeave, please refer to our [paper in *Cell Systems*](https://www.cell.com/cell-systems/fulltext/S2405-4712(19)30271-6):
 
 ```
-Tackmann, Janko, Joao Frederico Matias Rodrigues, and Christian von Mering. "Rapid inference
-of direct interactions in large-scale ecological networks from heterogeneous microbial
-sequencing data." bioRxiv (2018): 390195.
+Tackmann, Janko, Joao Frederico Matias Rodrigues, and Christian von Mering. "Rapid inference 
+of direct interactions in large-scaleecological networks from heterogeneous microbial 
+sequencing data." Cell Systems (2019).
 ```
 
 Example BibTeX entry:
 
 ```
-@article {tackmann2018rapid,
-	author = {Tackmann, Janko and Rodrigues, Joao Frederico Matias and von Mering, Christian},
-	title = {Rapid inference of direct interactions in large-scale ecological networks from heterogeneous microbial sequencing data},
-	year = {2018},
-	doi = {10.1101/390195},
-	publisher = {Cold Spring Harbor Laboratory},
-	URL = {https://www.biorxiv.org/content/early/2018/08/13/390195},
-	eprint = {https://www.biorxiv.org/content/early/2018/08/13/390195.full.pdf},
-	journal = {bioRxiv}
+@article{tackmann2019rapid,
+  title={Rapid inference of direct interactions in large-scale ecological networks from heterogeneous microbial sequencing data},
+  author={Tackmann, Janko and Rodrigues, Joao Frederico Matias and von Mering, Christian},
+  journal={Cell Systems},
+  year={2019},
+  publisher={Elsevier},
+  doi={10.1016/j.cels.2019.08.002},
+  url={https://doi.org/10.1016/j.cels.2019.08.002}
 }
 ```
 
