@@ -35,10 +35,10 @@ julia> netw_results = learn_network(data_path, meta_data_path, sensitive=true, h
 julia> G = graph(netw_results) # weighted graph representing interactions + weights
 ```
 
-Results can currently be saved in JLD2, fast for large networks, or as traditional [Graph Modelling Language](https://en.wikipedia.org/wiki/Graph_Modelling_Language) (".gml") or edgelist (".edgelist") formats:
+Results can currently be saved in JLD2 (*soon discontinued, see below*), fast for large networks, or as traditional [Graph Modelling Language](https://en.wikipedia.org/wiki/Graph_Modelling_Language) (".gml") or edgelist (".edgelist") formats:
 
 ```julia
-julia> save_network("/my/example/network_output.jld2", netw_results)
+julia> save_network("/my/example/network_output.edgelist", netw_results)
 julia> ## or: save_network("/my/example/network_output.gml", netw_results)
 ```
 
@@ -51,7 +51,7 @@ julia> # for .jld2, additional information is always saved if available
 
 A convenient loading function is available:
  ```julia
-julia> netw_results = load_network("/my/example/network_output.jld2")
+julia> netw_results = load_network("/my/example/network_output.edgelist")
  ```
 
 To get more information on a function, you may type `?` into the prompt, followed by a function name:
@@ -119,6 +119,7 @@ OTU tables can be provided in several formats:
 BIOM 2.0 ([description](http://biom-format.org/documentation/format_versions/biom-2.0.html), [example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_hdf5.biom))
 
 **JLD2**: a julia-specific, high-performance file format ([description](https://github.com/simonster/JLD2.jl), [example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_plus_meta.jld2))
+- **soon discontinued due to stability issues, please use a delimited format or BIOM**
 
 ### Meta data tables ###
 
@@ -209,8 +210,8 @@ Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaP
 To cite FlashWeave, please refer to our [paper in *Cell Systems*](https://www.cell.com/cell-systems/fulltext/S2405-4712(19)30271-6):
 
 ```
-Tackmann, Janko, Joao Frederico Matias Rodrigues, and Christian von Mering. "Rapid inference 
-of direct interactions in large-scaleecological networks from heterogeneous microbial 
+Tackmann, Janko, Joao Frederico Matias Rodrigues, and Christian von Mering. "Rapid inference
+of direct interactions in large-scaleecological networks from heterogeneous microbial
 sequencing data." Cell Systems (2019).
 ```
 

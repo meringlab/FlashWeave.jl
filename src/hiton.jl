@@ -53,9 +53,13 @@ end
 function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg{Int64,N} where N<:Int}, candidate::Int,
      accepted::Vector{Int},
      accepted_dict::NbrStatDict, alpha::AbstractFloat, debug::Integer, rej_dict::RejDict{Int}, track_rejections::Bool,
-     phase::Char, fast_elim::Bool, num_test_pair::Tuple{Int, Float64})
+     phase::Char, fast_elim::Bool, num_test_pair::Tuple{Int, Float64}, support_dict::NbrStatDict)
 
-     if issig(test_result, alpha)
+     if isempty(accepted)
+         push!(accepted, candidate)
+         accepted_dict[candidate] = support_dict[candidate]
+
+     elseif issig(test_result, alpha)
          push!(accepted, candidate)
          accepted_dict[candidate] = (test_result.stat, test_result.pval)
 
@@ -77,7 +81,7 @@ function update_sig_result!(test_result::TestResult, lowest_sig_Zs::Tuple{Vararg
 function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, accepted::Vector{Int},
      accepted_dict::NbrStatDict,
     test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer, n_obs_min::Integer, max_tests::Integer, debug::Integer, rej_dict::RejDict{Int},
-    track_rejections::Bool, z::Vector{DiscType}, phase::Char, fast_elim::Bool)  where {ElType<:Real, DiscType<:Integer}
+    track_rejections::Bool, z::Vector{DiscType}, phase::Char, fast_elim::Bool, support_dict::NbrStatDict)  where {ElType<:Real, DiscType<:Integer}
 
     data_prep = prepare_nzdata(candidate, data, test_obj)
 
@@ -86,16 +90,17 @@ function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, 
                                                                      max_tests=max_tests, debug=debug, z=z)
 
     update_sig_result!(test_result, lowest_sig_Zs, candidate, accepted, accepted_dict, alpha, debug, rej_dict,
-                             track_rejections, phase, fast_elim, (num_tests, frac_tests))
+                             track_rejections, phase, fast_elim, (num_tests, frac_tests), support_dict)
 end
 
 function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMatrix{ElType},
-        test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, max_tests::Integer=Int(1.5e9),
-        prev_accepted_dict::NbrStatDict=Dict(),
+        test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0,
+        max_tests::Integer=Int(1.5e9), prev_accepted_dict::NbrStatDict=NbrStatDict(),
         candidates_unchecked::Vector{Int}=Int[], time_limit::AbstractFloat=0.0, start_time::AbstractFloat=0.0,
         debug::Integer=0, whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
         rej_dict::RejDict{Int}=RejDict{Int}(), track_rejections::Bool=false,
-        z::Vector{DiscType}=Int[], phase::Char='I'; fast_elim::Bool=true, no_red_tests::Bool=false) where {ElType<:Real, DiscType<:Integer}
+        z::Vector{DiscType}=Int[], phase::Char='I'; fast_elim::Bool=true, no_red_tests::Bool=false,
+        support_dict::NbrStatDict=NbrStatDict()) where {ElType<:Real, DiscType<:Integer}
     phase != 'I' && phase != 'E' && error("'phase' must be 'I' or 'E'")
 
     nz = is_zero_adjusted(test_obj)
@@ -118,7 +123,8 @@ function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMa
             end
 
             check_candidate!(candidate, T, data, accepted, accepted_dict, test_obj, max_k, alpha, hps,
-                             n_obs_min, max_tests, debug, rej_dict, track_rejections, z, phase, fast_elim)
+                             n_obs_min, max_tests, debug, rej_dict, track_rejections, z, phase, fast_elim,
+                             support_dict)
         end
 
         if stop_reached(start_time, time_limit) && cand_index < length(candidates)
@@ -133,14 +139,17 @@ end
 function interleaving_phase(args...; add_initial_candidate::Bool=true,
     univar_nbrs::NbrStatDict=NbrStatDict())::Tuple{NbrStatDict,Vector{Int}}
 
-    TPC_dict, candidates_unchecked = hiton_backend(args..., 'I')
+    TPC_dict, candidates_unchecked = hiton_backend(args..., 'I'; support_dict=univar_nbrs)
     # set test stats of the initial candidate to its univariate association results
-    if add_initial_candidate
-        candidates = args[2]
-        if haskey(TPC_dict, candidates[1])
-            TPC_dict[candidates[1]] = univar_nbrs[candidates[1]]
-        end
-    end
+    #if add_initial_candidate
+    #    candidates = args[2]
+    #    #if haskey(TPC_dict, candidates[1])
+    #    TPC_dict[candidates[1]] = univar_nbrs[candidates[1]]
+    #    #end
+    #else
+    #    println("Werd candidate: $(args[2][1])")
+    #end
+
 
     TPC_dict, candidates_unchecked
 end
@@ -350,15 +359,16 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
 
             # elimination phase
-            PC_candidates, PC_unchecked, prev_PC_dict, TPC_dict, rej_dict = prepare_elimination_phase(prev_state, TPC_dict, rej_dict, track_rejections,
-                                                                                                      no_red_tests, fast_elim)
+            PC_candidates, PC_unchecked, prev_PC_dict, TPC_dict, rej_dict = prepare_elimination_phase(prev_state, TPC_dict,
+                                                                                rej_dict, track_rejections, no_red_tests,
+                                                                                fast_elim)
 
 
             PC_dict, TPC_unchecked = elimination_phase(T, PC_candidates, data_prep, test_obj, max_k, alpha,
                                                        hps, n_obs_min, max_tests, prev_PC_dict, PC_unchecked, time_limit,
-                                                        start_time, debug, whitelist, blacklist, rej_dict,
-                                                        track_rejections, z, fast_elim=fast_elim,
-                                                         no_red_tests=no_red_tests)
+                                                       start_time, debug, whitelist, blacklist, rej_dict,
+                                                       track_rejections, z, fast_elim=fast_elim,
+                                                       no_red_tests=no_red_tests, support_dict=TPC_dict)
 
             if !isempty(TPC_unchecked)
                 debug > 0 && println("Time limit exceeded, reporting incomplete results")

@@ -39,6 +39,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; transposed::Boo
     elseif isbiom(file_ext)
         ld_results = load_biom(data_path, meta_path)
     elseif isjld(file_ext)
+        @warn "jld2 support is deprecated and will be removed in future versions of FlashWeave"
         ld_results = load_jld(data_path, otu_data_key, otu_header_key, meta_data_key, meta_header_key, transposed=transposed)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_data_formats)")
@@ -66,6 +67,7 @@ function save_network(net_path::AbstractString, net_result::FWResult; detailed::
     elseif isgml(file_ext)
         write_gml(net_path, net_result)
     elseif isjld(file_ext)
+        @warn "jld2 support is deprecated and will be removed in future versions of FlashWeave"
         save(net_path, "results", net_result)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_net_formats)")
@@ -314,7 +316,7 @@ function read_edgelist(in_path::AbstractString)
 
         header, meta_mask
     end
-    G = SimpleWeightedGraph(srcs, dsts, ws)
+    G = SimpleWeightedGraph_nodemax(srcs, dsts, ws; m=length(header))
     net_result = FWResult(G; variable_ids=header, meta_variable_mask=meta_mask)
 end
 

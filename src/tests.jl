@@ -276,6 +276,8 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
     test_obj::AbstractTest, max_k::Integer, alpha::AbstractFloat; hps::Integer=5, n_obs_min::Integer=0, max_tests::Integer=Int(1.5e9),
     debug::Int=0, Z_wanted::AbstractVector{Int}=Int[], z::Vector{<:Integer}=Int[])
 
+    isempty(Z_total) && return TestResult(NaN, NaN, -1, true), (-1,), -1, NaN
+
     lowest_sig_result = TestResult(0.0, 0.0, 0.0, true)
     lowest_sig_Zs = ()
     discrete_test = isdiscrete(test_obj)

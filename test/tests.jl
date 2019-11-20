@@ -1,6 +1,6 @@
 using FlashWeave
 using FlashWeave: TestResult
-using FileIO
+#using FileIO
 using Test
 using DelimitedFiles
 
@@ -10,12 +10,36 @@ data_clr_nz, mask = FlashWeave.preprocess_data_default(data, "fz_nz", verbose=fa
 data_bin, mask = FlashWeave.preprocess_data_default(data, "mi", verbose=false, prec=64)
 data_mi_nz, mask = FlashWeave.preprocess_data_default(data, "mi_nz", verbose=false, prec=64)
 
-exp_dict = load(joinpath("data", "tests_expected.jld2"))["exp_dict"]
+#exp_dict = load(joinpath("data", "tests_expected.jld2"))["exp_dict"]
 
 function compare_test_results(r1::FlashWeave.TestResult, r2::FlashWeave.TestResult)
     isapprox(r1.stat, r2.stat, rtol=1e-2) && isapprox(r1.pval, r2.pval, rtol=1e-2) && r1.df == r2.df && r1.suff_power == r2.suff_power
 end
 
+function read_exp_dict(exp_path)
+    exp_mat, exp_header = readdlm(exp_path, header=true)
+    exp_dict = Dict()
+    for i in 1:size(exp_mat, 1)
+        row = exp_mat[i, :]
+        key = row[1]
+        test_info = row[2:end]
+
+        t_res = FlashWeave.TestResult(test_info...)
+        if startswith(key, "exp_cond")
+            exp_dict[key] = t_res
+        else
+            if !haskey(exp_dict, key)
+                exp_dict[key] = [t_res]
+            else
+                push!(exp_dict[key], t_res)
+            end
+        end
+    end
+    exp_dict
+end
+
+
+exp_dict = read_exp_dict(joinpath("data", "tests_expected.tsv"))
 
 for (test_name, data_norm) in [("mi", data_bin), ("mi_nz", data_mi_nz),
                                ("fz", data_clr), ("fz_nz", data_clr_nz)]

@@ -2,21 +2,16 @@ using FlashWeave
 using Test
 using SimpleWeightedGraphs
 using LightGraphs
-using FileIO
 using SparseArrays, DelimitedFiles, Statistics, Distributed, Logging
-
-nprocs() == 1 && addprocs(1)
-@everywhere using FlashWeave
-
 
 data_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv")
 data = Matrix{Float64}(readdlm(data_path, '\t')[2:end, 2:end])
 data_sp = sparse(data)
 header = ["X" * string(i) for i in 1:size(data, 2)]
 
-adj_exp_dict = load(joinpath("data", "learning_expected.jld2"))
-
-exp_dict = Dict(key=>SimpleWeightedGraph(adj_mat) for (key, adj_mat) in adj_exp_dict)
+exp_folder = joinpath("data", "learning_expected")
+exp_dict = Dict(splitext(file)[1] => graph(load_network(joinpath(exp_folder, file)))
+    for file in readdir(exp_folder))
 
 rtol = 1e-2
 atol = 0.0
@@ -38,7 +33,6 @@ end
 function make_network(data, test_name, make_sparse=false, prec=64, verbose=true, return_graph=true; kwargs...)
     data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=true,
                                                          make_sparse=make_sparse, prec=prec)
-    #kwargs_dict = Dict(kwargs)
     lgl_res = FlashWeave.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
     if return_graph
         lgl_res.graph
@@ -111,6 +105,11 @@ T_var = 1
 T_nbrs = nothing
 data_bin = FlashWeave.preprocess_data_default(data, "mi", verbose=false,
                                               make_sparse=true, prec=64)[1]
+
+
+nprocs() == 1 && addprocs(1)
+@everywhere using FlashWeave
+
 @testset "univar nbrs" begin
     nbrs_single = nothing
     nbrs_remote = nothing
@@ -179,6 +178,10 @@ end
                                                                     approx_nbr_diff=approx_nbr_diff,
                                                                     approx_weight_meandiff=approx_weight_meandiff)
                                     end
+
+                                    @testset "nonzero_weights" begin
+                                        @test !any(pred_graph.weights.nzval .== 0.0)
+                                    end
                                 end
                             end
                         end
@@ -204,83 +207,96 @@ end
 
 
 @testset "learn_network" begin
-    approx_nbr_diff = 0
-    approx_weight_meandiff = 0.05
+      approx_nbr_diff = 0
+      approx_weight_meandiff = 0.05
 
 
-    for heterogeneous in [true, false]
-        for sensitive in [true, false]
+      for heterogeneous in [true, false]
+          for sensitive in [true, false]
 
-            if !any([heterogeneous, sensitive])
-                # skip mi test
-                continue
-            end
+              if !any([heterogeneous, sensitive])
+                  # skip mi test
+                  continue
+              end
 
-            @testset "het_$heterogeneous // sens_$sensitive" begin
-                sens_str = sensitive ? "fz" : "mi"
-                het_str = heterogeneous ? "_nz" : ""
-                test_name = sens_str * het_str
-                exp_graph = exp_dict["exp_$(test_name)_maxk3"]
+              @testset "het_$heterogeneous // sens_$sensitive" begin
+                  sens_str = sensitive ? "fz" : "mi"
+                  het_str = heterogeneous ? "_nz" : ""
+                  test_name = sens_str * het_str
+                  exp_graph = exp_dict["exp_$(test_name)_maxk3"]
 
-                pred_netw = @silence_stdout learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
-                                   max_k=3, header=header, track_rejections=true, verbose=true)
-                pred_graph = graph(pred_netw)
+                  pred_netw = @silence_stdout learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
+                                     max_k=3, header=header, track_rejections=true, verbose=true)
+                  pred_graph = graph(pred_netw)
 
-                @testset "edge_identity" begin
-                    @test compare_graph_results(exp_graph, pred_graph,
-                                                rtol=rtol, atol=atol,
-                                                approx=true,
-                                                approx_nbr_diff=approx_nbr_diff,
-                                                approx_weight_meandiff=approx_weight_meandiff)
-                end
+                  @testset "edge_identity" begin
+                      @test compare_graph_results(exp_graph, pred_graph,
+                                                  rtol=rtol, atol=atol,
+                                                  approx=true,
+                                                  approx_nbr_diff=approx_nbr_diff,
+                                                  approx_weight_meandiff=approx_weight_meandiff)
+                  end
 
-                @testset "show" begin
-                    @test @silence_stdout isa(show(pred_netw), Nothing)
-                end
-            end
-        end
-    end
+                  @testset "show" begin
+                      @test @silence_stdout isa(show(pred_netw), Nothing)
+                  end
+              end
+          end
+      end
 
-    @testset "from file" begin
-        path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
-        for (data_format, suff_pair, transp_suff_pair) in zip(["tsv", "jld2"],
-                                                       [(".tsv", "_ids_transposed.tsv"),
-                                                        ("_plus_meta.jld2", "_plus_meta_transposed.jld2")],
-                                                        [("_meta.tsv", "_meta_transposed.tsv"),("","")])
-            @testset "$data_format" begin
-                path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]
-                pred_graphs = [graph(@silence_stdout learn_network(path_pairs[i], path_pairs[i_meta],
-                                                                   sensitive=true, heterogeneous=false,
-                                                                   max_k=3, verbose=true, transposed=transp,
-                                                                   n_obs_min=0))
-                               for (i, i_meta, transp) in [(1, 3, false), (2, 4, true)]]
+      @testset "from file" begin
+          path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
+          for (data_format, suff_pair, transp_suff_pair) in zip(["tsv", "jld2"],
+                                                         [(".tsv", "_ids_transposed.tsv"),
+                                                          ("_plus_meta.jld2", "_plus_meta_transposed.jld2")],
+                                                          [("_meta.tsv", "_meta_transposed.tsv"),("","")])
+              @testset "$data_format" begin
+                  path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]
 
-                for pred_graph in pred_graphs
-                    @test compare_graph_results(pred_graphs...,
-                                                rtol=rtol, atol=atol,
-                                                approx=true,
-                                                approx_nbr_diff=approx_nbr_diff,
-                                                approx_weight_meandiff=approx_weight_meandiff)
-                end
-            end
-        end
-    end
+                  # skip jld2
+                  data_format == "jld2" && continue
 
-    @testset "smoke one hot" begin
-        path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
-        oh_paths = [path_trunk * suff for suff in (".tsv", "_meta_oneHotTest.tsv")]
-        for sensitive in (true, false)
-            for heterogeneous in (true, false)
-                @testset "het_$heterogeneous // sens_$sensitive" begin
-                    pred_graph = graph(@silence_stdout learn_network(oh_paths...,
-                                                                     sensitive=sensitive,
-                                                                     heterogeneous=heterogeneous,
-                                                                     max_k=3, verbose=true, transposed=false,
+                  pred_graphs = [graph(@silence_stdout learn_network(path_pairs[i], path_pairs[i_meta],
+                                                                     sensitive=true, heterogeneous=false,
+                                                                     max_k=3, verbose=true, transposed=transp,
                                                                      n_obs_min=0))
-                    @test @silence_stdout isa(show(pred_graph), Nothing)
-                end
-            end
-        end
+                                 for (i, i_meta, transp) in [(1, 3, false), (2, 4, true)]]
+
+                  for pred_graph in pred_graphs
+                      @test compare_graph_results(pred_graphs...,
+                                                  rtol=rtol, atol=atol,
+                                                  approx=true,
+                                                  approx_nbr_diff=approx_nbr_diff,
+                                                  approx_weight_meandiff=approx_weight_meandiff)
+                  end
+              end
+          end
+      end
+
+      @testset "smoke one hot" begin
+          path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
+          oh_paths = [path_trunk * suff for suff in (".tsv", "_meta_oneHotTest.tsv")]
+          for sensitive in (true, false)
+              for heterogeneous in (true, false)
+                  @testset "het_$heterogeneous // sens_$sensitive" begin
+                      pred_graph = graph(@silence_stdout learn_network(oh_paths...,
+                                                                       sensitive=sensitive,
+                                                                       heterogeneous=heterogeneous,
+                                                                       max_k=3, verbose=true, transposed=false,
+                                                                       n_obs_min=0))
+                      @test @silence_stdout isa(show(pred_graph), Nothing)
+                  end
+              end
+          end
+      end
+end
+
+
+@testset "duplicates" begin
+    dupl_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small_1to5duplic_noIDs.tsv")
+    pred_graph = graph(@silence_stdout learn_network(dupl_path))
+    @testset "nonzero_weights" begin
+        @test !any(pred_graph.weights.nzval .== 0.0)
     end
 end
 

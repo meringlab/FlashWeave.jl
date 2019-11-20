@@ -1,3 +1,13 @@
+# master (unpublished)
+
+### general
+- improve sign determination for conditional mutual information tests
+- remove jld2 support due to stability issues
+
+### bug fixes
+- fix bug in read_edgelist where files with unconnected nodes at high
+header positions could not be read
+
 # v0.14.0 (minor, latest)
 
 ### general
@@ -10,7 +20,7 @@ categories, this avoids unreliable tests and improves interpretability (can be s
 ### bug fixes
 - fix Travis CI osx handling
 
-## v0.13.1 
+## v0.13.1
 - fix stdlib dependency issue
 
 # v0.13.0

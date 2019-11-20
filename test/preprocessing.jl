@@ -1,13 +1,21 @@
 using FlashWeave
 using StatsBase
-using FileIO
+#using FileIO
 using Test
 using SparseArrays, DelimitedFiles, Statistics
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_sparse = sparse(data)
 
-exp_dict = load(joinpath("data", "preprocessing_expected.jld2"), "exp_dict")
+#exp_dict = load(joinpath("data", "preprocessing_expected.jld2"), "exp_dict")
+exp_folder = joinpath("data", "preprocessing_expected")
+exp_dict = Dict{Any,Any}(replace(splitext(file)[1], '_'=>'-') => readdlm(joinpath(exp_folder, file), '\t')
+                for file in readdir(exp_folder))
+
+oh_mat = exp_dict["meta-tiny-oneHotTest"]
+oh_header = string.(oh_mat[1, :])
+oh_data = Matrix{Float64}(oh_mat[2:end, :])
+exp_dict["meta-tiny-oneHotTest"] = (meta_data=oh_data, meta_header=oh_header)
 
 function compare_nz_vecs(fznz_vec, minz_vec, verbose=false)
     fznz_vec_red = fznz_vec[fznz_vec .!= 0]
@@ -58,11 +66,11 @@ end
                                   for curr_data in (data, data_sparse)]
 
                     @testset "dense" begin
-                        @test data_norms[1] == data_norm_exp
+                        @test isapprox(data_norms[1], data_norm_exp)
                     end
 
                     @testset "sparse" begin
-                        @test data_norms[2] == data_norm_exp
+                        @test isapprox(data_norms[2], data_norm_exp)
                     end
                 end
             end
@@ -145,8 +153,8 @@ end
 
                         if make_onehot
                             # skip the continuous column for identity test
-                            @test data_norm[:, meta_mask_norm][:, 1:end-1] == exp_dict["meta_tiny_oneHotTest"].meta_data[row_mask, 1:end-1]
-                            @test header_norm[meta_mask_norm] == exp_dict["meta_tiny_oneHotTest"].meta_header
+                            @test data_norm[:, meta_mask_norm][:, 1:end-1] == exp_dict["meta-tiny-oneHotTest"].meta_data[row_mask, 1:end-1]
+                            @test header_norm[meta_mask_norm] == exp_dict["meta-tiny-oneHotTest"].meta_header
 
                             # check the continuous meta data column
                             if startswith(test_name, "mi")
