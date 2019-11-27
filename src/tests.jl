@@ -181,7 +181,7 @@ end
 ### CONDITIONAL ###
 ###################
 
-function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer}, test_obj::MiTestCond, hps::Integer, z::AbstractVector{<:Integer}=Int[])
+function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer}, test_obj::MiTestCond, hps::Integer, z::AbstractVector{<:Integer}=Int[])
     """Test association between X and Y"""
     @inbounds levels_x = test_obj.levels[X]
     @inbounds levels_y = test_obj.levels[Y]
@@ -225,7 +225,7 @@ function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Abs
 end
 
 
-function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5, levels::Vector{<:Integer}=Int[])
+function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5, levels::Vector{<:Integer}=Int[])
     """Convenience function for module tests"""
     if isempty(levels)
         levels = get_levels(data)
@@ -241,7 +241,7 @@ end
 
 ## CONTINUOUS ##
 
-function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:AbstractFloat},
+function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:AbstractFloat},
     test_obj::FzTestCond, n_obs_min::Integer)
     """Critical: expects zeros to be trimmed from both X and Y if nz is true"""
 
@@ -260,7 +260,7 @@ end
 
 # convenience function for module tests
 
-function test(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:AbstractFloat}, test_name::String;
+function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:AbstractFloat}, test_name::String;
      recursive::Bool=true, n_obs_min::Integer=0)
     """Convenience function for module tests"""
     cor_mat = recursive ? cor(data) : zeros(Float64, 0, 0)

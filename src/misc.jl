@@ -122,9 +122,8 @@ function make_weights(PC_dict::OrderedDict{Int,Tuple{Float64,Float64}},
 end
 
 
-function level_map!(Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{ElType}, z::AbstractVector{<:Integer},
-        cum_levels::AbstractVector{<:Integer},
-    z_map_arr::AbstractVector{<:Integer}) where ElType <: Integer
+function level_map!(Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{ElType}, z::AbstractVector{<:Integer},
+        cum_levels::AbstractVector{<:Integer}, z_map_arr::AbstractVector{<:Integer}) where ElType <: Integer
     fill!(z_map_arr, -1)
     levels_z = zero(ElType)
 

@@ -22,7 +22,7 @@ end
 contingency_table(X::Int, Y::Int, data::AbstractMatrix{<:Integer}) = contingency_table(X, Y, data, length(unique(data[:, X])), length(unique(data[:, Y])))
 
 
-function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{ElType}, cont_tab::Array{<:Integer, 3},
+function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{ElType}, cont_tab::Array{<:Integer, 3},
     z::Vector{<:Integer}, cum_levels::Vector{<:Integer}, z_map_arr::Vector{<:Integer}) where ElType<:Integer
     fill!(cont_tab, 0)
     levels_z = level_map!(Zs, data, z, cum_levels, z_map_arr)
@@ -49,13 +49,13 @@ contingency_table(X::Int, Y::Int, data::Matrix{<:Integer}, test_name::String) = 
 
 
 ## convenience wrappers for three-way contingency tables
-function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::Matrix{<:Integer},
+function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::Matrix{<:Integer},
     test_obj::ContTest3D)
     z = zeros(eltype(test_obj.levels), size(data, 1))
     contingency_table!(X, Y, Zs, data, test_obj.ctab, z, test_obj.zmap.cum_levels, test_obj.zmap.z_map_arr)
 end
 
-function contingency_table(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::AbstractMatrix{<:Integer},
+function contingency_table(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer},
     test_name::String, levels::Vector{<:Integer}=get_levels(data))
     test_obj = make_test_object(test_name, true, max_k=length(Zs), levels=levels, cor_mat=zeros(Float64, 0, 0))
     contingency_table!(X, Y, Zs, data, test_obj)
@@ -79,7 +79,7 @@ function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer},
     sparse_ctab_backend!((X, Y), data, test_obj, X_nz, Y_nz)
 end
 
-function contingency_table!(X::Int, Y::Int, Zs::Tuple{Vararg{Int64,N} where N<:Int}, data::SparseMatrixCSC{<:Integer},
+function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::SparseMatrixCSC{<:Integer},
         test_obj::ContTest3D)
     @inbounds if is_zero_adjusted(test_obj)
         X_nz = test_obj.levels[X] > 2
