@@ -363,7 +363,8 @@ function benjamini_hochberg!(pvals::AbstractVector{T}; alpha::AbstractFloat=0.01
         m=length(pvals)) where T <: AbstractFloat
     isempty(pvals) && return
 
-    sorted_pval_pairs = filter(x -> x[2] < alpha, collect(enumerate(pvals)))
+    # circumvent julia issue 33974
+    sorted_pval_pairs = [x for x in collect(enumerate(pvals)) if x[2] < alpha]
     isempty(sorted_pval_pairs) && return
     sort!(sorted_pval_pairs, by=x->x[2])
 
