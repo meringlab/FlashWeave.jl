@@ -145,7 +145,8 @@ end
 ##################
 ## RESULT TYPES ##
 ##################
-const RejDict{T} = Dict{T,Tuple{Tuple,TestResult,Tuple{Int,Float64}}}
+#const RejDict{T} = Dict{T,Tuple{Tuple,TestResult,Tuple{Int,Float64}}}
+const RejDict{T} = Dict{T,Tuple{Tuple{Int64,Vararg{Int64,N} where N},TestResult,Tuple{Int,Float64}}}
 
 struct HitonState{T}
     phase::Char

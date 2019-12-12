@@ -226,22 +226,70 @@ function load_biom(data_path, meta_path=nothing)
 end
 
 
-function save_rejections(rej_path, net_result)
-    rej_dict = net_result.rejections
+function load_rejections(rej_path)
+    rej_dict = Dict{Int, RejDict{Int}}()
+
+    open(rej_path, "r") do f
+        # skip header
+        readline(f)
+
+        for line in eachline(f)
+            line_items = split(line, "\t")
+            var_A, var_B = parse.(Int, split(line_items[1], " <-> "))
+            Zs = parse.(Int, Tuple(split(line_items[2], ",")))
+            stat, pval = parse.(Float64, line_items[3:4])
+            n_tests = parse(Int, line_items[5])
+            frac_tested = parse(Float64, line_items[6])
+            df = parse(Int, line_items[7])
+            suff_power = parse(Bool, line_items[8])
+            rej_tuple = (Zs, TestResult(stat, pval, df, suff_power), (n_tests, frac_tested))
+            if haskey(rej_dict, var_A)
+                rej_dict[var_A][var_B] = rej_tuple
+            else
+                rej_dict[var_A] = Dict(var_B=>rej_tuple)
+            end
+        end
+    end
+    rej_dict
+end
+
+
+function load_unfinished_variable_info(unf_path)
+    unf_dict = Dict()
+
+    open(unf_path, "r") do f
+        # skip header
+        readline(f)
+
+        for line in eachline(f)
+            line_items = split(line, "\t")
+            var_A = parse(Int, line_items[1])
+            phase = line_items[2][1]
+            unf_vars = parse.(Int, split(line_items[3], ","))
+            unf_dict[var_A] = (phase=phase, unchecked_vars=unf_vars)
+        end
+    end
+    unf_dict
+end
+
+
+function save_rejections(rej_path, net_result; digits=5)
+    rej_dict = rejections(net_result)
 
     open(rej_path, "w") do f
         if isempty(rej_dict)
             write(f, "# No rejections found, you may have forgotten to specify 'track_rejections' when running FlashWeave")
         else
-            write(f, join(["Edge", "Rejecting_set", "Stat", "P_value", "Num_tests", "Perc_tested"], "\t"), "\n")
+            write(f, join(["Edge", "Rejecting_set", "Stat", "P_value", "Num_tests", "Perc_tested", "Df", "SuffPower"], "\t"), "\n")
             for (var_A, rej_nbr_dict) in rej_dict
                 for (var_B, rej_info) in rej_nbr_dict
                     test_res = rej_info[2]
-                    stat, pval = test_res.stat, test_res.pval
+                    stat, pval, df, suff_power = [getproperty(test_res, p) for p in [:stat, :pval, :df, :suff_power]]
                     rej_set = rej_info[1]
                     num_tests, frac_tested = rej_info[3]
 
-                    line_items = [string(var_A) * " <-> " * string(var_B), join(rej_set, ","), round(stat, digits=5), pval, num_tests, round(frac_tested, digits=3)]
+                    line_items = [string(var_A) * " <-> " * string(var_B), join(rej_set, ","), round(stat, digits=digits),
+                                  round(pval, digits=digits), num_tests, round(frac_tested, digits=digits), df, suff_power]
                     write(f, join(line_items, "\t"), "\n")
                 end
             end
@@ -251,7 +299,7 @@ end
 
 
 function save_unfinished_variable_info(unf_path, net_result)
-    unf_states_dict = net_result.unfinished_states
+    unf_states_dict = unfinished_states(net_result)
     open(unf_path, "w") do f
         if isempty(unf_states_dict)
             write(f, "# No unchecked neighbors")

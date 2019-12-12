@@ -6,7 +6,7 @@ println("Preparing tests")
 
 nprocs() == 1 && addprocs(1)
 
-test_modules = ["io.jl", "preprocessing.jl", "contingency.jl", "statfuns.jl", "tests.jl",
+test_modules = [ "io.jl", "preprocessing.jl", "contingency.jl", "statfuns.jl", "tests.jl",
                 "misc.jl", "learning.jl"]
 
 @testset "all modules in testset" begin
