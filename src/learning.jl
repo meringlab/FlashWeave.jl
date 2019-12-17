@@ -422,7 +422,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
 
     if normalize
        verbose && println("\n### Normalizing ###\n")
-       input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose, make_sparse=make_sparse)
+       input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose, make_sparse=make_sparse, make_onehot=make_onehot)
     else
        @warn "Skipping normalization, only experts should choose this option."
        input_data = data

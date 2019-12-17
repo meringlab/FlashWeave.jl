@@ -139,7 +139,7 @@ function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_h
 
 
 hasrowids(data::AbstractMatrix, header::AbstractVector) =
-    header[1] == "" || length(unique(data[:, 1])) == size(data, 1)
+    header[1] == "" || (length(unique(data[:, 1])) == size(data, 1) && (isa(data[1, 1], String) || isa(data[1, 1], SubString)))
 
 # this could eventually be replaced with FileIO
 function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool=false, type_data::Bool=true)
@@ -163,9 +163,12 @@ function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool
     end
 
     header = string.(header_raw)[:]
+
+    # special case encountered in the wild (see test "numeric IDs")
     if all(endswith.(header, ".0"))
         header = map(x -> x[1:end-2], header)
     end
+
     data = type_data ? Matrix{Float64}(data_raw) : data_raw
 
     if meta_path != nothing

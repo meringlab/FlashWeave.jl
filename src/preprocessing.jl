@@ -17,7 +17,7 @@ end
 
 function check_onehot(x::AbstractVector)
     # check if proper floating point vector
-    if isa(x[1], AbstractFloat) && any(!iszero(xi % 1) for xi in x)
+    if isa(x[1], AbstractFloat) || isa(x[1], Integer)#&& any(!iszero(xi % 1) for xi in x)
         return false, []
     # otherwise check number of categories
     else

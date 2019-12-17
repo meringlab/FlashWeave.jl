@@ -114,6 +114,7 @@ Learn an interaction network from a data table (including OTUs and optionally me
 OTU tables can be provided in several formats:
 
 **delimited formats**: ".tsv" ([example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny.tsv)) or ".csv" ([example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny.csv))
+- if the first column contains row ids, these must be unique string identifiers
 
 **BIOM**: BIOM 1.0 ([description](http://biom-format.org/documentation/format_versions/biom-1.0.html), [example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_json.biom)) or the more performant
 BIOM 2.0 ([description](http://biom-format.org/documentation/format_versions/biom-2.0.html), [example](https://github.com/meringlab/FlashWeave.jl/tree/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_hdf5.biom))
@@ -140,7 +141,7 @@ See also the [test/data/HMP_SRA_gut](https://github.com/meringlab/FlashWeave.jl/
 For delimited and JLD2 formats, FlashWeave treats rows of the table as observations (i.e. samples) and columns as variables (i.e. OTUs or meta variables), consistent with the majority of statistical and machine-learning applications, but in contrast to several other microbiome analysis frameworks. Behavior can be switched with the ```transposed=true``` flag.
 
 #### One-hot encoding of meta variables ####
-Meta variables with more than two categories are automatically one-hot encoded by FlashWeave prior to network inference to increase the reliability and interpretability of statistical tests (the user will be notified if this happens). For instance, the meta variable
+Meta variables containing string factors with more than two categories are automatically one-hot encoded by FlashWeave prior to network inference to increase the reliability and interpretability of statistical tests (the user will be notified if this happens). For instance, the meta variable
 
 | HABITAT       |
 | ------------- |
