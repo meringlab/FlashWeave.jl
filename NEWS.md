@@ -3,10 +3,15 @@
 ### general
 - improve sign determination for conditional mutual information tests
 - remove jld2 support due to stability issues
+- categorical meta data elements must now include non-numeric characters to ensure
+dintinguishability from continuous columns
 
 ### bug fixes
 - fix bug in read_edgelist where files with unconnected nodes at high
 header positions could not be read
+- fix bug where continuous variables were sometimes one-hot encoded
+- fix bug where zero weights were assigned to highly associated variable pairs in rare cases
+- fix bug that could lead to the first data column being parsed as row identifiers if it had no duplicate entries
 
 # v0.14.0 (minor, latest)
 
