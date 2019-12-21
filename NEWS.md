@@ -1,5 +1,9 @@
 # master (unpublished)
 
+No changes yet
+
+# v0.15.0 (latest)
+
 ### general
 - improve sign determination for conditional mutual information tests
 - remove jld2 support due to stability issues
@@ -13,7 +17,7 @@ header positions could not be read
 - fix bug where zero weights were assigned to highly associated variable pairs in rare cases
 - fix bug that could lead to the first data column being parsed as row identifiers if it had no duplicate entries
 
-# v0.14.0 (minor, latest)
+# v0.14.0
 
 ### general
 - allow string factors in meta data

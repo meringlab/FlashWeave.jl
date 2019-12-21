@@ -1,13 +1,11 @@
 using FlashWeave
 using StatsBase
-#using FileIO
 using Test
 using SparseArrays, DelimitedFiles, Statistics
 
 data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv"), '\t')[2:end, 2:end])
 data_sparse = sparse(data)
 
-#exp_dict = load(joinpath("data", "preprocessing_expected.jld2"), "exp_dict")
 exp_folder = joinpath("data", "preprocessing_expected")
 exp_dict = Dict{Any,Any}(replace(splitext(file)[1], '_'=>'-') => readdlm(joinpath(exp_folder, file), '\t')
                 for file in readdir(exp_folder))
