@@ -13,9 +13,10 @@ dintinguishability from continuous columns
 ### bug fixes
 - fix bug in read_edgelist where files with unconnected nodes at high
 header positions could not be read
-- fix bug where continuous variables were sometimes one-hot encoded
-- fix bug where zero weights were assigned to highly associated variable pairs in rare cases
+- fix bug where continuous variables were sometimes one-hot encoded (thanks **@pbelmann** for reporting)
+- fix bug where zero weights were assigned to highly associated variable pairs in rare cases (thanks **@Mortomoto** for reporting)
 - fix bug that could lead to the first data column being parsed as row identifiers if it had no duplicate entries
+- fix `save_network` with `detailed=true` not producing output in the latest version (thanks **@pbelmann** for reporting)
 
 # v0.14.0
 
