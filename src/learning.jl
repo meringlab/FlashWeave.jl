@@ -373,7 +373,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,
-    cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0)
+    cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0, parallel_mode="auto")
 
     start_time = time()
 
@@ -381,7 +381,16 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     het_mode = heterogeneous ? "_nz" : ""
 
     test_name = cont_mode * het_mode
-    parallel_mode = nprocs() > 1 ? "multi_il" : "single_il"
+
+
+    if parallel_mode == "auto"
+        parallel_mode = nprocs() > 1 ? "multi_il" : "single_il"
+    else
+        valid_parallel_modes = ("multi_il", "single_il", "auto")
+        if !(parallel_mode in valid_parallel_modes)
+            error("\"$(parallel_mode)\" not a valid parallelization mode, choose one of $(valid_parallel_modes)")
+        end
+    end
 
     if transposed
         data = data'
