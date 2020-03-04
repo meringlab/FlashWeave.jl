@@ -369,7 +369,7 @@ Learn an interaction network from a data table (including OTUs and optionally me
 """
 function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
-    conv::AbstractFloat=0.01, header=nothing, meta_mask=nothing,
+    conv::AbstractFloat=0.01, header=nothing, meta_mask::Union{BitVector,Nothing}=nothing,
     feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,

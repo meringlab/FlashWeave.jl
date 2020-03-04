@@ -482,7 +482,7 @@ function check_convert_sparse(data, make_sparse, norm_str, prec)
 end
 
 """
-    normalize_data(data::AbstractMatrix{<:Real}) -> AbstractMatrix OR (AbstractMatrix{<:Real}, Vector{String})
+    normalize_data(data::AbstractMatrix{<:Real}) -> (AbstractMatrix{<:Real}, Vector{String}, Vector{Bool}, Vector{Bool})
 
 Normalize data using various forms of clr transform and discretization. This should only be used manually when experimenting with different normalization techniques.
 
