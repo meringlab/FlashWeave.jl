@@ -63,12 +63,20 @@ end
                                                  verbose=false)[1]
                                   for curr_data in (data, data_sparse)]
 
+                    # to account for legacy bin-filtering behaviour,
+                    # should eventually be changed in 'exp_dict'
+                    lvl_masks = if occursin("binned", norm_pair[1])
+                        [(FlashWeave.get_levels(A) .== 3)[:] for A in data_norms]
+                    else
+                        [trues(size(A, 2)) for A in data_norms]
+                    end
+
                     @testset "dense" begin
-                        @test isapprox(data_norms[1], data_norm_exp)
+                        @test isapprox(data_norms[1][:, lvl_masks[1]], data_norm_exp)
                     end
 
                     @testset "sparse" begin
-                        @test isapprox(data_norms[2], data_norm_exp)
+                        @test isapprox(data_norms[2][:, lvl_masks[2]], data_norm_exp)
                     end
                 end
             end

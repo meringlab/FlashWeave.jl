@@ -187,7 +187,7 @@ function discretize(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
             return hcat(disc_vecs...)
         end
     else
-        return mapslices(x -> discretize(x, n_bins, rank_method=rank_method, disc_method=disc_method), X, 1)
+        return mapslices(x -> discretize(x, n_bins, rank_method=rank_method, disc_method=disc_method), X, dims=1)
     end
 end
 
@@ -335,7 +335,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
             meta_header = header[meta_mask]
             header = header[nometa_mask]
         else
-            meta_header = nothing
+            meta_header = String[]
         end
 
         # one-hot encode meta data and convert string factors to ints
@@ -368,7 +368,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
     end
 
     if verbose
-        println("Discarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
+        filter_data && println("Discarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
         println("\nNormalization")
     end
 
@@ -394,7 +394,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
 
     elseif startswith(norm, "binned")
         if startswith(norm, "binned_nz")
-            # to make sure, non-absences that become zero after
+            # to make sure that non-absences that become zero after
             # pre-normalization are not considered as absences
             nz_mask = issparse(data) ? BitMatrix(undef, (0, 0)) : data .!= 0
 
@@ -404,23 +404,27 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
                 data = clrnorm(data, "clr_nz", 0.0)
             end
             data = discretize(data, n_bins=n_bins, nz=true, rank_method=rank_method, disc_method=disc_method,
-            nz_mask=nz_mask)
+                nz_mask=nz_mask)
         else
             data = discretize(data, n_bins=n_bins, nz=false, rank_method=rank_method, disc_method=disc_method)
         end
 
         unreduced_vars = size(data, 2)
-        bin_mask =  (get_levels(data) .== n_bins)[:]
+
+        # check that all columns have the correct number of bins
+        # among non-zero values (n_bins-1 for legacy reasons)
+        f_nzlvls = issparse(data) ? x->length(unique(nonzeros(x))) : x->length(unique(x[x .!= 0]))
+        bin_mask = vec(mapslices(f_nzlvls, data, dims=1) .== n_bins-1)
         data = data[:, bin_mask]
 
         if !isempty(header)
             header = header[bin_mask]
         end
 
-        verbose && println("\t-> removed $(unreduced_vars - size(data, 2)) variables with less than $n_bins levels")
+        verbose && println("\t-> removed $(unreduced_vars - size(data, 2)) variables with not exactly $n_bins levels")
 
     else
-        error("$norm not a valid normalization method.")
+        error("$norm is not a valid normalization method.")
     end
 
     if has_meta
@@ -496,7 +500,7 @@ Normalize data using various forms of clr transform and discretization. This sho
 
 - `norm_mode` - identifier of a valid normalization mode ('clr-adapt', 'clr-nonzero', 'clr-nonzero-binned', 'pres-abs', 'tss', 'tss-nonzero-binned')
 
-- `filter_data` - whether to remove samples and variables without information from `data`
+- `filter_data` - whether to remove uninformative samples and variables from `data`
 
 - `verbose` - print progress information
 
@@ -507,14 +511,15 @@ Normalize data using various forms of clr transform and discretization. This sho
 """
 function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm_mode::AbstractString="",
     header::Vector{String}=String[], meta_mask::BitVector=falses(size(data, 2)),
-    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true, make_sparse::Bool=true, make_onehot::Bool=true)
+    verbose::Bool=true, prec::Integer=32, filter_data::Bool=true, make_sparse::Bool=true, make_onehot::Bool=true,
+    preprocess_kwargs...)
     @assert xor(isempty(test_name), isempty(norm_mode)) "provide either test_name and norm_mode (but not both)"
 
     mode_map = Dict("clr-adapt"=>"clr_adapt", "clr-nonzero"=>"clr_nz",
                     "clr-nonzero-binned"=>"binned_nz_clr", "pres-abs"=>"binary",
                     "tss"=>"rows", "tss-nonzero-binned"=>"binned_nz_rows")
 
-    @assert isempty(norm_mode) || haskey(mode_map, norm_mode) "$norm_mode not a valid normalization mode"
+    @assert isempty(norm_mode) || haskey(mode_map, norm_mode) "$norm_mode is not a valid normalization mode"
     @assert xor(test_name == "", norm_mode == "") "provide exactly one out of 'test_name' and 'norm_mode'"
 
     if !isempty(test_name)
@@ -527,5 +532,5 @@ function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm
 
     norm_results = preproc_fun(data, norm_str; meta_mask=meta_mask, header=header,
                                verbose=verbose, filter_data=filter_data, prec=prec, make_sparse=make_sparse,
-                               make_onehot=make_onehot)
+                               make_onehot=make_onehot, preprocess_kwargs...)
 end
