@@ -9,7 +9,7 @@ using DataStructures
 using LightGraphs, SimpleWeightedGraphs
 
 # statistics
-using StatsBase, Distributions, Combinatorics
+using StatsBase, Combinatorics, Distributions
 
 # io
 using JSON, HDF5, FileIO

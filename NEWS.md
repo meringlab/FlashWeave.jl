@@ -1,8 +1,14 @@
 # master (unpublished)
 
-No changes yet
+### general
+- add explicit parallelism flag (`parallel_mode`) to `learn_network` to avoid having to remove workers when switching from multi-core to single-core computations
+- improve error messages in several places
 
-# v0.15.0 (latest)
+### bug fixes
+- fix edge case in bin filtering: variables w/o zero entries are now retained and properly discritized
+- ensure that `meta_mask` is a proper `BitVector` in `learn_network` and `normalize_data`
+
+# v0.15.0
 
 ### general
 - improve sign determination for conditional mutual information tests

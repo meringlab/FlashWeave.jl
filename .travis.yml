@@ -4,6 +4,7 @@ os:
   - windows
   - osx
 julia:
+  - 1.0
   - 1.3
   #- nightly
 notifications:

@@ -3,8 +3,8 @@ uuid = "2be3f83a-7913-5748-9f20-7d448995b934"
 keywords = ["metagenomics", "microbiome", "probabilistic-graphical-models", "high-performance-computing", "compositional-data", "metadata", "ecological-network", "co-occurence", "julia", "bioinformatics"]
 license = "GPL-3.0"
 desc = "Inference of microbial interaction networks from large-scale heterogeneous abundance data"
-version = "0.15.0"
 authors = ["Janko Tackmann <janko.tackmann@gmail.com>"]
+version = "0.15.0"
 
 [deps]
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
