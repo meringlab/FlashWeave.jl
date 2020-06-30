@@ -1,4 +1,7 @@
 # master (unpublished)
+- no changes
+
+# v0.16.0 (latest)
 
 ### general
 - add explicit parallelism flag (`parallel_mode`) to `learn_network` to avoid having to remove workers when switching from multi-core to single-core computations
