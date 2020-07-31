@@ -1,7 +1,18 @@
 # master (unpublished)
 - no changes
 
-# v0.16.0 (latest)
+# v0.17.0 (latest)
+
+### general
+- Julia versions < 1.2 are no longer supported; this change was necessary for the interleaved parallelism
+overhaul in this version
+- the interleaved parallelism backend got fixed to properly support changes introduced in Julia 1.2;
+it now runs more stably and features better error reporting
+
+### bug fixes
+- fixed occasional hangs when computing networks in parallel via the interleaved mode (issue #9)
+
+# v0.16.0
 
 ### general
 - add explicit parallelism flag (`parallel_mode`) to `learn_network` to avoid having to remove workers when switching from multi-core to single-core computations

@@ -60,7 +60,6 @@ end
         end
 
         @testset "unfinished states" begin
-            println(tmp_path * "_unchecked.tsv")
             unf_dict_ld = FlashWeave.load_unfinished_variable_info(tmp_path * "_unchecked.tsv")
             @test begin
                 all(all(getproperty(unf_dict_ld[i], p) == getproperty(unf_dict[i], p)

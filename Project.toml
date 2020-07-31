@@ -4,7 +4,7 @@ keywords = ["metagenomics", "microbiome", "probabilistic-graphical-models", "hig
 license = "GPL-3.0"
 desc = "Inference of microbial interaction networks from large-scale heterogeneous abundance data"
 authors = ["Janko Tackmann <janko.tackmann@gmail.com>"]
-version = "0.16.0"
+version = "0.17.0"
 
 [deps]
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
@@ -37,7 +37,7 @@ JSON = "0.21"
 LightGraphs = "1"
 SimpleWeightedGraphs = "1"
 StatsBase = "0.32"
-julia = "1"
+julia = "1.2"
 
 [extras]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"

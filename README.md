@@ -9,14 +9,20 @@ FlashWeave predicts ecological interactions between microbes from large-scale co
 
 ## Installation ##
 
-To install Julia, please follow instructions on https://github.com/JuliaLang/julia. The preferred way is to obtain a binary from https://julialang.org/downloads/. Make sure you install Julia 1.0 or above, the versions currently supported by FlashWeave.
+To install Julia, please follow instructions on https://github.com/JuliaLang/julia. The preferred way is to obtain a binary from https://julialang.org/downloads/. Make sure you install Julia 1.2 or above, the versions currently supported by FlashWeave.
 
 In an interactive Julia session, you can then install FlashWeave after typing `]` via
 
 ```julia
-(v1.0) pkg> add FlashWeave
-# to run tests: (v1.0) pkg> test FlashWeave
+(v1.2) pkg> add FlashWeave
+# to run tests: (v1.2) pkg> test FlashWeave
 ```
+
+**Important note: from version 0.17, FlashWeave dropped support for Julia versions < 1.2. If you want to use FlashWeave with older Julia installations, make sure to install FlashWeave 0.16.0 (or lower) via `]` + `add FlashWeave@0.16.0`.**
+
+## Latest changes ##
+
+See [NEWS.md](https://github.com/meringlab/FlashWeave.jl/blob/master/NEWS.md) for the latest features and bugfixes.
 
 ## Basic usage ##
 
