@@ -7,7 +7,10 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
     converged = false
     while true
         try
-            target_var, univar_nbrs, prev_state, skip_nbrs = take!(shared_job_q)
+            # take the latest added job to ensure incomplete variables are
+            # finished first (see stackchannels.jl)
+            target_var, univar_nbrs, prev_state, skip_nbrs = stacktake!(shared_job_q)
+
             # if kill signal
             if target_var == -1
                 put!(shared_result_q, (0, myid()))
@@ -26,17 +29,14 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
 
             nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs,
                                     prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
-
             put!(shared_result_q, (target_var, nbr_state))
         catch exc
-            println("Exception occurred! ", exc)
-            println(catch_stacktrace())
+            put!(shared_result_q, (myid(), exc))
             throw(exc)
         end
 
     end
 end
-
 
 function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType},
         all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, levels::Vector{DiscType},
@@ -64,10 +64,12 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         error("$parallel not a valid execution mode.")
     end
 
-    shared_job_q = RemoteChannel(() -> StackChannel{Tuple}(size(data, 2) * 2))
-    shared_result_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2)), 1)
+    shared_job_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2) * 2), 1)
+    shared_result_q = RemoteChannel(() -> Channel{Tuple}(size(data, 2) * 2), 1)
 
-    # initialize jobs
+    # initialize jobs, only send more jobs to the shared queue if necessary
+    # to maximize the information sent with each job (this is implemented
+    # via a separate stack + buffer)
     queued_jobs = 0
     waiting_vars = Stack{Int}()
     for (i, target_var) in enumerate(reverse(target_vars))
@@ -100,12 +102,13 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
     edge_set = Set{Tuple{Int,Int}}()
     kill_signals_sent = 0
+    kill_confirms_rec = 0
     start_time = time()
     last_update_time = start_time
     check_convergence = false
     converged = false
 
-    while remaining_jobs > 0
+    while remaining_jobs > 0 || kill_confirms_rec < n_workers
         target_var, nbr_result = take!(shared_result_q)
         queued_jobs -= 1
         if isa(nbr_result, HitonState{Int})
@@ -148,9 +151,12 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
             if !workers_local
                 rmprocs(nbr_result)
             end
-        else
-            println(nbr_result)
+            kill_confirms_rec += 1
+        elseif isa(nbr_result, Exception)
+            println("Excepion for worker $(target_var):")
             throw(nbr_result)
+        else
+            throw("Got unexpected 'nbr_result' of type $(typeof(nbr_result))")
         end
 
         if !isempty(waiting_vars) && queued_jobs < job_q_buff_size
@@ -219,11 +225,20 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
             end
         end
 
-
+        # kill remaining workers
+        if remaining_jobs == 0
+            while kill_signals_sent < n_workers
+                kill_signal = (-1, Dict{Int,Tuple{Float64,Float64}}(), HitonState{Int}('S', OrderedDict(), OrderedDict(), [], Dict()), Set{Int}())
+                put!(shared_job_q, kill_signal)
+                kill_signals_sent += 1
+            end
+        end
     end
 
     if !workers_local
         rmprocs(workers())
+    else
+        wait.(worker_returns)
     end
 
     graph_dict

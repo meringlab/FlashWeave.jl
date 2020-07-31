@@ -1,34 +1,60 @@
-import Base: AbstractChannel, put!, take!, isready, isopen, close, lock, unlock, check_channel_state, notify
+# This file is altered from "base/channels.jl" and "stdlib/Distributed/src/remotecall.jl" distributed with Julia (License is MIT: https://julialang.org/license)
+import Base: AbstractChannel, put!, take!, isready, isopen, close, lock, unlock, check_channel_state, notify, isbuffered
+import Distributed: RemoteValue, RemoteException, SyncTake, call_on_owner, lookup_ref
 
-# not ideal but Base doesn't leave us much choice
-function stacktake!(c::Channel)
+stacktake!(c::Channel) = isbuffered(c) ? stacktake_buffered(c) : stacktake_unbuffered(c)
+function stacktake_buffered(c::Channel)
     lock(c)
     try
         while isempty(c.data)
             check_channel_state(c)
             wait(c.cond_take)
         end
-        v = pop!(c.data) # only line changed from Base.take!()
-        notify(c.cond_put, nothing, false, false)
+        v = pop!(c.data)
+        notify(c.cond_put, nothing, false, false) # notify only one, since only one slot has become available for a put!.
         return v
     finally
         unlock(c)
     end
 end
 
-struct StackChannel{T} <: AbstractChannel{T}
-    channel::Channel{T}
+# 0-size channel
+function stacktake_unbuffered(c::Channel{T}) where T
+    lock(c)
+    try
+        check_channel_state(c)
+        notify(c.cond_put, nothing, false, false)
+        return wait(c.cond_take)::T
+    finally
+        unlock(c)
+    end
 end
 
-StackChannel{T}(n::Int) where T = StackChannel(Channel{T}(n))
 
-put!(lc::StackChannel, x) = put!(lc.channel, x)
-take!(lc::StackChannel) = stacktake!(lc.channel)
+stacktake!(rv::RemoteValue, args...) = stacktake!(rv.c, args...)
+function stacktake_ref(rid, caller, args...)
+    rv = lookup_ref(rid)
+    synctake = false
+    if myid() != caller && rv.synctake !== nothing
+        # special handling for local put! / remote take! on unbuffered channel
+        # github issue #29932
+        synctake = true
+        lock(rv.synctake)
+    end
 
-close(lc::StackChannel) = close(lc.channel)
-isopen(lc::StackChannel) = isopen(lc.channel)
+    v=take!(rv, args...)
+    isa(v, RemoteException) && (myid() == caller) && throw(v)
 
-isready(lc::StackChannel) = isready(lc.channel)
+    if synctake
+        return SyncTake(v, rv)
+    else
+        return v
+    end
+end
 
-lock(lc::StackChannel) = lock(lc.channel)
-unlock(lc::StackChannel) = unlock(lc.channel)
+"""
+    take!(rr::RemoteChannel, args...)
+Fetch value(s) from a [`RemoteChannel`](@ref) `rr`,
+removing the value(s) in the process.
+"""
+stacktake!(rr::RemoteChannel, args...) = call_on_owner(stacktake_ref, rr, myid(), args...)
