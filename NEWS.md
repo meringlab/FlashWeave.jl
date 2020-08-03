@@ -1,5 +1,5 @@
 # master (unpublished)
-- no changes
+- `fast_elim` flag now also exposed via `learn_network`
 
 # v0.17.0 (latest)
 

@@ -204,10 +204,10 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
     header=nothing, meta_variable_mask=nothing, dense_cor::Bool=true, recursive_pcor::Bool=true,
     cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, all_univar_nbrs=nothing)
+    track_rejections::Bool=false, all_univar_nbrs=nothing, kwargs...)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
-    parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
+    parallel: 'single', 'single_il', 'multi_il'
     """
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule =
                                                                               prepare_lgl(data, test_name,
@@ -223,7 +223,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                         :hps => hps, :n_obs_min => n_obs_min, :max_tests => max_tests,
                         :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
                         :weight_type => weight_type, :debug => debug, :time_limit => time_limit,
-                        :track_rejections => track_rejections, :cache_pcor => cache_pcor)
+                        :track_rejections => track_rejections, :cache_pcor => cache_pcor, kwargs...)
 
     if all_univar_nbrs == nothing
         target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min,
@@ -336,6 +336,8 @@ Learn an interaction network from a data table (including OTUs and optionally me
 - `conv` - convergence threshold, i.e. if `conv=0.01` assume convergence if the number of edges increased by only 1% after 100% more runtime (checked in intervals)
 
 - `feed_forward` - enable feed-forward heuristic
+
+- `fast_elim` - enable fast elimiation heuristic
 
 - `max_tests` - maximum number of conditional tests that should be performed on a variable pair before association is assumed
 
