@@ -291,6 +291,11 @@ end
       end
 end
 
+# smoke test fast elimination heuristic
+@testset "fast_elim" begin
+    @test isa(learn_network(data, sensitive=true, heterogeneous=false,
+                                         max_k=3, header=header, fast_elim=false, verbose=false), FlashWeave.FWResult)
+end
 
 @testset "duplicates" begin
     dupl_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small_1to5duplic_noIDs.tsv")

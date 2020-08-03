@@ -208,7 +208,6 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_ep', 'multi_il'
-    fast_elim: currently always on
     """
     levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule =
                                                                               prepare_lgl(data, test_name,
@@ -370,7 +369,7 @@ Learn an interaction network from a data table (including OTUs and optionally me
 function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
     conv::AbstractFloat=0.01, header=nothing, meta_mask::Union{BitVector,Nothing}=nothing,
-    feed_forward::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
+    feed_forward::Bool=true,  fast_elim::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,
     cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0, parallel_mode="auto")
@@ -423,7 +422,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
 
     params_dict = Dict(:test_name=>test_name, :parallel=>parallel_mode, :max_k=>max_k,
                        :alpha=>alpha, :convergence_threshold=>conv, :feed_forward=>feed_forward,
-                       :track_rejections=>track_rejections, :verbose=>verbose,
+                       :fast_elim=>fast_elim, :track_rejections=>track_rejections, :verbose=>verbose,
                        :header=>header,
                        :max_tests=>max_tests, :hps=>hps, :FDR=>FDR, :n_obs_min=>n_obs_min,
                        :cache_pcor=>cache_pcor, :time_limit=>time_limit,
