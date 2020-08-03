@@ -162,14 +162,14 @@ end
 
 
 function maxweight(weight1::Float64, weight2::Float64, e1::Int, e2::Int, header=nothing)
-    sign1 = sign(weight1)
-    sign2 = sign(weight2)
-
     if isnan(weight1)
         return weight2
     elseif isnan(weight2)
         return weight1
     else
+        sign1 = sign(weight1)
+        sign2 = sign(weight2)
+
         if sign1 * sign2 < 0
             e1w, e2w = header != nothing ? (e1, e2) : (header[e1], header[e2])
             @warn "Opposite signs for edge $e1w <-> $e2w detected. Arbitarily choosing one."
@@ -202,6 +202,7 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
     srcs = Int[]
     dsts = Int[]
     ws = Float64[]
+    nan_edges = 0
 
     prev_edges = Set{Tuple{Int,Int}}()
     for node1 in keys(weights_dict)
@@ -213,6 +214,13 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
                 rev_weight = get(weights_dict[node2], node1, NaN64)
 
                 sym_weight = edge_merge_fun(weight, rev_weight, node1, node2, header)
+
+                # remove edges with undefined weights
+                if isnan(sym_weight)
+                    nan_edges += 1
+                    continue
+                end
+
                 push!(srcs, e[1])
                 push!(dsts, e[2])
                 push!(ws, sym_weight)
@@ -220,6 +228,8 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
             end
         end
     end
+
+    nan_edges > 0 && @warn "$nan_edges edges with NaN weights were removed."
 
     SimpleWeightedGraph_nodemax(srcs, dsts, ws; m=max_var)
 end
