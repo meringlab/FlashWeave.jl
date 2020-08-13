@@ -286,7 +286,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
 
     if !discrete_test && nz
         if n_obs_min > size(data, 1)
-            return TestResult(0.0, 1.0, 0.0, false), Int[]
+            return TestResult(0.0, 1.0, 0.0, false), lowest_sig_Zs, num_tests, 0.0
         end
 
         if test_obj.cache_pcor

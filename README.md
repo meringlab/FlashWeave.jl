@@ -37,7 +37,7 @@ julia> netw_results = learn_network(data_path, meta_data_path, sensitive=true, h
 
 << summary statistics of the learned network >>
 
-julia> G = graph(netw_results) # weighted graph representing interactions + weights
+julia> G = graph(netw_results) # weighted graph object representing interactions + weights, to be used with the JuliaGraphs ecosystem (https://github.com/JuliaGraphs)
 ```
 
 Results can currently be saved in JLD2 (*soon discontinued, see below*), fast for large networks, or as traditional [Graph Modelling Language](https://en.wikipedia.org/wiki/Graph_Modelling_Language) (".gml") or edgelist (".edgelist") formats:
