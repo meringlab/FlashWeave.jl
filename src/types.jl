@@ -145,7 +145,7 @@ end
 ##################
 ## RESULT TYPES ##
 ##################
-#const RejDict{T} = Dict{T,Tuple{Tuple,TestResult,Tuple{Int,Float64}}}
+
 const RejDict{T} = Dict{T,Tuple{Tuple{Int64,Vararg{Int64,N} where N},TestResult,Tuple{Int,Float64}}}
 
 struct HitonState{T}
@@ -263,4 +263,120 @@ function show(io::IO, result::FWResult{T}) where T<:Integer
 
     println(io, "Rejections:")
     println(io, !isempty(rejections(result)) ? "tracked" : "not tracked")
+end
+
+###############
+## ITERATORS ##
+###############
+
+import Base:iterate
+
+struct BNBIterator{M<:AbstractMatrix, T1<:DataType, T2<:NamedTuple, T3<:Tuple}
+    X::Int
+    Y::Int
+    Z_total::Vector{Int}
+    data::M
+    test_type::T1
+    cut_branches::Bool
+    test_params::T2 # everything needed for 'make_test_object'
+    test_args::T3 # additional args needed to run 'test' (order matters!)
+end
+
+struct BNBIteratorState{T1<:AbstractVector, T2<:Tuple,
+    T3<:AbstractSet, T4<:Any, T5<:AbstractTest}
+    i::Int
+    qs::T1
+    Zs::T2
+    Z_pool::T3
+    Z_pool_state::T4
+    test_obj::T5
+    ref_pval::Float64
+end
+
+Base.IteratorSize(::BNBIterator) = Base.SizeUnknown()
+
+function make_test_object(::Type{MiTestCond{S,T}}, max_k_curr, test_params) where {S<:Real, T<:AbstractNz}
+    MiTestCond(test_params.levels, T(), max_k_curr)
+end
+
+function make_test_object(::Type{FzTestCond{S,T}}, max_k_curr, test_params) where {S<:Real, T<:AbstractNz}
+    FzTestCond{S,T}(test_params.cor_mat, Dict{String,Dict{String,S}}(), T(), test_params.cache_pcor)
+end
+
+function _test_next(itr, i, qs, Zs, Z, test_obj, ref_pval)
+    Zs_test = (Zs..., Z)
+    test_res = test(itr.X, itr.Y, Zs_test, itr.data, test_obj, itr.test_args...)
+
+    # length(qs) equals the adjusted max_k, see iterate(itr::BNBIterator)
+    # length(qs[i]) >= 2 clause ensures that at least two elements land in the next queue
+    # to ensure max_k can be reached when 'cut_branches' is enabled
+    if i < length(qs) && test_res.suff_power && (!itr.cut_branches || (test_res.pval > ref_pval || length(qs[i]) < 2))
+        qs[i][Z] = test_res.pval
+    end
+    return test_res, Zs_test
+end
+
+function _init_pool(itr::BNBIterator{M,T1,T2,T3}, i, qs) where {M<:AbstractMatrix, T1<:DataType, T2<:NamedTuple, T3<:Tuple}
+    if i == 1
+        Z_pool = OrderedSet(itr.Z_total)
+    else
+        Z_pool = OrderedSet(keys(qs[i-1]))
+    end
+
+    Z, Z_pool_state = iterate(Z_pool)
+    test_obj = make_test_object(itr.test_type, i, itr.test_params)
+    return Z_pool, Z_pool_state, Z, test_obj
+end
+
+function Base.iterate(itr::BNBIterator)
+    max_k = min(itr.test_params.max_k, length(itr.Z_total))
+    max_k == 0 && return nothing
+    i = 1
+    qs = [PriorityQueue{Int,Float64}(Base.Order.Reverse) for i in 1:max_k]
+    Zs = ()
+    ref_pval = -1.0
+    Z_pool, Z_pool_state, Z, test_obj = _init_pool(itr, i, qs)
+
+    next_itr_val = _test_next(itr, i, qs, Zs, Z, test_obj, ref_pval)
+    state = BNBIteratorState(i, qs, Zs, Z_pool, Z_pool_state, test_obj, ref_pval)
+    return next_itr_val, state
+end
+
+function Base.iterate(itr::BNBIterator, state::BNBIteratorState)
+    i = state.i
+    qs = state.qs
+    Zs = state.Zs
+    test_obj = state.test_obj
+    Z_pool = state.Z_pool
+    Z_pool_state = state.Z_pool_state
+    ref_pval = state.ref_pval
+
+    Z_pool_ret = iterate(Z_pool, Z_pool_state)
+
+    if Z_pool_ret != nothing
+        Z, Z_pool_state = Z_pool_ret
+    else
+        # find next usable queue (=enough elements to pop one
+        # and have at least one more left to populate the next pool)
+        while length(qs[i]) < 2
+            i -= 1
+            i == 0 && return nothing
+        end
+
+        if length(Zs) >= i
+            Zs = Zs[1:i-1]
+        end
+
+        Z_ext, pval = dequeue_pair!(qs[i])
+        Zs = (Zs..., Z_ext,)
+
+        ref_pval = itr.cut_branches ? pval : -1.0
+
+        i += 1
+        Z_pool, Z_pool_state, Z, test_obj = _init_pool(itr, i, qs)
+    end
+
+    next_itr_val = _test_next(itr, i, qs, Zs, Z, test_obj, ref_pval)
+    state = BNBIteratorState(i, qs, Zs, Z_pool, Z_pool_state, test_obj, ref_pval)
+    return next_itr_val, state
 end

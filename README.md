@@ -111,9 +111,10 @@ Learn an interaction network from a data table (including OTUs and optionally me
 
     •    update_interval - if verbose=true, determines the interval (seconds) at which network stat updates are printed
 ```
+
 ## Downstream analysis ##
 
-For further analysis of the computed network, one can take advantage of Julia's graph analysis ecosystem (https://github.com/JuliaGraphs), in particular the [LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl) package (using the object returned by FlashWeave's `graph()` function). Otherwise, the network can be used directly with external graph analysis packages (e.g. [igraph](https://igraph.org/redirect.html) or [networkx](https://networkx.github.io/)) by exporting it via FlashWeave's `save_network` into a supported format. For visualization, we recommend exporting & loading the network into specialized tools such as [Cytoscape](https://cytoscape.org/) or [Gephi](https://gephi.org/).
+For further analysis of the computed network, one can take advantage of Julia's graph analysis ecosystem (https://github.com/JuliaGraphs), in particular the [LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl) package (using the object returned by FlashWeave's `graph` function). Otherwise, the network can be used directly with external graph analysis packages (e.g. [igraph](https://igraph.org/redirect.html) or [networkx](https://networkx.github.io/)) by exporting it via FlashWeave's `save_network` into a supported format. For visualization, we recommend exporting & loading the network into specialized tools such as [Cytoscape](https://cytoscape.org/) or [Gephi](https://gephi.org/).
 
 ## Input data formats ##
 

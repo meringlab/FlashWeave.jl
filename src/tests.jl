@@ -340,6 +340,27 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
 end
 
 
+function test_subsets(itr::BNBIterator, alpha::AbstractFloat; n_obs_min::Integer=0, max_tests::Integer=1e9)
+    num_tests = 0
+    if n_obs_min > size(itr.data, 1)
+        return TestResult(0.0, 1.0, 0.0, false), (), num_tests
+    else
+        ret_test_res = TestResult(1.0, 0.0, 0.0, true)
+        ret_Zs = ()
+        for (test_res, Zs) in itr
+            num_tests += 1
+            if !issig(test_res, alpha) || (max_tests > 0 && num_tests >= max_tests)
+                return test_res, Zs, num_tests
+            elseif test_res.pval > ret_test_res.pval
+                ret_test_res = test_res
+                ret_Zs = Zs
+            end
+        end
+        return ret_test_res, ret_Zs, num_tests
+    end
+end
+
+
 # backend functions for pairwise univariate tests
 
 function condensed_stats_to_dict(n_vars::Integer, pvals::AbstractVector{Float64}, stats::AbstractVector{Float64},

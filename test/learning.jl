@@ -22,13 +22,12 @@ macro silence_stdout(expr)
         res = try
             $(esc(expr))
         finally
-            close(p1), close(p2)
             redirect_stdout(orig_stdout)
+            close(p1), close(p2)
         end
         res
     end
 end
-
 
 function make_network(data, test_name, make_sparse=false, prec=64, verbose=true, return_graph=true; kwargs...)
     data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=true,
@@ -159,8 +158,10 @@ end
                                     time_limit = is_il ? 30.0 : 0.0
 
 
-                                    pred_graph = @silence_stdout make_network(data, test_name, make_sparse, 64,
-                                        max_k=max_k, parallel=parallel, time_limit=time_limit)
+                                    pred_graph = @silence_stdout begin
+                                                    make_network(data, test_name, make_sparse, 64,
+                                                                 max_k=max_k, parallel=parallel, time_limit=time_limit)
+                                                 end
 
                                     # special case for conditional mi
                                     if is_il && test_name == "mi" && max_k == 3
@@ -225,13 +226,15 @@ end
                   test_name = sens_str * het_str
                   exp_graph = exp_dict["exp_$(test_name)_maxk3"]
 
-                  pred_netw = @silence_stdout learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
-                                     max_k=3, header=header, track_rejections=true, verbose=true)
+                  pred_netw = @silence_stdout begin
+                                  learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
+                                                max_k=3, header=header, track_rejections=true, verbose=true)
+                              end
                   pred_graph = graph(pred_netw)
 
                   @testset "edge_identity" begin
                       @test compare_graph_results(exp_graph, pred_graph,
-                                                  rtol=rtol, atol=atol,
+                                                  # rtol=rtol, atol=atol,
                                                   approx=true,
                                                   approx_nbr_diff=approx_nbr_diff,
                                                   approx_weight_meandiff=approx_weight_meandiff)
@@ -250,17 +253,21 @@ end
                                                          [(".tsv", "_ids_transposed.tsv"),
                                                           ("_plus_meta.jld2", "_plus_meta_transposed.jld2")],
                                                           [("_meta.tsv", "_meta_transposed.tsv"),("","")])
+              data_format == "jld2" && continue
               @testset "$data_format" begin
                   path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]
 
                   # skip jld2
-                  data_format == "jld2" && continue
 
-                  pred_graphs = [graph(@silence_stdout learn_network(path_pairs[i], path_pairs[i_meta],
-                                                                     sensitive=true, heterogeneous=false,
-                                                                     max_k=3, verbose=true, transposed=transp,
-                                                                     n_obs_min=0))
-                                 for (i, i_meta, transp) in [(1, 3, false), (2, 4, true)]]
+
+                  pred_graphs = []
+                  for (i, i_meta, transp) in [(1, 3, false), (2, 4, true)]
+                      pred_netw = learn_network(path_pairs[i], path_pairs[i_meta],
+                                        sensitive=true, heterogeneous=false,
+                                        max_k=3, verbose=false, transposed=transp,
+                                        n_obs_min=0)
+                      push!(pred_graphs, graph(pred_netw))
+                  end
 
                   for pred_graph in pred_graphs
                       @test compare_graph_results(pred_graphs...,
@@ -273,17 +280,17 @@ end
           end
       end
 
-      @testset "smoke one hot" begin
+      @testset "one hot" begin
           path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
           oh_paths = [path_trunk * suff for suff in (".tsv", "_meta_oneHotTest.tsv")]
           for sensitive in (true, false)
               for heterogeneous in (true, false)
                   @testset "het_$heterogeneous // sens_$sensitive" begin
-                      pred_graph = graph(@silence_stdout learn_network(oh_paths...,
-                                                                       sensitive=sensitive,
-                                                                       heterogeneous=heterogeneous,
-                                                                       max_k=3, verbose=true, transposed=false,
-                                                                       n_obs_min=0))
+                      pred_graph = @silence_stdout begin
+                                      graph(learn_network(oh_paths..., sensitive=sensitive,
+                                                    heterogeneous=heterogeneous, max_k=3,
+                                                    verbose=true, transposed=false, n_obs_min=0))
+                                    end
                       @test @silence_stdout isa(show(pred_graph), Nothing)
                   end
               end
@@ -299,7 +306,7 @@ end
 
 @testset "duplicates" begin
     dupl_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small_1to5duplic_noIDs.tsv")
-    pred_graph = graph(@silence_stdout learn_network(dupl_path))
+    pred_graph = @silence_stdout graph(learn_network(dupl_path))
     @testset "nonzero_weights" begin
         @test !any(pred_graph.weights.nzval .== 0.0)
     end
@@ -307,16 +314,36 @@ end
 
 
 @testset "convergence" begin
-    @test @silence_stdout isa(show(FlashWeave.FWResult(make_network(data, "fz", true, 64, true, false,
-                                               convergence_threshold=Inf,
-                                               max_k=3, parallel="single_il", time_limit=1e-8,
-                                               update_interval=0.001))), Nothing)
+    @test @silence_stdout begin
+                isa(show(FlashWeave.FWResult(make_network(data, "fz", true, 64, true, false,
+                        convergence_threshold=Inf, max_k=3, parallel="single_il",
+                        time_limit=1e-8, update_interval=0.001))), Nothing)
+          end
 end
 
 
 @testset "hiton msg" begin
-    @test @silence_stdout isa(FlashWeave.si_HITON_PC(T_var, data_bin, Int[], zeros(0, 0),
+    @test @silence_stdout begin
+                isa(FlashWeave.si_HITON_PC(T_var, data_bin, Int[], zeros(0, 0),
                               univar_nbrs=T_nbrs, debug=2), FlashWeave.HitonState)
+          end
+end
+
+# smoke test bnb heuristic
+@testset "bnb heuristic" begin
+    for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
+        for make_sparse in [true, false]
+            for cb in [true, false]
+                @testset "$(test_name)_$(make_sparse)_cb$(cb)_single" begin
+                    pred_graph = @silence_stdout begin
+                        make_network(data, test_name, make_sparse, 64, max_k=3,
+                        parallel="single", time_limit=0.0; bnb=true, cut_test_branches=cb)
+                    end
+                    @test isa(pred_graph, SimpleWeightedGraph)
+                end
+            end
+        end
+    end
 end
 
 
