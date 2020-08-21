@@ -215,10 +215,6 @@ julia> ## addprocs_sge(5, queue="<your queue>", qsub_env="<your environment>", r
 
 Please refer to the [ClusterManagers.jl documentation](https://github.com/JuliaParallel/ClusterManagers.jl) for further details.
 
-## Changelog ##
-
-See [NEWS](https://github.com/meringlab/FlashWeave.jl/blob/master/NEWS.md) for the latest changes and bugfixes.
-
 ## Citing ##
 
 To cite FlashWeave, please refer to our [paper in *Cell Systems*](https://www.cell.com/cell-systems/fulltext/S2405-4712(19)30271-6):
