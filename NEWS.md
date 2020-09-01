@@ -19,7 +19,7 @@ it now runs more stably and features better error reporting
 - improve error messages in several places
 
 ### bug fixes
-- fix edge case in bin filtering: variables w/o zero entries are now retained and properly discritized
+- fix edge case in bin filtering: variables w/o zero entries are now retained and properly discretized
 - ensure that `meta_mask` is a proper `BitVector` in `learn_network` and `normalize_data`
 
 # v0.15.0
@@ -31,7 +31,7 @@ it now runs more stably and features better error reporting
 dintinguishability from continuous columns
 
 ### bug fixes
-- fix bug in read_edgelist where files with unconnected nodes at high
+- fix bug in `read_edgelist` where files with unconnected nodes at high
 header positions could not be read
 - fix bug where continuous variables were sometimes one-hot encoded (thanks **@pbelmann** for reporting)
 - fix bug where zero weights were assigned to highly associated variable pairs in rare cases (thanks **@Mortomoto** for reporting)

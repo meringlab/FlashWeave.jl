@@ -286,7 +286,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
         univar_nbrs::NbrStatDict=NbrStatDict(),
         prev_state::HitonState{Int}=HitonState{Int}('S', OrderedDict(), OrderedDict(), [], Dict()),
         debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false,
-         cache_pcor::Bool=true, kwargs...) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+        cache_pcor::Bool=true, kwargs...) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     debug > 0 && println("Finding neighbors for $T")
 
