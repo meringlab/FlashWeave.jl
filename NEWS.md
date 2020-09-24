@@ -1,6 +1,6 @@
 # master (unpublished)
 - `fast_elim` flag now also exposed via `learn_network`
-- fix bug that prevented combining sparse .biom data with non-numeric meta data
+- fix bug that prevented combining sparse .biom data with non-numeric meta data (issue #20, thanks **@ARW-UBT** for reporting)
 
 # v0.17.0 (latest)
 
