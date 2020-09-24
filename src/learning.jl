@@ -303,6 +303,13 @@ function learn_network(data_path::AbstractString, meta_data_path=nothing;
         check_data(data, header, meta_mask=meta_mask)
     else
         check_data(data, meta_data, header=header, meta_header=meta_header)
+
+        # convert data to dense if meta_data is not
+        # numeric to support hcat
+        if issparse(data) && !(eltype(meta_data) <: Real)
+            data = Matrix(data)
+        end
+
         data = hcat(data, meta_data)
         meta_mask = vcat(falses(length(header)), trues(length(meta_header)))
         header = vcat(header, meta_header)
