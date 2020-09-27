@@ -52,7 +52,7 @@ end
 """
     save_network(net_path::AbstractString, net_result::FWResult) -> Void
 
-Save network results to disk. Available formats are '.tsv', '.csv', '.gml' and '.jld2'.
+Save network results to disk. Available formats are '.edgelist', '.gml' and '.jld2'.
 
 - `net_path` - output path for the network
 
@@ -84,7 +84,7 @@ end
 """
     load_network(net_path::AbstractString) -> FWResult{Int}
 
-Load network results from disk. Available formats are '.tsv', '.csv', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters are only available when loading from JLD2.
+Load network results from disk. Available formats are '.edgelist', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters are only available when loading from JLD2.
 
 - `net_path` - path from which to load the network results
 """
