@@ -13,15 +13,15 @@ isdefaultkey(key::AbstractString) = key in ("otu_data", "otu_header", "meta_data
 
 
 """
-    load_data(data_path::AbstractString, meta_path::AbstractString) -> (AbstractMatrix{<:Real}, Vector{String}, AbstractMatrix{<:Real}, Vector{String})
+    load_data(data_path::AbstractString, meta_path::AbstractString) -> (AbstractArray{<:Real, 2}, Vector{String}, AbstractArray{<:Real, 2}, Vector{String})
 
-Load tables with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv', '.biom' and '.jld2'.
+Load matrices with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv', '.biom' and '.jld2'.
 
-- `data_path` - path to a file storing an OTU count table
+- `data_path` - path to a file storing an OTU count matrix
 
 - `meta_data_path` - optional path to a file with meta variable information
 
-- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file, if a data item is absent the corresponding key should be 'nothing'
+- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file. If a data item is absent the corresponding key should be 'nothing'. See '?load_data' for additional information.
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
@@ -58,7 +58,7 @@ Save network results to disk. Available formats are '.edgelist', '.gml' and '.jl
 
 - `net_result` - network results object that should be saved
 
-- `detailed` - output additional information, such as discarding sets, if available
+- `detailed` - save additional information, such as discarding sets, if available (output file suffixes: '_rejections', '_unchecked')
 """
 function save_network(net_path::AbstractString, net_result::FWResult; detailed::Bool=false)
     file_ext = splitext(net_path)[2]
@@ -84,7 +84,7 @@ end
 """
     load_network(net_path::AbstractString) -> FWResult{Int}
 
-Load network results from disk. Available formats are '.edgelist', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. Run parameters are only available when loading from JLD2.
+Load network results from disk. Available formats are '.edgelist', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. FlashWeave parameters that were used for network inference are only available when loading from JLD2.
 
 - `net_path` - path from which to load the network results
 """

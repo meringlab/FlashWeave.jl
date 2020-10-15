@@ -25,8 +25,7 @@ end
 
 ### discrete
 
-function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::AbstractContTest, hps::Integer,
-        n_obs_min::Int=0)
+function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::AbstractContTest, hps::Integer, n_obs_min::Int=0)
     @inbounds levels_x = test_obj.levels[X]
     @inbounds levels_y = test_obj.levels[Y]
 

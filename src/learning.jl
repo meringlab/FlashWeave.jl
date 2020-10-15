@@ -267,24 +267,21 @@ end
 
 
 """
-    learn_network(data_path::AbstractString, meta_data_path::AbstractString) -> FWResult{Int}
+    learn_network(data_path::AbstractString, meta_data_path::AbstractString) -> FWResult{<:Integer}
 
-Works like learn_network(data::AbstractArray{ElType}), but takes file paths an OTU table and optionally a
-meta data table as an input (instead of a data matrix).
+Works like learn_network(data::AbstractArray{<:Real, 2}), but instead of a data matrix takes file paths to an OTU table and optionally a meta data table as an input.
 
-- `data_path` - path to a file storing an OTU count table (and in the case of JLD2 possibly meta data)
+- `data_path` - path to a file storing an OTU count matrix (and JLD2 meta data)
 
 - `meta_data_path` - optional path to a file with meta data
 
-- `*_key`  - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file, if a data item is absent the corresponding key should be 'nothing'. More help under '?load_data'
+- `*_key`  - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file. If a data item is absent the corresponding key should be 'nothing'. See '?load_data' for additional information.
 
 - `verbose` - print progress information
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 
-- `kwargs...` - additional keyword arguments passed to learn_network(data::AbstractArray{ElType})
-
-
+- `kwargs...` - additional keyword arguments passed to learn_network(data::AbstractArray{<:Real, 2})
 """
 function learn_network(data_path::AbstractString, meta_data_path=nothing;
     otu_data_key::AbstractString="otu_data",
@@ -320,45 +317,45 @@ end
 
 
 """
-    learn_network(data::AbstractArray{<:Real}) -> FWResult{Int}
+    learn_network(data::AbstractArray{<:Real, 2}) -> FWResult{<:Integer}
 
-Learn an interaction network from a data table (including OTUs and optionally meta variables).
+Learn an interaction network from a data matrix (including OTUs and optionally meta variables).
 
-- `data` - data table with information on OTU counts and (optionally) meta variables
+- `data` - data matrix with information on OTU counts and (optionally) meta variables
 
 - `header` - names of variable columns in `data`
 
 - `meta_mask` - true/false mask indicating which variables are meta variables
 
-*Algorithmic parameters*:
+*Algorithmic parameters*
 
 - `heterogeneous` - enable heterogeneous mode for multi-habitat or -protocol data with at least thousands of samples (FlashWeaveHE)
 
-- `sensitive` - enable fine-grained associations (FlashWeave-S, FlashWeaveHE-S),  `sensitive=false` results in the `fast` modes FlashWeave-F or FlashWeaveHE-F
+- `sensitive` - enable fine-grained association prediction (FlashWeave-S, FlashWeaveHE-S),  `sensitive=false` results in the `fast` modes (FlashWeave-F, FlashWeaveHE-F)
 
-- `max_k` - maximum size of conditioning sets, high values can strongly increase runtime. `max_k=0` results in no conditioning (univariate mode)
+- `max_k` - maximum size of conditioning sets, high values can lead to the removal of more spurious edgens, but may also strongly increase runtime and reduce statistical power. `max_k=0` results in no conditioning (univariate mode)
 
-- `alpha` - threshold used to determine statistical significance
+- `alpha` - statistical significance threshold at which individual edges are accepted
 
-- `conv` - convergence threshold, i.e. if `conv=0.01` assume convergence if the number of edges increased by only 1% after 100% more runtime (checked in intervals)
+- `conv` - convergence threshold, e.g. if `conv=0.01` assume convergence if the number of edges increased by only 1% after 100% more runtime (checked in intervals)
 
 - `feed_forward` - enable feed-forward heuristic
 
-- `fast_elim` - enable fast elimiation heuristic
+- `fast_elim` - enable fast-elimiation heuristic
 
-- `max_tests` - maximum number of conditional tests that should be performed on a variable pair before association is assumed
+- `max_tests` - maximum number of conditional tests that is performed on a variable pair before association is assumed
 
 - `hps` - reliability criterion for statistical tests when `sensitive=false`
 
 - `FDR` - perform False Discovery Rate correction (Benjamini-Hochberg method) on pairwise associations
 
-- `n_obs_min` - don't compute associations between variables having less reliable samples (i.e. non-zero if `heterogeneous=true`) than this number. `-1`: automatically choose a threshold.
+- `n_obs_min` - don't compute associations between variables having less reliable samples (non-zero samples if `heterogeneous=true`) than this number. `-1`: automatically choose a threshold.
 
 - `time_limit` - if feed-forward heuristic is active, determines the interval (seconds) at which neighborhood information is updated
 
-*General parameters*:
+*General parameters*
 
-- `normalize` - automatically choose and perform data normalization (based on `sensitive` and `heterogeneous`)
+- `normalize` - automatically choose and perform data normalization method (based on `sensitive` and `heterogeneous`)
 
 - `track_rejections` - store for each discarded edge, which variable set lead to its exclusion (can be memory intense for large networks)
 
@@ -373,7 +370,6 @@ Learn an interaction network from a data table (including OTUs and optionally me
 - `make_onehot` - create one-hot encodings for meta data variables with more than two categories (should be left at `true` in almost all cases)
 
 - `update_interval` - if `verbose=true`, determines the interval (seconds) at which network stat updates are printed
-
 """
 function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,

@@ -486,28 +486,27 @@ function check_convert_sparse(data, make_sparse, norm_str, prec)
 end
 
 """
-    normalize_data(data::AbstractMatrix{<:Real}) -> (AbstractMatrix{<:Real}, Vector{String}, Vector{Bool}, Vector{Bool})
+    normalize_data(data::AbstractArray{<:Real, 2}) -> (AbstractArray{<:Real, 2}, Vector{String}, Vector{Bool}, Vector{Bool})
 
-Normalize data using various forms of clr transform and discretization. This should only be used manually when experimenting with different normalization techniques.
+Normalize data using various forms of centered-logratio transformation and discretization. This should only be used manually when experimenting with different normalization techniques.
 
-- `data` - data table with information on OTU counts and (optionally) meta variables
+- `data` - data matrix with information on OTU counts and (optionally) meta variables
 
-- `header` - names of variable-column s in `data`
+- `header` - names of variable-columns in `data`
 
 - `meta_mask` - true/false mask indicating which variables are meta variables
 
-- `test_name` - name of a FlashWeave-specific statistical test mode, the appropriate normalization method will be chosen automatically
+- `test_name` - name of a FlashWeave-specific statistical test mode, the corresponding normalization method will be chosen automatically
 
 - `norm_mode` - identifier of a valid normalization mode ('clr-adapt', 'clr-nonzero', 'clr-nonzero-binned', 'pres-abs', 'tss', 'tss-nonzero-binned')
 
-- `filter_data` - whether to remove uninformative samples and variables from `data`
+- `filter_data` - whether to remove samples with no counts and variables with zero variation from `data`
 
 - `verbose` - print progress information
 
 - `prec` - precision in bits to use for calculations (16, 32, 64 or 128)
 
-- `make_sparse`, `make_onehot` - see docstring for "learn_network()"
-
+- `make_sparse`, `make_onehot` - see docstring for "learn_network(data::AbstractArray{<:Real, 2})"
 """
 function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm_mode::AbstractString="",
     header::Vector{String}=String[], meta_mask::BitVector=falses(size(data, 2)),
