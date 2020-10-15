@@ -45,7 +45,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         convergence_threshold::AbstractFloat=0.01,
         conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi_il",
         edge_rule::String="OR", edge_merge_fun=maxweight, nonsparse_cond::Bool=false, verbose::Bool=true,
-        workers_local::Bool=true, feed_forward::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+        workers_local::Bool=true, feed_forward::Bool=true, kill_remote_workers::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     test_name = GLL_args[:test_name]
     weight_type = GLL_args[:weight_type]
@@ -235,7 +235,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         end
     end
 
-    if !workers_local
+    if !workers_local && kill_remote_workers
         rmprocs(workers())
     else
         wait.(worker_returns)

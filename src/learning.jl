@@ -204,7 +204,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
     header=nothing, meta_variable_mask=nothing, dense_cor::Bool=true, recursive_pcor::Bool=true,
     cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, all_univar_nbrs=nothing, kwargs...)
+    track_rejections::Bool=false, all_univar_nbrs=nothing, kill_remote_workers::Bool=true, kwargs...)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_il'
@@ -239,7 +239,8 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                               :feed_forward => feed_forward, :edge_rule => edge_rule,
                               :edge_merge_fun => edge_merge_fun,
                               :workers_local => workers_all_local(),
-                              :variable_ids => header, :meta_variable_mask => meta_variable_mask)
+                              :variable_ids => header, :meta_variable_mask => meta_variable_mask,
+                              :kill_remote_workers => kill_remote_workers)
 
     nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data,
                                                                       all_univar_nbrs, levels,
