@@ -3,9 +3,10 @@
 
 const valid_net_formats = (".edgelist", ".gml", ".jld2")
 const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2")
+const valid_dlm_formats = (".tsv", ".csv")
 
 isjld(ext::AbstractString) = ext == ".jld2"
-isdlm(ext::AbstractString) = ext in (".tsv", ".csv")
+isdlm(ext::AbstractString) = ext in valid_dlm_formats
 isbiom(ext::AbstractString) = ext == ".biom"
 isedgelist(ext::AbstractString) = ext == ".edgelist"
 isgml(ext::AbstractString) = ext == ".gml"
@@ -25,14 +26,19 @@ Load matrices with OTU count and optionally meta data from disc. Available forma
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
-function load_data(data_path::AbstractString, meta_path=nothing; transposed::Bool=false,
-     otu_data_key::AbstractString="otu_data", meta_data_key="meta_data",
-     otu_header_key::AbstractString="otu_header", meta_header_key="meta_header")
+function load_data(data_path::AbstractString, meta_path::Union{AbstractString,Nothing}=nothing; transposed::Bool=false,
+     otu_data_key::AbstractString="otu_data", meta_data_key::AbstractString="meta_data",
+     otu_header_key::AbstractString="otu_header", meta_header_key::AbstractString="meta_header")
      """Load OTU tables and meta data from various formats.
      -- Set jld2 keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
     file_ext = splitext(data_path)[2]
     transposed && file_ext == ".biom" && @warn("'transposed' cannot be used with .biom files")
+
+    if meta_path != nothing
+        meta_file_ext = splitext(meta_path)[2]
+        !isdlm(meta_file_ext) && @error "$(meta_file_ext) is an invalid meta data format, please provide one of $(valid_dlm_formats)"
+    end
 
     if isdlm(file_ext)
         ld_results = load_dlm(data_path, meta_path, transposed=transposed)
@@ -40,6 +46,7 @@ function load_data(data_path::AbstractString, meta_path=nothing; transposed::Boo
         ld_results = load_biom(data_path, meta_path)
     elseif isjld(file_ext)
         @warn "jld2 support is deprecated and will be removed in future versions of FlashWeave"
+        meta_path != nothing && @error "jld2 format not compatible with external meta data files, please add meta data directly to the jld2 file (default group key: 'meta_data')"
         ld_results = load_jld(data_path, otu_data_key, otu_header_key, meta_data_key, meta_header_key, transposed=transposed)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_data_formats)")

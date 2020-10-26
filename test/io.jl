@@ -90,6 +90,7 @@ meta_header_fact = meta_header_fact[:]
 
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
+            meta_path = isempty(meta_suff) ? nothing : meta_path
             data_ld = load_data(data_path, meta_path, meta_data_key=meta_data_key, meta_header_key=meta_header_key)
             @test data_ld[1] == data
             @test data_ld[2] == header
@@ -106,8 +107,12 @@ end
     for (data_format, data_suff, meta_suff) in zip(["tsv", "jld2"],
                                                    ["_ids_transposed.tsv", "_plus_meta_transposed.jld2"],
                                                    ["_meta_transposed.tsv", ""])
+       # skip jld2
+       data_format == "jld2" && continue
+
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
+            meta_path = isempty(meta_suff) ? nothing : meta_path
             data_ld = load_data(data_path, meta_path, transposed=true, meta_data_key=meta_data_key,
                                 meta_header_key=meta_header_key)
             @test data_ld[1] == data
