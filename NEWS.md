@@ -1,9 +1,20 @@
 # master (unpublished)
-- `fast_elim` flag now also exposed via `learn_network`
-- fix bug that prevented combining sparse .biom data with non-numeric meta data (issue #20, thanks **@ARW-UBT** for reporting)
-- fixed documentation for `save_network`/`load_network` to drop outdated .tsv/.csv mention (thanks **@ARW-UBT** for reporting)
 
-# v0.17.0 (latest)
+- no changes
+
+# v0.18.0 (latest)
+
+### general
+
+- `fast_elim` flag now also exposed via `learn_network`
+- fixed documentation for `save_network`/`load_network` to drop outdated .tsv/.csv mention (thanks **@ARW-UBT** for reporting)
+- update dependency versions
+
+### bug fixes
+
+- fix bug that prevented combining sparse .biom data with non-numeric meta data (issue #20, thanks **@ARW-UBT** for reporting)
+
+# v0.17.0
 
 ### general
 - Julia versions < 1.2 are no longer supported; this change was necessary for the interleaved parallelism
