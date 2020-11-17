@@ -9,7 +9,7 @@ nprocs() == 1 && addprocs(1)
 test_modules = [ "io.jl", "preprocessing.jl", "contingency.jl", "statfuns.jl", "tests.jl",
                 "misc.jl", "learning.jl"]
 
-@testset "all modules in testset" begin
+@testset "all modules in test set" begin
     @test Set(test_modules) == Set(filter(x -> endswith(x, ".jl") && x != "runtests.jl", readdir(pwd())))
 end
 
