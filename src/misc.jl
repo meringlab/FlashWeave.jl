@@ -76,7 +76,8 @@ function signed_weight(stat::Float64, pval::Float64, kind::AbstractString="stat"
     if kind == "stat"
         weight = stat
     else
-        error("only 'stat' weights are currently supported")
+        #error("only 'stat' weights are currently supported")
+        weight = pval
     end
     weight
 end
