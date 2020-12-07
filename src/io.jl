@@ -205,7 +205,7 @@ end
 
 function load_biom_hdf5(data_path)
     f = h5open(data_path, "r")
-    m, n = read(attrs(f)["shape"])
+    m, n = read(attributes(f)["shape"])
     colptr, rowval, nzval = [read(f, "sample/matrix/$key") for key in ["indptr", "indices", "data"]]
     otu_table = permutedims(SparseMatrixCSC(m, n, colptr .+ 1, rowval .+ 1, Vector{Int}(nzval)))
     header = read(f, "observation/ids")
