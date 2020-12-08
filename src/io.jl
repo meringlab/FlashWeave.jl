@@ -188,7 +188,6 @@ function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool
 end
 
 
-
 function load_biom_json(data_path)
     json_struc = JSON.parsefile(data_path)
     otu_table = Matrix{Int}(hcat(json_struc["data"]...))
@@ -205,7 +204,7 @@ end
 
 function load_biom_hdf5(data_path)
     f = h5open(data_path, "r")
-    m, n = read(attributes(f)["shape"])
+    m, n = read(attrs(f)["shape"])
     colptr, rowval, nzval = [read(f, "sample/matrix/$key") for key in ["indptr", "indices", "data"]]
     otu_table = permutedims(SparseMatrixCSC(m, n, colptr .+ 1, rowval .+ 1, Vector{Int}(nzval)))
     header = read(f, "observation/ids")
