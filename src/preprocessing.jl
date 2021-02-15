@@ -576,11 +576,17 @@ function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm
 end
 
 function normalize_data(data::AbstractMatrix, extra_data::AbstractVector; verbose::Bool=true, kwargs...)
+    if verbose
+        verbose && println("Normalization")
+        verbose && println("\t-> multiple data sets provided, using separate normalization mode")
+    end
+
     data_norm, header_norm, meta_mask_norm, obs_filter_mask = normalize_data(data; kwargs..., verbose=false)
     extra_data_norm = map(extra_data) do (X, extra_header)
         X_norm, extra_header_norm, _, obs_filter_mask_extra = normalize_data(X; kwargs..., meta_mask=falses(size(X, 2)), header=extra_header, verbose=false)
         (data=X_norm, header=extra_header_norm, obs_filter_mask=obs_filter_mask_extra)
     end
+
     sample_idx = collect(1:size(data, 1))
     data_comb, header_comb, meta_mask_comb, obs_filter_mask_comb = combine_data(data_norm, header_norm, meta_mask_norm, obs_filter_mask, sample_idx, extra_data_norm)
     (data=data_comb, header=header_comb, meta_mask=meta_mask_comb, obs_filter_mask=obs_filter_mask_comb)

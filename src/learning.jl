@@ -447,8 +447,6 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
         end
     end
 
-    sample_idx = collect(1:size(data, 1))
-
     if transposed
         data = data'
 
@@ -481,15 +479,15 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     check_data(data, header, meta_mask=meta_mask)
 
     if normalize
-        verbose && println("\n### Normalizing ###\n")
+        verbose && println("### Normalizing ###\n")
         if isnothing(extra_data)
             input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, 
                 prec=prec, verbose=verbose, make_sparse=make_sparse, make_onehot=make_onehot)
         else
-            verbose && println("\tmultiple data sets provided, using separate normalization mode")
             input_data, header, meta_mask = normalize_data(data, extra_data, test_name=test_name, header=header, meta_mask=meta_mask, 
                 prec=prec, verbose=verbose, make_sparse=make_sparse, make_onehot=make_onehot)
         end
+        verbose && println()
     else
         @warn "Skipping normalization, only experts should choose this option."
         if isnothing(extra_data)
@@ -501,21 +499,6 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
 
     check_data(input_data, header, meta_mask=meta_mask)
 
-    n_mvs = sum(meta_mask)
-    if verbose
-        println("""Inferring network with $(mode_string(heterogeneous, sensitive, max_k))\n
-        \tRun information:
-        \tsensitive - $sensitive
-        \theterogeneous - $heterogeneous
-        \tmax_k - $(max_k)
-        \talpha - $alpha
-        \tsparse - $(issparse(data))
-        \tworkers - $(length(workers()))
-        \tOTUs - $(size(data, 2) - n_mvs)
-        \tMVs - $(n_mvs)""")
-    end
-
-
     params_dict = Dict(:test_name=>test_name, :parallel=>parallel_mode, :max_k=>max_k,
                        :alpha=>alpha, :convergence_threshold=>conv, :feed_forward=>feed_forward,
                        :fast_elim=>fast_elim, :track_rejections=>track_rejections, :verbose=>verbose,
@@ -524,7 +507,22 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
                        :cache_pcor=>cache_pcor, :time_limit=>time_limit,
                        :update_interval=>update_interval)
 
-    verbose && println("\n### Learning interactions ###\n")
+    verbose && println("### Learning interactions ###\n")
+
+    n_mvs = sum(meta_mask)
+    if verbose
+        println("""Inferring network with $(mode_string(heterogeneous, sensitive, max_k))\n
+        \tRun information:
+        \tsensitive - $sensitive
+        \theterogeneous - $heterogeneous
+        \tmax_k - $(max_k)
+        \talpha - $alpha
+        \tsparse - $(issparse(input_data))
+        \tworkers - $(length(workers()))
+        \tOTUs - $(size(input_data, 2) - n_mvs)
+        \tMVs - $(n_mvs)""")
+    end
+
     lgl_results, time_taken = @timed LGL(input_data; params_dict...)
 
     # insert final parameters
