@@ -26,16 +26,16 @@ Load matrices with OTU count and optionally meta data from disc. Available forma
 
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
-function load_data(data_path::AbstractString, meta_path::Union{AbstractString,Nothing}=nothing; transposed::Bool=false,
-     otu_data_key::AbstractString="otu_data", meta_data_key::AbstractString="meta_data",
-     otu_header_key::AbstractString="otu_header", meta_header_key::AbstractString="meta_header")
+function load_data(data_path::AbstractString, meta_path::StrOrNoth=nothing; transposed::Bool=false,
+     otu_data_key::StrOrNoth="otu_data", meta_data_key::StrOrNoth="meta_data",
+     otu_header_key::StrOrNoth="otu_header", meta_header_key::StrOrNoth="meta_header")
      """Load OTU tables and meta data from various formats.
      -- Set jld2 keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
     file_ext = splitext(data_path)[2]
     transposed && file_ext == ".biom" && @warn("'transposed' cannot be used with .biom files")
 
-    if meta_path != nothing
+    if !isnothing(meta_path)
         meta_file_ext = splitext(meta_path)[2]
         !isdlm(meta_file_ext) && @error "$(meta_file_ext) is an invalid meta data format, please provide one of $(valid_dlm_formats)"
     end
@@ -46,7 +46,10 @@ function load_data(data_path::AbstractString, meta_path::Union{AbstractString,No
         ld_results = load_biom(data_path, meta_path)
     elseif isjld(file_ext)
         @warn "jld2 support is deprecated and will be removed in future versions of FlashWeave"
-        meta_path != nothing && @error "jld2 format not compatible with external meta data files, please add meta data directly to the jld2 file (default group key: 'meta_data')"
+        !isnothing(meta_path) && @error "jld2 format not compatible with external meta data files, please add meta data directly to the jld2 file (default group key: 'meta_data')"
+        for (key, desc) in [(otu_data_key, "otu data"), (otu_header_key, "otu ids")]
+            @assert !isnothing(key) "must provide a key for $(desc)"
+        end
         ld_results = load_jld(data_path, otu_data_key, otu_header_key, meta_data_key, meta_header_key, transposed=transposed)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_data_formats)")
@@ -114,20 +117,20 @@ end
 ######################
 
 function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_header_key::AbstractString,
-     meta_data_key=nothing, meta_header_key=nothing; transposed::Bool=false)
+     meta_data_key::StrOrNoth=nothing, meta_header_key::StrOrNoth=nothing; transposed::Bool=false)
      d = load(data_path)
 
      for (key, key_desc) in [(otu_data_key, "otu_data_key"),
                              (otu_header_key, "otu_header_key"),
                              (meta_data_key, "meta_data_key"),
                              (meta_header_key, "meta_header_key")]
-         key != nothing && !haskey(d, key) && !(key in ["meta_data_key", "meta_header_key"]) && error("key '$key' not found in input file. Please make sure to provide the appropriate $key_desc when using non-standard input files for FlashWeave or set $key_desc to 'nothing'. Keys present in input file: $(join(keys(d), ", "))")
+         !isnothing(key) && !haskey(d, key) && !(key in ["meta_data_key", "meta_header_key"]) && error("key '$key' not found in input file. Please make sure to provide the appropriate $key_desc when using non-standard input files for FlashWeave or set $key_desc to 'nothing'. Keys present in input file: $(join(keys(d), ", "))")
      end
 
      data = d[otu_data_key]
      header = d[otu_header_key]
 
-     if meta_data_key != nothing && haskey(d, meta_data_key)
+     if !isnothing(meta_data_key) && haskey(d, meta_data_key)
          meta_data = d[meta_data_key]
          meta_header = d[meta_header_key]
      else
@@ -136,7 +139,7 @@ function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_h
 
      if transposed
          data = data'
-         if meta_data != nothing
+         if !isnothing(meta_data)
              meta_data = meta_data'
          end
      end
@@ -178,7 +181,7 @@ function load_dlm(data_path::AbstractString, meta_path=nothing; transposed::Bool
 
     data = type_data ? Matrix{Float64}(data_raw) : data_raw
 
-    if meta_path != nothing
+    if !isnothing(meta_path)
         meta_data, meta_header = load_dlm(meta_path, transposed=transposed, type_data=false)
     else
         meta_data = meta_header = nothing
@@ -225,7 +228,7 @@ function load_biom(data_path, meta_path=nothing)
         end
     end
 
-    if meta_path != nothing
+    if !isnothing(meta_path)
         meta_data, meta_header = load_dlm(meta_path, type_data=false)
     else
         meta_data = meta_header = nothing

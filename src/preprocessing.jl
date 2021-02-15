@@ -485,6 +485,47 @@ function check_convert_sparse(data, make_sparse, norm_str, prec)
     data, make_sparse
 end
 
+function combine_data(data::AbstractMatrix, header::AbstractVector{<:AbstractString}, meta_mask::BitVector, obs_filter_mask::BitVector,
+    sample_idx::Union{AbstractVector{<:Integer},Nothing}, extra_data::AbstractVector)
+    # if samples were dropped during filtering, prepare row alignment step
+    if !isnothing(sample_idx)
+        @assert all(length.(extra_data) .> 2) "extra_data is missing sample filter information"
+        obs_filter_mask_comb = trues(length(sample_idx))
+        for mask in [obs_filter_mask, [x[3] for x in extra_data]...]
+            obs_filter_mask_comb .&= mask
+        end
+        
+        n_removed = sum(.!(obs_filter_mask_comb))
+        !all(obs_filter_mask_comb) && @warn("$(n_removed) samples had only zero counts in at least one data set and will not be used for inference")
+
+        sample_idx_comb = sample_idx[obs_filter_mask_comb]
+        sample_idx_data = sample_idx[obs_filter_mask]
+        data = data[indexin(sample_idx_comb, sample_idx_data), :]
+    else
+        obs_filter_mask_comb = obs_filter_mask
+    end
+
+    data_vec = [data]
+    header_vec = [header]
+    meta_mask_vec = [meta_mask]
+    for tup in extra_data
+        X, extra_header = tup[1], tup[2]
+
+        # keep X aligned with data
+        if !isnothing(sample_idx)
+            extra_obs_mask = tup[3]
+            sample_idx_X = sample_idx[extra_obs_mask]
+            X = X[indexin(sample_idx_comb, sample_idx_X), :]
+        end
+
+        pushfirst!(data_vec, X)
+        pushfirst!(header_vec, extra_header)
+        pushfirst!(meta_mask_vec, falses(size(X, 2)))
+    end
+
+    hcat(data_vec...), vcat(header_vec...), vcat(meta_mask_vec...), obs_filter_mask_comb
+end
+
 """
     normalize_data(data::AbstractArray{<:Real, 2}) -> (AbstractArray{<:Real, 2}, Vector{String}, Vector{Bool}, Vector{Bool})
 
@@ -529,7 +570,19 @@ function normalize_data(data::AbstractMatrix; test_name::AbstractString="", norm
         norm_str = mode_map[norm_mode]
     end
 
-    norm_results = preproc_fun(data, norm_str; meta_mask=meta_mask, header=header,
+    preproc_fun(data, norm_str; meta_mask=meta_mask, header=header,
                                verbose=verbose, filter_data=filter_data, prec=prec, make_sparse=make_sparse,
                                make_onehot=make_onehot, preprocess_kwargs...)
 end
+
+function normalize_data(data::AbstractMatrix, extra_data::AbstractVector; verbose::Bool=true, kwargs...)
+    data_norm, header_norm, meta_mask_norm, obs_filter_mask = normalize_data(data; kwargs..., verbose=false)
+    extra_data_norm = map(extra_data) do (X, extra_header)
+        X_norm, extra_header_norm, _, obs_filter_mask_extra = normalize_data(X; kwargs..., meta_mask=falses(size(X, 2)), header=extra_header, verbose=false)
+        (data=X_norm, header=extra_header_norm, obs_filter_mask=obs_filter_mask_extra)
+    end
+    sample_idx = collect(1:size(data, 1))
+    data_comb, header_comb, meta_mask_comb, obs_filter_mask_comb = combine_data(data_norm, header_norm, meta_mask_norm, obs_filter_mask, sample_idx, extra_data_norm)
+    (data=data_comb, header=header_comb, meta_mask=meta_mask_comb, obs_filter_mask=obs_filter_mask_comb)
+end
+

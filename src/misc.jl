@@ -12,9 +12,9 @@ end
 function check_data(data::AbstractMatrix, meta_data::AbstractMatrix; header=nothing, meta_header=nothing)
     @assert size(data, 1) == size(meta_data, 1) "observations of data do not fit meta_data: $(size(data, 1)) vs. $(size(meta_data, 1))"
 
-    @assert !xor(header == nothing, meta_header == nothing) "provide two headers (or none)"
+    @assert !xor(isnothing(header), isnothing(meta_header)) "provide two headers (or none)"
 
-    if header != nothing
+    if !isnothing(header)
         check_data(data, header)
         @assert size(meta_data, 2) == length(meta_header) "meta_header does not fit meta_data"
     end
@@ -22,7 +22,12 @@ end
 
 function check_data(data::AbstractMatrix, header::AbstractVector; meta_mask=nothing)
     @assert size(data, 2) == length(header) "header does not fit data: $(size(data, 2)) vs. $(length(header))"
-    meta_mask != nothing && @assert size(data, 2) == length(meta_mask) "meta_mask does not fit data: $(size(data, 2)) vs. $(length(meta_mask))"
+    !isnothing(meta_mask) && @assert size(data, 2) == length(meta_mask) "meta_mask does not fit data: $(size(data, 2)) vs. $(length(meta_mask))"
+    if length(header) != length(unique(header)) 
+        header_nonunique = [x for (x, c) in countmap(header) if c > 1]
+        throw("Variable names are not unique: " * join(header_nonunique, ", "))
+    end
+    nothing
 end
 
 

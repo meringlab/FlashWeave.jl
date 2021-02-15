@@ -266,6 +266,43 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     LGLResult{Int}(graph, rej_dict, unfinished_state_dict)
 end
 
+function combine_data_with_meta(data::AbstractMatrix, header::AbstractVector{<:AbstractString}, meta_data::AbstractMatrix, 
+    meta_header::AbstractVector{<:AbstractString})
+
+    # convert data to dense if meta_data is not
+    # numeric to support hcat
+    if issparse(data) && !(eltype(meta_data) <: Real)
+        data = Matrix(data)
+    end
+
+    data_comb = hcat(data, meta_data)
+    header_comb = vcat(header, meta_header)
+    n_meta = length(meta_header)
+    meta_mask = vcat(falses(size(data_comb, 2) - n_meta), trues(n_meta))
+    
+    data_comb, header_comb, meta_mask
+end
+
+function make_table(data_path::AbstractString, meta_data_path::StrOrNoth=nothing;
+    otu_data_key::StrOrNoth="otu_data", otu_header_key::StrOrNoth="otu_header", 
+    meta_data_key::StrOrNoth="meta_data", meta_header_key::StrOrNoth="meta_header", 
+    verbose::Bool=true, transposed::Bool=false)
+    
+    data, header, meta_data, meta_header = load_data(data_path, meta_data_path, otu_data_key=otu_data_key,
+                                                     otu_header_key=otu_header_key, meta_data_key=meta_data_key,
+                                                     meta_header_key=meta_header_key, transposed=transposed)
+
+    if isnothing(meta_data)
+        meta_mask = falses(length(header))
+        check_data(data, header, meta_mask=meta_mask)
+    else
+        check_data(data, meta_data, header=header, meta_header=meta_header)
+
+        data, header, meta_mask = combine_data_with_meta(data, header, meta_data, meta_header)
+    end
+
+    data, header, meta_mask
+end
 
 """
     learn_network(data_path::AbstractString, meta_data_path::AbstractString) -> FWResult{<:Integer}
@@ -284,36 +321,47 @@ Works like learn_network(data::AbstractArray{<:Real, 2}), but instead of a data 
 
 - `kwargs...` - additional keyword arguments passed to learn_network(data::AbstractArray{<:Real, 2})
 """
-function learn_network(data_path::AbstractString, meta_data_path=nothing;
-    otu_data_key::AbstractString="otu_data",
-    otu_header_key::AbstractString="otu_header", meta_data_key="meta_data",
-    meta_header_key="meta_header", verbose::Bool=true,
+function learn_network(data_path::AbstractString, meta_data_path::StrOrNoth=nothing;
+    otu_data_key::StrOrNoth="otu_data",
+    otu_header_key::StrOrNoth="otu_header", meta_data_key::StrOrNoth="meta_data",
+    meta_header_key::StrOrNoth="meta_header", verbose::Bool=true,
     transposed::Bool=false, kwargs...)
 
     verbose && println("\n### Loading data ###\n")
-    data, header, meta_data, meta_header = load_data(data_path, meta_data_path, otu_data_key=otu_data_key,
-                                                     otu_header_key=otu_header_key, meta_data_key=meta_data_key,
-                                                     meta_header_key=meta_header_key, transposed=transposed)
-
-
-    if meta_data == nothing
-        meta_mask = falses(length(header))
-        check_data(data, header, meta_mask=meta_mask)
-    else
-        check_data(data, meta_data, header=header, meta_header=meta_header)
-
-        # convert data to dense if meta_data is not
-        # numeric to support hcat
-        if issparse(data) && !(eltype(meta_data) <: Real)
-            data = Matrix(data)
-        end
-
-        data = hcat(data, meta_data)
-        meta_mask = vcat(falses(length(header)), trues(length(meta_header)))
-        header = vcat(header, meta_header)
-    end
+    data, header, meta_mask = make_table(data_path, meta_data_path, otu_data_key=otu_data_key,
+                                         otu_header_key=otu_header_key, meta_data_key=meta_data_key,
+                                         meta_header_key=meta_header_key, transposed=transposed)
 
     learn_network(data; header=header, meta_mask=meta_mask, verbose=verbose, kwargs...)
+end
+
+"""
+    learn_network(all_data_paths::AbstractVector{<:AbstractString}, meta_data_path::AbstractString) -> FWResult{<:Integer}
+
+Works like learn_network(data_path::AbstractString, meta_data_path::AbstractString), but takes paths to multiple data sets (independent sequencing experiments (e.g. 16S + ITS) for the same biological samples) which are normalized independently.
+"""
+function learn_network(all_data_paths::AbstractVector{<:AbstractString}, meta_data_path::StrOrNoth=nothing;
+    otu_data_key::StrOrNoth="otu_data",
+    otu_header_key::StrOrNoth="otu_header", meta_data_key::StrOrNoth="meta_data",
+    meta_header_key::StrOrNoth="meta_header", verbose::Bool=true,
+    transposed::Bool=false, kwargs...)
+
+    data_path = all_data_paths[1]
+    if length(all_data_paths) > 1
+        extra_data = NamedTuple[]
+        for extra_data_path in all_data_paths[2:end]
+            X, extra_header = load_data(extra_data_path, nothing, otu_data_key=otu_data_key,
+                                        otu_header_key=otu_header_key, meta_data_key=nothing,
+                                        meta_header_key=nothing, transposed=transposed)
+            push!(extra_data, (data=X, header=extra_header))
+        end
+    else
+        extra_data=nothing
+    end
+
+    learn_network(data_path, meta_data_path; otu_data_key=otu_data_key,
+        otu_header_key=otu_header_key, meta_data_key=nothing,
+        meta_header_key=nothing, transposed=transposed, extra_data=extra_data, kwargs...)
 end
 
 
@@ -371,6 +419,8 @@ Learn an interaction network from a data matrix (including OTUs and optionally m
 - `make_onehot` - create one-hot encodings for meta data variables with more than two categories (should be left at `true` in almost all cases)
 
 - `update_interval` - if `verbose=true`, determines the interval (seconds) at which network stat updates are printed
+
+- `extra_data` - tuples of the form (data, header) representing counts from additional sequencing experiments (e.g. 16S + ITS) for the same biological samples. These will be normalized independently.
 """
 function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
@@ -378,7 +428,8 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     feed_forward::Bool=true,  fast_elim::Bool=true, normalize::Bool=true, track_rejections::Bool=false, verbose::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,
-    cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0, parallel_mode="auto")
+    cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0, parallel_mode="auto",
+    extra_data::Union{AbstractVector,Nothing}=nothing)
 
     start_time = time()
 
@@ -386,7 +437,6 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     het_mode = heterogeneous ? "_nz" : ""
 
     test_name = cont_mode * het_mode
-
 
     if parallel_mode == "auto"
         parallel_mode = nprocs() > 1 ? "multi_il" : "single_il"
@@ -397,19 +447,59 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
         end
     end
 
+    sample_idx = collect(1:size(data, 1))
+
     if transposed
         data = data'
+
+        if !isnothing(extra_data)
+            extra_data = [(data=X', header=extra_header) for (X, extra_header) in extra_data]
+        end
     end
 
-    if header == nothing
+    if isnothing(meta_mask)
+        meta_mask = falses(size(data, 2))
+    end
+
+    if isnothing(header)
         header = ["X" * string(i) for i in 1:size(data, 2)]
-    end
 
-    if meta_mask == nothing
-        meta_mask = falses(length(header))
+        if !isnothing(extra_data)
+            i_offset = length(header)
+            extra_data = map(extra_data) do (X, extra_header)
+                if isnothing(extra_header)
+                    extra_header_new = ["X" * string(i_offset+i) for i in 1:size(X, 2)]
+                    i_offset += size(X, 2)
+                    (data=X, header=extra_header_new)
+                else
+                    (data=X, header=extra_header)
+                end
+            end
+        end
     end
 
     check_data(data, header, meta_mask=meta_mask)
+
+    if normalize
+        verbose && println("\n### Normalizing ###\n")
+        if isnothing(extra_data)
+            input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, 
+                prec=prec, verbose=verbose, make_sparse=make_sparse, make_onehot=make_onehot)
+        else
+            verbose && println("\tmultiple data sets provided, using separate normalization mode")
+            input_data, header, meta_mask = normalize_data(data, extra_data, test_name=test_name, header=header, meta_mask=meta_mask, 
+                prec=prec, verbose=verbose, make_sparse=make_sparse, make_onehot=make_onehot)
+        end
+    else
+        @warn "Skipping normalization, only experts should choose this option."
+        if isnothing(extra_data)
+            input_data = data
+        else
+            input_data, header, meta_mask = combine_data(data, header, meta_mask, trues(size(data, 1)), nothing, extra_data)
+        end
+    end
+
+    check_data(input_data, header, meta_mask=meta_mask)
 
     n_mvs = sum(meta_mask)
     if verbose
@@ -433,15 +523,6 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
                        :max_tests=>max_tests, :hps=>hps, :FDR=>FDR, :n_obs_min=>n_obs_min,
                        :cache_pcor=>cache_pcor, :time_limit=>time_limit,
                        :update_interval=>update_interval)
-
-    if normalize
-       verbose && println("\n### Normalizing ###\n")
-       input_data, header, meta_mask = normalize_data(data, test_name=test_name, header=header, meta_mask=meta_mask, prec=prec, verbose=verbose, make_sparse=make_sparse, make_onehot=make_onehot)
-    else
-       @warn "Skipping normalization, only experts should choose this option."
-       input_data = data
-    end
-
 
     verbose && println("\n### Learning interactions ###\n")
     lgl_results, time_taken = @timed LGL(input_data; params_dict...)

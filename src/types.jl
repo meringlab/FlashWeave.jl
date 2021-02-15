@@ -3,6 +3,7 @@
 #####################
 
 const NbrStatDict = OrderedDict{Int,Tuple{Float64,Float64}}
+const StrOrNoth = Union{AbstractString,Nothing}
 
 mutable struct PairMeanObj
     sum_x::Float64
