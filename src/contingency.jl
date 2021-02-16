@@ -11,7 +11,7 @@ function contingency_table!(X::Int, Y::Int, data::AbstractMatrix{ElType}, cont_t
 end
 
 
-function contingency_table(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, levels_x::Integer, levels_y::Integer, nz::Bool=false)
+function contingency_table(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, levels_x::Integer, levels_y::Integer)
     cont_tab = zeros(Int, levels_x, levels_y)
     contingency_table!(X, Y, data, cont_tab)
 

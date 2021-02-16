@@ -16,8 +16,8 @@ end
 
 
 function check_onehot(x::AbstractVector)
-    # check if proper floating point vector
-    if isa(x[1], AbstractFloat) || isa(x[1], Integer)#&& any(!iszero(xi % 1) for xi in x)
+    # check if numeric vector
+    if isa(x[1], AbstractFloat) || isa(x[1], Integer)
         return false, []
     # otherwise check number of categories
     else
@@ -247,23 +247,24 @@ end
 
 
 iscontinuousnorm(norm::String) = norm == "rows" || startswith(norm, "clr")
+function iscontinuous(x_vec::AbstractVector)
+    if isapprox(round.(x_vec, digits=0), x_vec)
+        # label as continous if it doesn't resemble one-hot vector
+        return maximum(x_vec) > 1 || length(unique(x_vec)) > 2
+    else
+        return true
+    end
+end
+
 
 function discretize_meta!(meta_data::Matrix{ElType}, norm, n_bins) where ElType <: Real
     for i in 1:size(meta_data, 2)
         meta_vec = meta_data[:, i]
-        try
-            disc_meta_vec = convert(Vector{Int}, meta_vec)
-            if norm == "clr_nz"
-                disc_meta_vec += 1
-            end
+        if iscontinuous(meta_vec)
+            disc_meta_vec = discretize(meta_vec, n_bins)
             meta_vec = convert(Vector{ElType}, disc_meta_vec)
-        catch InexactError
-            if !iscontinuousnorm(norm)
-                disc_meta_vec = discretize(meta_vec, n_bins)
-                meta_vec = convert(Vector{ElType}, disc_meta_vec)
-            end
+            meta_data[:, i] .= meta_vec
         end
-        meta_data[:, i] .= meta_vec
     end
 end
 
@@ -316,6 +317,42 @@ end
 presabs_norm!(X::SparseMatrixCSC{ElType}) where ElType <: Real = map!(sign, X.nzval, X.nzval)
 presabs_norm!(X::Matrix{ElType}) where ElType <: Real = map!(sign, X, X)
 
+function filter_by_variance(data::AbstractMatrix, meta_data::Union{AbstractMatrix,Nothing}, header::Vector{String}, verbose::Bool;
+    filter_rows::Bool=true, filter_cols::Bool=true)
+    unfilt_dims = size(data)
+    if filter_cols
+        col_mask = (var(data, dims=1)[:] .> 0.0)[:]
+        data = data[:, col_mask]
+
+        if !isempty(header)
+            header = header[col_mask]
+        end
+    end
+
+    if filter_rows
+        row_mask = (sum(data, dims=2)[:] .> 0)[:]
+        data = data[row_mask, :]
+        if !isnothing(meta_data)
+            meta_data = meta_data[row_mask, :]
+        end
+    else
+        row_mask = trues(size(data, 1))
+    end
+
+    if verbose
+        rm_samples = unfilt_dims[1] - size(data, 1)
+        rm_vars = unfilt_dims[2] - size(data, 2)
+        
+        if rm_samples > 0 || rm_vars > 0
+            println("\t-> discarded ", rm_samples, " samples and ", rm_vars, " variables.")
+        else
+            println("\t-> no samples or variables discarded")
+        end
+    end
+
+    return data, meta_data, header, row_mask
+end
+
 
 function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::AbstractFloat=1e-5,
     n_bins::Integer=3, rank_method::String="tied",
@@ -323,7 +360,6 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
     make_sparse::Bool=issparse(data),
     prec::Integer=32, filter_data=true, header::Vector{String}=String[], make_onehot::Bool=true)
 
-    verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     has_meta = any(meta_mask)
 
     if has_meta
@@ -345,33 +381,21 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
             @warn "Skipping one-hot encoding, only experts should choose this option."
             meta_data = factors_to_ints(meta_data)
         end
+    else
+        meta_data = nothing
     end
 
     data, make_sparse = check_convert_sparse(data, make_sparse, norm, prec)
     M = make_sparse ? SparseMatrixCSC : Matrix
 
+    verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     if filter_data
-        unfilt_dims = size(data)
-        col_mask = (var(data, dims=1)[:] .> 0.0)[:]
-        data = data[:, col_mask]
-        row_mask = (sum(data, dims=2)[:] .> 0)[:]
-        data = data[row_mask, :]
-        if has_meta
-            meta_data = meta_data[row_mask, :]
-        end
-
-        if !isempty(header)
-            header = header[col_mask]
-        end
+        data, meta_data, header, row_mask = filter_by_variance(data, meta_data, header, verbose)
     else
-        row_mask = nothing
+        row_mask = trues(size(data, 1))
     end
 
-    if verbose
-        filter_data && println("Discarded ", unfilt_dims[1] - size(data, 1), " samples and ", unfilt_dims[2] - size(data, 2), " variables.")
-        println("\nNormalization")
-    end
-
+    verbose && println("\nNormalization")
     if norm == "rows"
         rownorm!(data)
 
@@ -428,11 +452,15 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
     end
 
     if has_meta
-        if issparse(meta_data)
-            meta_data = discretize_meta(meta_data, norm, 2)
-        else
-            discretize_meta!(meta_data, norm, 2)
+        if !iscontinuousnorm(norm)
+            verbose && println("\nDiscretizing meta variables")
+            if issparse(meta_data)
+                meta_data = discretize_meta(meta_data, norm, 2)
+            else
+                discretize_meta!(meta_data, norm, 2)
+            end
         end
+
         meta_mask = vcat(falses(size(data, 2)), trues(size(meta_data, 2)))
         data = hcat(data, convert(typeof(data), meta_data))
 
@@ -442,6 +470,9 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
     else
         meta_mask = falses(size(data, 2))
     end
+
+    verbose && println("\nRemoving normalized variables with 0 variance (or equivalently 1 level)")
+    data, _, header, _ = filter_by_variance(data, nothing, header, verbose; filter_rows=false)
 
     target_base_type_str = iscontinuousnorm(norm) ? "Float" : "Int"
     T = eval(Symbol("$target_base_type_str$prec"))
