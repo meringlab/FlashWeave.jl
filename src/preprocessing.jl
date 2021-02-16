@@ -120,18 +120,18 @@ function adaptive_pseudocount!(X::Matrix{ElType}) where ElType <: AbstractFloat
     base_pcount = min_abund >= 1 ? 1.0 : min_abund / 10
     max_depth_pvars = pseudocount_vars_from_sample(max_depth_sample)
     pseudo_counts = [adaptive_pseudocount(base_pcount, max_depth_pvars..., view(X, x, :)) for x in 1:size(X, 1)]
-    pcount_z_mask = pseudo_counts .== 0
-    if any(pcount_z_mask)
-        @warn "adaptive pseudo-counts for $(sum(pcount_z_mask)) samples were lower than machine precision due to insufficient counts, removing them"
-        X = X[.!pcount_z_mask, :]
-        pseudo_counts = pseudo_counts[.!pcount_z_mask]
+    pcount_nz_mask = .!iszero.(pseudo_counts)
+    if !all(pcount_nz_mask)
+        @warn "adaptive pseudo-counts for $(sum(.!pcount_nz_mask)) samples were lower than machine precision due to insufficient counts, removing them"
+        X = X[pcount_nz_mask, :]
+        pseudo_counts = pseudo_counts[pcount_nz_mask]
     end
 
     for i in 1:size(X, 1)
         s_vec = @view X[i, :]
         s_vec[s_vec .== 0] .= pseudo_counts[i]
     end
-    X
+    X, pcount_nz_mask
 end
 
 function clr!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
@@ -167,9 +167,9 @@ end
 
 
 function adaptive_clr!(X::Matrix{ElType}) where ElType <: AbstractFloat
-    X = adaptive_pseudocount!(X)
+    X, pcount_nz_mask = adaptive_pseudocount!(X)
     clr!(X, pseudo_count=0.0, ignore_zeros=false)
-    X
+    X, pcount_nz_mask
 end
 
 
@@ -213,13 +213,13 @@ function discretize(x_vec::Vector{ElType}, n_bins::Integer=3; rank_method::Strin
 
     elseif disc_method == "mean"
         if n_bins > 2
-            error("disc_method $disc_method only works with 2 bins.")
+            error("disc_method $disc_method only works with 2 bins")
         end
 
         bin_thresh = mean(x_vec)
         disc_vec = map(x -> x <= bin_thresh ? 0 : 1, x_vec)
     else
-        error("$disc_method is not a valid discretization method.")
+        error("$disc_method is not a valid discretization method")
     end
 
     disc_vec
@@ -256,6 +256,8 @@ function iscontinuous(x_vec::AbstractVector)
     end
 end
 
+iscontinuous(X::AbstractMatrix) = [iscontinuous(view(X, :, i)) for i in 1:size(X, 2)]
+
 
 function discretize_meta!(meta_data::Matrix{ElType}, norm, n_bins) where ElType <: Real
     for i in 1:size(meta_data, 2)
@@ -278,13 +280,13 @@ end
 function clrnorm(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractFloat)
     """Covers all flavors of clr transform, makes sparse matrices dense if pseudo-counts
     are used to make computations more efficient"""
-
+    row_mask = trues(size(data, 1))
     if norm == "clr"
         data = convert(Matrix{Float64}, data)
         clr!(data, pseudo_count=clr_pseudo_count)
     elseif norm == "clr_adapt"
         data = convert(Matrix{Float64}, data)
-        data = adaptive_clr!(data)
+        data, row_mask = adaptive_clr!(data)
     elseif norm == "clr_nz"
         if issparse(data)
             data = convert(SparseMatrixCSC{Float64}, data)
@@ -295,7 +297,7 @@ function clrnorm(data::AbstractMatrix, norm::String, clr_pseudo_count::AbstractF
         end
     end
 
-    data
+    data, row_mask
 end
 
 rownorm!(X::Matrix{ElType}) where ElType <: AbstractFloat = X ./= sum(X, dims=2)
@@ -327,6 +329,8 @@ function filter_by_variance(data::AbstractMatrix, meta_data::Union{AbstractMatri
         if !isempty(header)
             header = header[col_mask]
         end
+    else
+        col_mask = trues(size(data, 2))
     end
 
     if filter_rows
@@ -344,13 +348,19 @@ function filter_by_variance(data::AbstractMatrix, meta_data::Union{AbstractMatri
         rm_vars = unfilt_dims[2] - size(data, 2)
         
         if rm_samples > 0 || rm_vars > 0
-            println("\t-> discarded ", rm_samples, " samples and ", rm_vars, " variables.")
+            if filter_rows && filter_cols
+                println("\t-> discarded ", rm_samples, " samples and ", rm_vars, " variables")
+            elseif filter_rows
+                println("\t-> discarded ", rm_samples, " samples")
+            elseif filter_cols
+                println("\t-> discarded ", rm_vars, " variables")
+            end
         else
             println("\t-> no samples or variables discarded")
         end
     end
 
-    return data, meta_data, header, row_mask
+    return data, meta_data, header, row_mask, col_mask
 end
 
 
@@ -378,7 +388,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
         if make_onehot
             meta_data, meta_header = onehot(meta_data, meta_header; verbose=verbose)
         else
-            @warn "Skipping one-hot encoding, only experts should choose this option."
+            @warn "Skipping one-hot encoding, only experts should choose this option"
             meta_data = factors_to_ints(meta_data)
         end
     else
@@ -390,7 +400,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
 
     verbose && println("Removing variables with 0 variance (or equivalently 1 level) and samples with 0 reads")
     if filter_data
-        data, meta_data, header, row_mask = filter_by_variance(data, meta_data, header, verbose)
+        data, meta_data, header, row_mask, _ = filter_by_variance(data, meta_data, header, verbose) # can ignore col_mask here
     else
         row_mask = trues(size(data, 1))
     end
@@ -400,7 +410,17 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
         rownorm!(data)
 
     elseif startswith(norm, "clr")
-        data = clrnorm(data, norm, clr_pseudo_count)
+        data, clr_row_mask = clrnorm(data, norm, clr_pseudo_count)
+        if has_meta
+            meta_data = meta_data[clr_row_mask, :]
+        end
+
+        # set removed samples to false in global filter mask
+        # (two step, since input data for clr is already filtered)
+        sample_idx = collect(1:length(row_mask))
+        sample_idx_filt = sample_idx[row_mask]
+        rm_samples = sample_idx_filt[.!clr_row_mask]
+        row_mask[rm_samples] .= false
 
     elseif norm == "binary"
         presabs_norm!(data)
@@ -414,7 +434,10 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
             header = header[bin_mask]
         end
 
-        verbose && println("\t-> removed $(unreduced_vars - size(data, 2)) variables with not exactly 2 levels")
+        if verbose
+            n_rm = unreduced_vars - size(data, 2)
+            n_rm > 0 && println("\t-> removed $(n_rm) variables with not exactly 2 levels")
+        end
 
     elseif startswith(norm, "binned")
         if startswith(norm, "binned_nz")
@@ -425,7 +448,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
             if endswith(norm, "rows")
                 rownorm!(data)
             elseif endswith(norm, "clr")
-                data = clrnorm(data, "clr_nz", 0.0)
+                data, _ = clrnorm(data, "clr_nz", 0.0) # can ignore clr_row_mask since pseudo-counts are not adaptive
             end
             data = discretize(data, n_bins=n_bins, nz=true, rank_method=rank_method, disc_method=disc_method,
                 nz_mask=nz_mask)
@@ -448,7 +471,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
         verbose && println("\t-> removed $(unreduced_vars - size(data, 2)) variables with not exactly $n_bins levels")
 
     else
-        error("$norm is not a valid normalization method.")
+        error("$norm is not a valid normalization method")
     end
 
     if has_meta
@@ -461,6 +484,17 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
             end
         end
 
+        if norm == "clr_nz"
+            # assure zeros are used for one-hot meta variables in fz_nz mode
+            cont_mask = iscontinuous(meta_data)
+            for i in findall(.!cont_mask)
+                meta_data[:, i] .+= 1
+            end
+        end
+
+        verbose && println("\nRemoving meta variables with 0 variance (or equivalently 1 level)")
+        meta_data, _, meta_header, _ = filter_by_variance(meta_data, nothing, meta_header, verbose; filter_rows=false)
+
         meta_mask = vcat(falses(size(data, 2)), trues(size(meta_data, 2)))
         data = hcat(data, convert(typeof(data), meta_data))
 
@@ -470,9 +504,6 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
     else
         meta_mask = falses(size(data, 2))
     end
-
-    verbose && println("\nRemoving normalized variables with 0 variance (or equivalently 1 level)")
-    data, _, header, _ = filter_by_variance(data, nothing, header, verbose; filter_rows=false)
 
     target_base_type_str = iscontinuousnorm(norm) ? "Float" : "Int"
     T = eval(Symbol("$target_base_type_str$prec"))

@@ -24,14 +24,14 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     if time_limit != 0.0 && !endswith(parallel, "_il")
         @warn "Using time_limit without interleaved parallelism is not advised."
     elseif parallel == "multi_il" && time_limit == 0.0 && feed_forward
-        @warn "Specify 'time_limit' when using interleaved parallelism to potentially increase speed."
+        @warn "Specify 'time_limit' when using interleaved parallelism to potentially increase speed"
     end
 
     disc_type = Int32
     cont_type = Float32
 
     if isdiscrete(test_name)
-        verbose && println("Computing levels..")
+        verbose && println("Computing levels")
         levels = get_levels(data)
         cor_mat = zeros(cont_type, 0, 0)
     else
@@ -54,7 +54,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
             n_obs_min = 20
         end
 
-        verbose && println("Automatically setting 'n_obs_min' to $n_obs_min for enhanced reliability.")
+        verbose && println("Automatically setting 'n_obs_min' to $n_obs_min for enhanced reliability")
     end
 
     if n_obs_min > size(data, 1)
@@ -81,7 +81,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
     tmp_folder::AbstractString="") where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
-    verbose && println("Computing univariate associations..")
+    verbose && println("Computing univariate associations")
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps,
                                           n_obs_min=n_obs_min, FDR=FDR,
@@ -122,7 +122,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
         cor_mat = zeros(cont_type, size(data, 2), size(data, 2))
     end
 
-    verbose && println("\nStarting conditioning search..")
+    verbose && println("\nStarting conditioning search")
 
     if nonsparse_cond && !endswith(parallel, "il")
         @warn "nonsparse_cond currently not implemented"
@@ -250,7 +250,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                                                                       verbose, track_rejections, hiton_kwargs,
                                                                       interleaved_kwargs)
 
-    verbose && println("\nPostprocessing..")
+    verbose && println("\nPostprocessing")
 
     weights_dict = Dict{Int,Dict{Int,Float64}}()
     for target_var in keys(nbr_dict)
@@ -261,7 +261,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     graph = make_symmetric_graph(weights_dict, edge_rule, edge_merge_fun=edge_merge_fun, max_var=size(data, 2),
                                  header=header)
 
-    verbose && println("Complete.")
+    verbose && println("Complete")
 
     LGLResult{Int}(graph, rej_dict, unfinished_state_dict)
 end
@@ -489,7 +489,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
         end
         verbose && println()
     else
-        @warn "Skipping normalization, only experts should choose this option."
+        @warn "Skipping normalization, only experts should choose this option"
         if isnothing(extra_data)
             input_data = data
         else
@@ -520,7 +520,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
         \tsparse - $(issparse(input_data))
         \tworkers - $(length(workers()))
         \tOTUs - $(size(input_data, 2) - n_mvs)
-        \tMVs - $(n_mvs)""")
+        \tMVs - $(n_mvs)\n""")
     end
 
     lgl_results, time_taken = @timed LGL(input_data; params_dict...)

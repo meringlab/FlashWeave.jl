@@ -159,7 +159,13 @@ end
 
                         if make_onehot
                             # skip the continuous column for identity test
-                            @test data_norm[:, meta_mask_norm][:, 1:end-1] == exp_dict["meta-tiny-oneHotTest"].meta_data[row_mask, 1:end-1]
+                            A = data_norm[:, meta_mask_norm][:, 1:end-1]
+                            A_exp = exp_dict["meta-tiny-oneHotTest"].meta_data[row_mask, 1:end-1]
+
+                            if test_name == "fz_nz"
+                                A .-= 1 # account for +1 hack for one-hot variables in fz_nz
+                            end
+                            @test A == A_exp
                             @test header_norm[meta_mask_norm] == exp_dict["meta-tiny-oneHotTest"].meta_header
 
                             # check the continuous meta data column
