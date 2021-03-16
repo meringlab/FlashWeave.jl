@@ -44,6 +44,21 @@ function make_test_object(test_name::String, cond::Bool; max_k::Integer=0,
     test_obj
 end
 
+function get_precision_type(prec; norm_mode=nothing, test_name=nothing)
+    @assert xor(!isnothing(test_name), !isnothing(norm_mode)) "provide exactly one out of 'test_name' and 'norm_mode'"
+    is_cont = !isnothing(norm_mode) ? iscontinuousnorm(norm_mode) : iscontinuous(test_name)
+    target_base_type_str = is_cont ? "Float" : "Int"
+    return eval(Symbol("$target_base_type_str$prec"))
+end
+
+function convert_to_target_prec(data::AbstractMatrix, prec, make_sparse; kwargs...)
+    T = get_precision_type(prec; kwargs...)
+
+    # need two-step conversion because direct 64+Dense -> 32+sparse currently
+    # does not work
+    M_out = make_sparse ? SparseMatrixCSC : Matrix
+    return data |> M_out{T}
+end
 
 function get_levels(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
     unique_vals = BitSet()

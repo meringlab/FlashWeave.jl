@@ -505,13 +505,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
         meta_mask = falses(size(data, 2))
     end
 
-    target_base_type_str = iscontinuousnorm(norm) ? "Float" : "Int"
-    T = eval(Symbol("$target_base_type_str$prec"))
-
-    # need two-step conversion because direct 64+Dense -> 32+sparse currently
-    # does not work
-    M_out = make_sparse ? SparseMatrixCSC : Matrix
-    data = data |> M{T} |> M_out{T}
+    data = convert_to_target_prec(data, prec, make_sparse; norm_mode=norm)
 
     (data=data, header=header, meta_mask=meta_mask, obs_filter_mask=row_mask)
 end

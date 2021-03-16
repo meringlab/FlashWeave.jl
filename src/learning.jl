@@ -225,7 +225,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                         :weight_type => weight_type, :debug => debug, :time_limit => time_limit,
                         :track_rejections => track_rejections, :cache_pcor => cache_pcor, kwargs...)
 
-    if all_univar_nbrs == nothing
+    if isnothing(all_univar_nbrs)
         target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min,
                                                               FDR, levels, parallel, cor_mat,
                                                               correct_reliable_only, verbose,
@@ -494,6 +494,13 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
             input_data = data
         else
             input_data, header, meta_mask = combine_data(data, header, meta_mask, trues(size(data, 1)), nothing, extra_data)
+        end
+
+        try
+            input_data = convert_to_target_prec(data, prec, make_sparse; test_name=test_name)
+        catch
+            T_target = get_precision_type(prec; test_name=test_name)
+            @error("Could not convert input data to required type $(T_target). Make sure all data values are numeric (if 'fast=false') or integers (if 'fast=true')")
         end
     end
 
