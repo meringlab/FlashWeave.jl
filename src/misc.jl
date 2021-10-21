@@ -87,7 +87,7 @@ stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit 
 function needs_nz_view(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest) where ElType
     nz = is_zero_adjusted(test_obj)
     is_nz_var = iscontinuous(test_obj) || test_obj.levels[X] > 2
-    nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))# || isa(test_obj, MiTestCond))
+    nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))
 end
 
 signed_weight(test_result::TestResult, kind::AbstractString="stat") = signed_weight(test_result.stat, test_result.pval, kind)

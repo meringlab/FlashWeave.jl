@@ -177,15 +177,15 @@ end
 function FWResult(inf_results::LGLResult{T}; variable_ids=nothing, meta_variable_mask=nothing,
     parameters=nothing) where T<:Integer
     n_vars = nv(inf_results.graph)
-    if parameters == nothing
+    if isnothing(parameters)
         parameters = Dict{Symbol,Any}()
     end
 
-    if variable_ids == nothing
+    if isnothing(variable_ids)
         variable_ids = ["X" * string(x) for x in 1:n_vars]
     end
 
-    if meta_variable_mask == nothing
+    if isnothing(meta_variable_mask)
         meta_variable_mask = falses(n_vars)
     end
 
@@ -259,7 +259,7 @@ function show(io::IO, result::FWResult{T}) where T<:Integer
     if n_unf == 0
         println(io, "none\n")
     else
-        println(io, "$n_unf, on average missing $mean_n_unchecked neighbors ($mean_frac_unchecked%)\n")
+        println(io, "$n_unf, on average missing $mean_n_unchecked neighbors (mean fraction: $mean_frac_unchecked)\n")
     end
 
     println(io, "Rejections:")
@@ -354,7 +354,7 @@ function Base.iterate(itr::BNBIterator, state::BNBIteratorState)
 
     Z_pool_ret = iterate(Z_pool, Z_pool_state)
 
-    if Z_pool_ret != nothing
+    if !isnothing(Z_pool_ret)
         Z, Z_pool_state = Z_pool_ret
     else
         # find next usable queue (=enough elements to pop one

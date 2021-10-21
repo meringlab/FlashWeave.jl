@@ -485,10 +485,12 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
         end
 
         if norm == "clr_nz"
-            # assure zeros are used for one-hot meta variables in fz_nz mode
-            cont_mask = iscontinuous(meta_data)
-            for i in findall(.!cont_mask)
-                meta_data[:, i] .+= 1
+            # assure zeros are used for meta variables in fz_nz mode via shifting 
+            # all values of respective variables by +1
+            for i in 1:size(meta_data, 2)
+                if any(iszero.(meta_data[:, i]))
+                    meta_data[:, i] .+= 1
+                end
             end
         end
 
