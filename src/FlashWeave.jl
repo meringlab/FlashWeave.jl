@@ -7,6 +7,7 @@ using SharedArrays, LinearAlgebra, Dates
 # data structures
 using DataStructures
 using LightGraphs, SimpleWeightedGraphs
+import SimpleWeightedGraphs: nv, edges, ne, vertices
 
 # statistics
 using StatsBase, Combinatorics, Distributions

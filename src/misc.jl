@@ -169,15 +169,15 @@ end
 
 
 function print_network_stats(graph::LightGraphs.Graph)
-    n_nodes = nv(graph)
-    n_edges = ne(graph)
+    n_nodes = LightGraphs.nv(graph)
+    n_edges = LightGraphs.ne(graph)
     println("Current nodes/edges: $n_nodes / $n_edges")
     println("Degree stats:")
-    deg = degree(graph)
+    deg = LightGraphs.degree(graph)
     println(summarystats(deg))
     deg_median = median(deg)
-    if deg_median > 20
-        @warn "The network seems unusually dense (current median degree $deg_median across all nodes) which can lead to slow speed. For possible causes see <>."
+    if deg_median > n_nodes/4
+        @warn "The network seems unusually dense (current median degree $deg_median across all nodes) which can lead to slow speed."
     end
 end
 

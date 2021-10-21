@@ -207,7 +207,9 @@ end
 
 function load_biom_hdf5(data_path)
     f = h5open(data_path, "r")
-    m, n = read(attrs(f)["shape"])
+    # use either 'attrs' or 'attributes' (depends on HDF5 version)
+    attr_fun = isdefined(HDF5, :attrs) ? attrs : attributes
+    m, n = read(attr_fun(f)["shape"])
     colptr, rowval, nzval = [read(f, "sample/matrix/$key") for key in ["indptr", "indices", "data"]]
     otu_table = permutedims(SparseMatrixCSC(m, n, colptr .+ 1, rowval .+ 1, Vector{Int}(nzval)))
     header = read(f, "observation/ids")
@@ -337,7 +339,7 @@ function write_edgelist(out_path::AbstractString, net_result::FWResult)
         write(out_f, "# meta mask\t", join(meta_mask, ","), "\n")
 
         for e in edges(G)
-            if header == nothing
+            if isnothing(header)
                 e1 = e.src
                 e2 = e.dst
             else
@@ -377,7 +379,7 @@ function read_edgelist(in_path::AbstractString)
         header, meta_mask
     end
     G = SimpleWeightedGraph_nodemax(srcs, dsts, ws; m=length(header))
-    net_result = FWResult(G; variable_ids=header, meta_variable_mask=meta_mask)
+    FWResult(G; variable_ids=header, meta_variable_mask=meta_mask)
 end
 
 

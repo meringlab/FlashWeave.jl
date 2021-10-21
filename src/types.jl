@@ -176,7 +176,7 @@ end
 
 function FWResult(inf_results::LGLResult{T}; variable_ids=nothing, meta_variable_mask=nothing,
     parameters=nothing) where T<:Integer
-    n_vars = nv(inf_results.graph)
+    n_vars = SimpleWeightedGraphs.nv(inf_results.graph)
     if isnothing(parameters)
         parameters = Dict{Symbol,Any}()
     end
@@ -251,7 +251,7 @@ function show(io::IO, result::FWResult{T}) where T<:Integer
 
     println(io, "Network:")
     n_meta_vars = sum(result.meta_variable_mask)
-    n_vars = nv(G)
+    n_vars = SimpleWeightedGraphs.nv(G)
     println(io, "$(ne(G)) interactions between $n_vars variables ($(n_vars - n_meta_vars) OTUs and $(n_meta_vars) MVs)\n")
 
     println(io, "Unfinished variables:")
