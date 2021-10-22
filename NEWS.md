@@ -1,8 +1,15 @@
 # master (unpublished)
 
+No changes
+
+# v0.18.1 (latest)
+
+### bug fixes
+
+- add hotfix for irregular breaking changes in SimpleWeightedGraphs.jl
 - fix bug that prevented adaptive_clr from correctly propagating samples that were dropped due to numerical edge cases (thanks **@jonasjonker** for reporting)
 
-# v0.18.0 (latest)
+# v0.18.0
 
 ### general
 
