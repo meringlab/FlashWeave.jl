@@ -5,7 +5,7 @@ os:
   - osx
 julia:
   - 1.2
-  - 1.5
+  - 1.6
 notifications:
   email: false
 addons:
