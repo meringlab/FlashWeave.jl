@@ -1,6 +1,7 @@
 # FlashWeave #
 
 [![Project Status: Active - The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
+[![Build Status](https://github.com/meringlab/FlashWeave.jl/workflows/CI/badge.svg)](https://github.com/meringlab/FlashWeave.jl/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/meringlab/FlashWeave.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/meringlab/FlashWeave.jl)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
