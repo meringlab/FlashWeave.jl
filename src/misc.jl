@@ -56,8 +56,12 @@ function convert_to_target_prec(data::AbstractMatrix, prec, make_sparse; kwargs.
 
     # need two-step conversion because direct 64+Dense -> 32+sparse currently
     # does not work
-    M_out = make_sparse ? SparseMatrixCSC : Matrix
-    return data |> M_out{T}
+    data_out = Matrix{T}(data)
+    if make_sparse
+        return sparse(data_out)
+    else
+        return data_out
+    end
 end
 
 function get_levels(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
