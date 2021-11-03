@@ -183,8 +183,8 @@ end
                                     continue
                                 end
 
-
                                 @testset "parallel $parallel" begin
+
                                     is_il = endswith(parallel, "_il")
                                     time_limit = is_il ? 30.0 : 0.0
 

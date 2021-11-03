@@ -18,7 +18,7 @@ jobs:
         os:
           - ubuntu-latest
           - macOS-latest
-          - windows-latest
+          # - windows-latest ## temporarily disabled due to "Access is denied" error with SharedArrays.jl
         arch:
           - x64
     steps:
