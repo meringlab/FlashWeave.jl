@@ -26,8 +26,12 @@ end
 ### discrete
 
 function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::AbstractContTest, hps::Integer, n_obs_min::Int=0)
-    @inbounds levels_x = test_obj.levels[X]
-    @inbounds levels_y = test_obj.levels[Y]
+    @inbounds begin
+        levels_x = test_obj.levels[X]
+        levels_y = test_obj.levels[Y]
+        max_val_x = test_obj.max_vals[X]
+        max_val_y = test_obj.max_vals[Y]
+    end
 
     if !sufficient_power(X, Y, data, test_obj, n_obs_min, hps)
         mi_stat = 0.0
@@ -35,10 +39,6 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
         pval = 1.0
         suff_power = false
     else
-        if is_zero_adjusted(test_obj)
-            offset_levels(levels_x, levels_y)
-        end
-
         if !issparse(data)
             contingency_table!(X, Y, data, test_obj.ctab)
         else
@@ -46,7 +46,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
         end
 
         if is_zero_adjusted(test_obj)
-            sub_ctab = nz_adjust_cont_tab(levels_x, levels_y, test_obj.ctab)
+            sub_ctab = nz_adjust_cont_tab(max_val_x, max_val_y, test_obj.ctab)
             levels_x = size(sub_ctab, 1)
             levels_y = size(sub_ctab, 2)
         else
@@ -93,11 +93,12 @@ end
 
 # convenience wrapper
 function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:Integer},
-        test_name::String, hps::Integer=5, n_obs_min::Int=0, levels::Vector{<:Integer}=Int[])
-    if isempty(levels)
+        test_name::String, hps::Integer=5, n_obs_min::Int=0, levels::Vector{<:Integer}=Int[], max_vals::Vector{<:Integer}=Int[])
+    if isempty(levels) || isempty(max_vals)
         levels = get_levels(data)
+        max_vals = get_max_vals(data)
     end
-    test_obj = make_test_object(test_name, false, max_k=0, levels=levels, cor_mat=zeros(Float64, 0, 0))
+    test_obj = make_test_object(test_name, false, max_k=0, levels=levels, max_vals=max_vals, cor_mat=zeros(Float64, 0, 0))
     test(X, Ys, data, test_obj, hps, n_obs_min)
 end
 
@@ -172,7 +173,7 @@ end
 #convenience wrapper
 function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFloat},
         test_name::String, n_obs_min::Integer=0)
-    test_obj = make_test_object(test_name, false, max_k=0, levels=Int[], cor_mat=zeros(Float64, 0, 0))
+    test_obj = make_test_object(test_name, false, max_k=0, levels=Int[], max_vals=Int[], cor_mat=zeros(Float64, 0, 0))
     test(X, Ys, data, test_obj, n_obs_min)
 end
 
@@ -182,8 +183,12 @@ end
 
 function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer}, test_obj::MiTestCond, hps::Integer, z::AbstractVector{<:Integer}=Int[])
     """Test association between X and Y"""
-    @inbounds levels_x = test_obj.levels[X]
-    @inbounds levels_y = test_obj.levels[Y]
+    @inbounds begin
+        levels_x = test_obj.levels[X]
+        levels_y = test_obj.levels[Y]
+        max_val_x = test_obj.max_vals[X]
+        max_val_y = test_obj.max_vals[Y]
+    end
 
     if !issparse(data)
         levels_z = contingency_table!(X, Y, Zs, data, test_obj.ctab, z, test_obj.zmap.cum_levels, test_obj.zmap.z_map_arr)
@@ -193,7 +198,7 @@ function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::Abstra
     end
 
     if is_zero_adjusted(test_obj)
-        sub_ctab = nz_adjust_cont_tab(levels_x, levels_y, test_obj.ctab)
+        sub_ctab = nz_adjust_cont_tab(max_val_x, max_val_y, test_obj.ctab)
         levels_x = size(sub_ctab, 1)
         levels_y = size(sub_ctab, 2)
     else
@@ -226,11 +231,12 @@ end
 
 function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5, levels::Vector{<:Integer}=Int[])
     """Convenience function for module tests"""
-    if isempty(levels)
+    if isempty(levels) || isempty(max_vals)
         levels = get_levels(data)
+        max_vals = get_max_vals(data)
     end
 
-    test_obj = MiTestCond(levels, is_zero_adjusted(test_name) ? Nz() : NoNz(), length(Zs))
+    test_obj = MiTestCond(levels, is_zero_adjusted(test_name) ? Nz() : NoNz(), length(Zs), max_vals)
 
     z = issparse(data) ? eltype(levels)[] : zeros(eltype(levels), size(data, 1))
     test(X, Y, Zs, data, test_obj, hps, z)
@@ -428,7 +434,8 @@ end
 
 function pw_univar_neighbors(data::AbstractMatrix{ElType};
         test_name::String="mi", alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, FDR::Bool=true,
-        levels::AbstractVector{DiscType}=DiscType[], parallel::String="single",
+        levels::AbstractVector{DiscType}=DiscType[], max_vals::AbstractVector{DiscType}=DiscType[],
+        parallel::String="single",
         workers_local::Bool=true,
         cor_mat::Matrix{ContType}=zeros(ContType, 0, 0),
         tmp_folder::AbstractString="",
@@ -439,9 +446,10 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
 
     if startswith(test_name, "mi") && isempty(levels)
         levels = get_levels(data)
+        max_vals = get_max_vals(data)
     end
 
-    test_obj = make_test_object(test_name, false, levels=levels, cor_mat=cor_mat)
+    test_obj = make_test_object(test_name, false, levels=levels, max_vals=max_vals, cor_mat=cor_mat)
 
     n_vars = length(target_vars)
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)

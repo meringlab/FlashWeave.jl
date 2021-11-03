@@ -39,8 +39,9 @@ function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}
 end
 
 ## convenience wrapper for two-way contingency tables
-function contingency_table(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer}, test_name::String, levels::Vector{<:Integer}=get_levels(data))
-    test_obj = make_test_object(test_name, false, max_k=0, levels=levels, cor_mat=zeros(Float64, 0, 0))
+function contingency_table(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer}, test_name::String, levels::Vector{<:Integer}=get_levels(data),
+    max_vals::Vector{<:Integer}=get_max_vals(data))
+    test_obj = make_test_object(test_name, false, max_k=0, levels=levels, max_vals=max_vals, cor_mat=zeros(Float64, 0, 0))
     contingency_table!(X, Y, data, test_obj)
     test_obj.ctab::Matrix{Int}
 end
@@ -56,8 +57,8 @@ function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}
 end
 
 function contingency_table(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer},
-    test_name::String, levels::Vector{<:Integer}=get_levels(data))
-    test_obj = make_test_object(test_name, true, max_k=length(Zs), levels=levels, cor_mat=zeros(Float64, 0, 0))
+    test_name::String, levels::Vector{<:Integer}=get_levels(data), max_vals::Vector{<:Integer}=get_max_vals(data))
+    test_obj = make_test_object(test_name, true, max_k=length(Zs), levels=levels, max_vals=max_vals, cor_mat=zeros(Float64, 0, 0))
     contingency_table!(X, Y, Zs, data, test_obj)
     test_obj.ctab::Array{Int,3}
 end

@@ -1,5 +1,5 @@
 using FlashWeave
-using Test
+using Test, Random, StableRNGs
 using SimpleWeightedGraphs
 using LightGraphs
 using SparseArrays, DelimitedFiles, Statistics, Distributed, Logging
@@ -31,7 +31,7 @@ macro silence_stdout(expr)
 end
 
 function make_network(data, test_name, make_sparse=false, prec=64, verbose=true, return_graph=true; kwargs...)
-    data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=true,
+    data_norm, mask = FlashWeave.preprocess_data_default(data, test_name, verbose=verbose,
                                                          make_sparse=make_sparse, prec=prec)
     lgl_res = FlashWeave.LGL(data_norm; test_name=test_name, verbose=verbose,  kwargs...)
     if return_graph
@@ -122,7 +122,7 @@ nprocs() == 1 && addprocs(1)
                 @testset "pmap $use_pmap" begin
                     nbrs = FlashWeave.pw_univar_neighbors(data_bin, parallel=parallel,
                                                           workers_local=wl,
-                                                          levels=Int[], cor_mat=zeros(0, 0))
+                                                          levels=Int[], max_vals=Int[], cor_mat=zeros(0, 0))
                     @test isa(nbrs, Dict)
                     !use_pmap && push!(nbrs_dicts, nbrs)
                 end
@@ -137,6 +137,36 @@ nprocs() == 1 && addprocs(1)
     global T_nbrs = nbrs_dicts[1][T_var]
 end
 
+# assure that including high-information meta variables leads to edge removal
+@testset "meta conditioning" begin
+    rng = StableRNG(1234)
+    otu_mat_rand = rand(rng, 0:2, 100, 10)
+    otu_target = rand(rng, 0:2, 100) # counts for two identical OTUs
+
+    # meta variable identical to target OTUs, but without zeros
+    mv_target = copy(otu_target)
+    mv_target[mv_target .== 0] .= 1
+    
+    otu_mat_full = hcat(otu_mat_rand, otu_target, otu_target, mv_target)
+    meta_mask = vcat(falses(12), true)
+
+    for sensitive in [true, false]
+        @testset "sensitive $sensitive" begin
+            for max_k in [0, 1]
+                @testset "max_k $(max_k)" begin
+                    net = learn_network(otu_mat_full; sensitive=sensitive, heterogeneous=true, max_k=max_k, verbose=false, 
+                        meta_mask, normalize=false)
+                    num_edges = SimpleWeightedGraphs.ne(graph(net))
+                    if max_k == 0
+                        @test num_edges == 3
+                    else # with conditioning, one of the three edges is explained away (the others stay due to heuristic)
+                        @test num_edges == 2
+                    end
+                end
+            end
+        end
+    end
+end
 
 @testset "LGL_backend" begin
     for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
@@ -165,7 +195,7 @@ end
                                                  end
 
                                     # special case for conditional mi
-                                    if is_il && test_name == "mi" && max_k == 3
+                                    if test_name == "mi" && max_k == 3
                                         approx_nbr_diff = 22
                                         approx_weight_meandiff = 0.16
                                     else
@@ -176,7 +206,7 @@ end
                                     @testset "edge_identity" begin
                                         @test compare_graph_results(exp_graph, pred_graph,
                                                                     rtol=rtol, atol=atol,
-                                                                    approx=is_il,
+                                                                    approx=true,
                                                                     approx_nbr_diff=approx_nbr_diff,
                                                                     approx_weight_meandiff=approx_weight_meandiff)
                                     end
@@ -194,12 +224,34 @@ end
     end
 end
 
+@testset "pcor_recursive_fits_iterative" begin
+    approx_nbr_diff = 0
+    approx_weight_meandiff = 0.05
+    
+    for test_name in ["fz", "fz_nz"]
+        @testset "$test_name" begin
+            for prec in [32, 64]
+                @testset "precision $prec" begin
+                    pred_graph_iter = make_network(data, test_name, false, prec, false; recursive_pcor=false)
+                    pred_graph_rec = make_network(data, test_name, false, prec, false)
+                    @testset "edge_identity" begin
+                        @test compare_graph_results(pred_graph_iter, pred_graph_rec,
+                                                    rtol=rtol, atol=atol,
+                                                    approx=true,
+                                                    approx_nbr_diff=approx_nbr_diff,
+                                                    approx_weight_meandiff=approx_weight_meandiff)
+                    end
+                end
+            end
+        end
+    end
+end
 
 @testset "precision_32" begin
     for (test_name, make_sparse) in [("mi_nz", true), ("fz", false)]
         for make_sparse in [true, false]
             @testset "$(test_name)_$(make_sparse)_single" begin
-                pred_graph = @silence_stdout make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single", time_limit=0.0)
+                pred_graph = @silence_stdout make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single_il", time_limit=0.0)
                 exp_graph = exp_dict["exp_$(test_name)_maxk3"]
                 @test compare_graph_results(exp_graph, pred_graph, rtol=1e-2, atol=0.0)
             end
@@ -235,7 +287,6 @@ end
 
                 @testset "edge_identity" begin
                     @test compare_graph_results(exp_graph, pred_graph,
-                                                # rtol=rtol, atol=atol,
                                                 approx=true,
                                                 approx_nbr_diff=approx_nbr_diff,
                                                 approx_weight_meandiff=approx_weight_meandiff)
@@ -324,7 +375,7 @@ end
 
 @testset "hiton msg" begin
     @test @silence_stdout begin
-                isa(FlashWeave.si_HITON_PC(T_var, data_bin, Int[], zeros(0, 0),
+                isa(FlashWeave.si_HITON_PC(T_var, data_bin, Int[], Int[], zeros(0, 0),
                               univar_nbrs=T_nbrs, debug=2), FlashWeave.HitonState)
           end
 end
@@ -346,16 +397,38 @@ end
     end
 end
 
+# assure that tables with variables that are observed everywhere are handled correctly
+@testset "non-zero variables" begin
+    rng = StableRNG(1234)
+    A = rand(rng, 1:1000, 100, 10)
+    A[rand(rng, Bool, 100, 10)] .= 0
+    A[:, end] .+= 1 # enforce one variable without zeros
+    for sensitive in [true, false]
+        @testset "sensitive $sensitive" begin
+            for heterogeneous in [true, false]
+                @testset "heterogeneous $heterogeneous" begin
+                    for max_k in [0, 1]
+                        @testset "max_k $(max_k)" begin
+                            @test isa(learn_network(A; sensitive=sensitive, heterogeneous=heterogeneous, max_k=max_k, verbose=false, normalize=true), FlashWeave.FWResult)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 
 # to create expected output
 
-# exp_dict = Dict()
-# for test_name in ["mi", "mi_nz", "fz", "fz_nz"]
-#     for max_k in [0, 3]
-#         graph = make_network(data, test_name, false, 64, max_k=max_k, parallel="single", time_limit=0.0)
-#         exp_dict["exp_$(test_name)_maxk$(max_k)"] = graph.weights
-#      end
-# end
-#
-# out_path = joinpath("data", "learning_expected.jld2")
-# save(out_path, exp_dict)
+#for test_name in ["fz", "fz_nz", "mi", "mi_nz"]
+#    for max_k in [0, 3]
+#        sensitive = startswith(test_name, "fz")
+#        heterogeneous = endswith(test_name, "_nz")
+#        net = learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous, prec=64, max_k=max_k,
+#            parallel_mode="single_il", time_limit=30.0, verbose=false)
+#        path = joinpath("data", "learning_expected", "exp_$(test_name)_maxk$(max_k).edgelist")
+#        save_network(path, net)
+#     end
+#end
+

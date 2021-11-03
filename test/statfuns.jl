@@ -24,16 +24,16 @@ data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_smal
 @testset "correlation" begin
     data_clr, mask = FlashWeave.preprocess_data_default(data, "fz", verbose=false,
     prec=64)
-    exp_pcor_Z1 = -0.16393307352649364
+    exp_pcor_Z1 = -0.16393307352649356
     cor_mat = cor(data_clr)
     @testset "pcor_Z1" begin
         @test isapprox(@inferred(FlashWeave.pcor(1, 16, (41,), data_clr)), exp_pcor_Z1, rtol=1e-6)
-        @test isapprox(@inferred(FlashWeave.pcor_rec(1, 16, (41,), cor_mat, Dict{String,Dict{String,Float64}}())), exp_pcor_Z1, rtol=1e-6)
+        @test isapprox(@inferred(FlashWeave.pcor_rec(1, 16, (41,), cor_mat, Dict{String,Dict{String,Float64}}())), exp_pcor_Z1, atol=1e-4) # use atol due to numeric instability of 'cor', see 'pcor_rec()'
     end
     exp_pcor_Z3 = -0.07643814205965811
     @testset "pcor_Z3" begin
         @test isapprox(@inferred(FlashWeave.pcor(31, 21, (7, 14, 18), data_clr)), exp_pcor_Z3, rtol=1e-6)
-        @test isapprox(@inferred(FlashWeave.pcor_rec(31, 21, (7, 14, 18), cor_mat, Dict{String,Dict{String,Float64}}())), exp_pcor_Z3, rtol=1e-6)
+        @test isapprox(@inferred(FlashWeave.pcor_rec(31, 21, (7, 14, 18), cor_mat, Dict{String,Dict{String,Float64}}())), exp_pcor_Z3, atol=1e-4) # use atol due to numeric instability of 'cor', see 'pcor_rec()'
     end
     @testset "pval_fz" begin
         @test isapprox(@inferred(FlashWeave.fz_pval(exp_pcor_Z1, 351, 1)), 0.0020593283914246987, rtol=1e-6)

@@ -32,14 +32,14 @@ end
 
 
 function make_test_object(test_name::String, cond::Bool; max_k::Integer=0,
-        levels::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), cache_pcor::Bool=true) where ContType<:AbstractFloat
+        levels::Vector{<:Integer}=Int[], max_vals::Vector{<:Integer}=Int[], cor_mat::Matrix{ContType}=zeros(ContType, 0, 0), cache_pcor::Bool=true) where ContType<:AbstractFloat
     discrete_test = isdiscrete(test_name)
     nz = is_zero_adjusted(test_name) ? Nz() : NoNz()
 
     if cond
-        test_obj = discrete_test ? MiTestCond(levels, nz, max_k) : FzTestCond(cor_mat, Dict{String,Dict{String,ContType}}(), nz, cache_pcor)
+        test_obj = discrete_test ? MiTestCond(levels, nz, max_k, max_vals) : FzTestCond(cor_mat, Dict{String,Dict{String,ContType}}(), nz, cache_pcor)
     else
-        test_obj = discrete_test ? MiTest(levels, nz) : FzTest(cor_mat, nz)
+        test_obj = discrete_test ? MiTest(levels, nz, max_vals) : FzTest(cor_mat, nz)
     end
     test_obj
 end
@@ -71,17 +71,33 @@ function get_levels(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integ
     end
 
     add_zero = size(data, 1) > length(nzrange(data, x)) ? 1 : 0
-    length(unique_vals) + add_zero
+    ElType(length(unique_vals) + add_zero)
 end
 
 
 function get_levels(x::Int, data::Matrix{ElType}) where ElType <: Integer
-    length(unique(@view data[:, x]))
+    ElType(length(unique(@view data[:, x])))
 end
 
 
 function get_levels(data::AbstractMatrix{ElType}) where ElType <: Integer
     map(x -> get_levels(x, data), 1:size(data, 2))
+end
+
+
+function get_max_vals(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
+    nz_itr = nzrange(data, x)
+    isempty(nz_itr) ? zero(ElType) : maximum(data.nzval[j] for j in nz_itr)
+end
+
+
+function get_max_vals(x::Int, data::Matrix{ElType}) where ElType <: Integer
+    maximum(@view data[:, x])
+end
+
+
+function get_max_vals(data::AbstractMatrix{ElType}) where ElType <: Integer
+    map(x -> get_max_vals(x, data), 1:size(data, 2))
 end
 
 

@@ -87,7 +87,7 @@ function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, 
 
     if bnb
         if TestType <: MiTestCond
-            test_params = (max_k=max_k, levels=test_obj.levels)
+            test_params = (max_k=max_k, levels=test_obj.levels, max_vals=test_obj.max_vals)
             test_args = (hps, z)
         elseif TestType <: FzTestCond
             test_params = (max_k=max_k, cor_mat=test_obj.cor_mat, cache_pcor=test_obj.cache_pcor)
@@ -169,7 +169,7 @@ function make_stopped_HitonState()
     HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
 end
 
-function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, levels::Vector{DiscType}, max_k::Integer,
+function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, levels::Vector{DiscType}, max_vals::Vector{DiscType}, max_k::Integer,
      cor_mat::AbstractMatrix{ContType}, cache_pcor::Bool) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     stop_hiton = false
@@ -177,6 +177,7 @@ function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, 
     if isdiscrete(test_name)
         if isempty(levels)
             levels = get_levels(data)::Vector{DiscType}
+            max_vals = get_max_vals(data)::Vector{DiscType}
         end
 
         if levels[T] < 2
@@ -189,11 +190,11 @@ function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, 
         z = DiscType[]
     end
 
-    test_obj = make_test_object(test_name, true, max_k=max_k, levels=levels, cor_mat=cor_mat, cache_pcor=cache_pcor)
+    test_obj = make_test_object(test_name, true, max_k=max_k, levels=levels, max_vals=max_vals, cor_mat=cor_mat, cache_pcor=cache_pcor)
     data_prep = prepare_nzdata(T, data, test_obj)
     test_variables = filter(x -> x != T, 1:size(data, 2))
 
-    data_prep, levels, z, test_obj, test_variables, stop_hiton
+    data_prep, levels, max_vals, z, test_obj, test_variables, stop_hiton
 end
 
 function prepare_interleaving_phase(prev_state::HitonState{Int}, rej_dict::RejDict{Int},
@@ -279,7 +280,8 @@ end
 ## Main function for Hiton-PC ##
 ################################
 
-function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscType}=DiscType[], cor_mat::Matrix{ContType}=zeros(ContType);
+function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscType}, max_vals::Vector{DiscType}, 
+        cor_mat::Matrix{ContType};
         test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, max_tests::Int=Int(1.5e9),
         fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_stat",
         whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
@@ -292,7 +294,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
     rej_dict = RejDict{Int}()
 
-    data_prep, levels, z, test_obj, test_variables, stop_hiton = init_hiton_pc(T, data, test_name, levels, max_k, cor_mat, cache_pcor)
+    data_prep, levels, max_vals, z, test_obj, test_variables, stop_hiton = init_hiton_pc(T, data, test_name, levels, max_vals, max_k, cor_mat, cache_pcor)
 
     if stop_hiton
         return make_stopped_HitonState()
@@ -389,8 +391,16 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
         debug > 1 && println(PC_dict)
 
     else
+        TPC_dict = NbrStatDict()
         PC_dict = univar_nbrs
     end
 
     return make_final_HitonState(prev_state, PC_dict, TPC_dict, rej_dict)
+end
+
+## convenience function for learning local neighborhoods
+function si_HITON_PC(T, data; test_name, levels=isdiscrete(test_name) ? get_levels(data) : Int[], 
+    max_vals=isdiscrete(test_name) ? get_max_vals(data) : Int[], cor_mat=zeros(Float32, 0, 0), kwargs...)
+univar_res = FlashWeave.pw_univar_neighbors(data, test_name=test_name, levels=levels, max_vals=max_vals, cor_mat=cor_mat)
+FlashWeave.si_HITON_PC(T, data, levels, max_vals, cor_mat; test_name=test_name, univar_nbrs=univar_res[T], kwargs...)
 end

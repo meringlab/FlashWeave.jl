@@ -1,4 +1,4 @@
-function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_rule::String,
+function interleaved_worker(data::AbstractMatrix{ElType}, levels, max_vals, cor_mat, edge_rule::String,
      nonsparse_cond::Bool, shared_job_q::RemoteChannel, shared_result_q::RemoteChannel,
      GLL_args::Dict{Symbol,Any}) where {ElType<:Real}
 
@@ -27,7 +27,7 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, cor_mat, edge_
             blacklist = Set{Int}()
             whitelist = skip_nbrs
 
-            nbr_state = si_HITON_PC(target_var, data, levels, cor_mat; univar_nbrs=univar_nbrs,
+            nbr_state = si_HITON_PC(target_var, data, levels, max_vals, cor_mat; univar_nbrs=univar_nbrs,
                                     prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
             put!(shared_result_q, (target_var, nbr_state))
         catch exc
@@ -40,7 +40,7 @@ end
 
 function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMatrix{ElType},
         all_univar_nbrs::Dict{Int,OrderedDict{Int,Tuple{Float64,Float64}}}, levels::Vector{DiscType},
-        cor_mat::Matrix{ContType}, GLL_args::Dict{Symbol,Any};
+        max_vals::Vector{DiscType}, cor_mat::Matrix{ContType}, GLL_args::Dict{Symbol,Any};
         update_interval::Real=30.0, variable_ids=nothing, meta_variable_mask=nothing,
         convergence_threshold::AbstractFloat=0.01,
         conv_check_start::AbstractFloat=0.1, conv_time_step::AbstractFloat=0.1, parallel::String="multi_il",
@@ -86,7 +86,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
 
     verbose && println("\nPreparing workers..")
 
-    worker_returns = [@spawnat wid interleaved_worker(data, levels, cor_mat, edge_rule,
+    worker_returns = [@spawnat wid interleaved_worker(data, levels, max_vals, cor_mat, edge_rule,
                                                       nonsparse_cond,
                                                       shared_job_q, shared_result_q, GLL_args)
                       for wid in worker_ids]

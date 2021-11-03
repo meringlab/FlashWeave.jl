@@ -468,7 +468,7 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
             header = header[bin_mask]
         end
 
-        verbose && println("\t-> removed $(unreduced_vars - size(data, 2)) variables with not exactly $n_bins levels")
+        verbose && println("\t-> removed $(unreduced_vars - size(data, 2)) variables with not exactly $n_bins non-zero levels")
 
     else
         error("$norm is not a valid normalization method")

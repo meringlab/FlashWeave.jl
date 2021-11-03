@@ -79,14 +79,15 @@ abstract type ContTest2D{S,T} <: AbstractContTest{S,T} end
 struct MiTest{S<:Integer, T<:AbstractNz} <: ContTest2D{S, T}
     ctab::Matrix{Int}
     levels::Vector{S}
+    max_vals::Vector{S}
     marg_i::Vector{S}
     marg_j::Vector{S}
     nz::T
 end
 
-function MiTest(levels::Vector{S}, nz::AbstractNz) where S<:Integer
-    max_level = maximum(levels)
-    MiTest(zeros(Int, max_level, max_level), levels, zeros(S, max_level), zeros(S, max_level), nz)
+function MiTest(levels::Vector{S}, nz::AbstractNz, max_vals::Vector{S}) where S<:Integer
+    max_level = maximum(max_vals) + one(S)
+    MiTest(zeros(Int, max_level, max_level), levels, max_vals, zeros(S, max_level), zeros(S, max_level), nz)
 end
 
 reset!(test_obj::ContTest2D) = fill!(test_obj.ctab, 0)
@@ -98,20 +99,21 @@ struct MiTestCond{S<:Integer, T<:AbstractNz} <: ContTest3D{S, T}
     ctab::Array{Int, 3}
     zmap::ZMapper{S}
     levels::Vector{S}
+    max_vals::Vector{S}
     marg_i::Matrix{S}
     marg_j::Matrix{S}
     marg_k::Vector{S}
     nz::T
 end
 
-function MiTestCond(levels::Vector{S}, nz::AbstractNz, max_k::Integer) where S<:Integer
-    max_level = maximum(levels)
+function MiTestCond(levels::Vector{S}, nz::AbstractNz, max_k::Integer, max_vals::Vector{S}) where S<:Integer
+    max_level = maximum(max_vals) + one(S)
     zmap = ZMapper(max_k, max_level)
     ctab = zeros(Int, (max_level, max_level, max_level^max_k))
     marg_i = zeros(S, max_level, max_level^max_k)
     marg_j = copy(marg_i)
     marg_k = zeros(S, max_level^max_k)
-    MiTestCond(ctab, zmap, levels, marg_i, marg_j, marg_k, nz)
+    MiTestCond(ctab, zmap, levels, max_vals, marg_i, marg_j, marg_k, nz)
 end
 
 function reset!(test_obj::ContTest3D)
@@ -297,7 +299,7 @@ end
 Base.IteratorSize(::BNBIterator) = Base.SizeUnknown()
 
 function make_test_object(::Type{MiTestCond{S,T}}, max_k_curr, test_params) where {S<:Real, T<:AbstractNz}
-    MiTestCond(test_params.levels, T(), max_k_curr)
+    MiTestCond(test_params.levels, T(), max_k_curr, test_params.max_vals)
 end
 
 function make_test_object(::Type{FzTestCond{S,T}}, max_k_curr, test_params) where {S<:Real, T<:AbstractNz}

@@ -18,35 +18,7 @@ end
 
 
 function pcor(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Real})
-    @inbounds sub_data = @view data[:, [X, Y, Zs...]]
-
-    if size(sub_data, 1) < 1
-        return 0.0
-    end
-
-    @inbounds p = try
-        cov_mat = cov(sub_data)
-        inv_mat = pinv(cov_mat)
-
-        var_x = inv_mat[1, 1]
-        var_y = inv_mat[2, 2]
-        if var_x == 0.0 || var_y == 0.0
-            p = 0.0
-        else
-            p = -inv_mat[1, 2] / sqrt(var_x * var_y)
-        end
-
-        # make sure partial correlation coeff stays within bounds
-        if p < -1.0
-            p = -1.0
-        elseif p >= 1.0
-            p = 1.0
-        end
-
-        return p
-    catch
-        return 0.0
-    end
+    @views partialcor(data[:, X], data[:, Y], data[:, collect(Zs)])
 end
 
 
@@ -65,8 +37,10 @@ function pcor_rec(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, cor_mat:
             pXY = cor_mat[X, Y]
             pXZ = cor_mat[X, Z]
             pYZ = cor_mat[Y, Z]
+            enum_term = pXY - pXZ * pYZ
+            enum_term = round(enum_term, digits=5) # account for numeric instability of cor with Float32
             denom_term = (sqrt(one(ContType) - pXZ^2) * sqrt(one(ContType) - pYZ^2))
-            p = denom_term == 0.0 ? 0.0 : (pXY - pXZ * pYZ) / denom_term
+            p = denom_term == 0.0 ? 0.0 : enum_term / denom_term
 
         else
             Zs_nZ0 = Zs[1:end-1]
@@ -75,9 +49,10 @@ function pcor_rec(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, cor_mat:
             pXY_nZ0 = pcor_rec(X, Y, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
             pXZ0_nZ0 = pcor_rec(X, Z0, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
             pYZ0_nZ0 = pcor_rec(Y, Z0, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
-
+            enum_term = pXY_nZ0 - pXZ0_nZ0 * pYZ0_nZ0
+            enum_term = round(enum_term, digits=5) # account for numeric instability of cor with Float32
             denom_term = sqrt(one(ContType) - pXZ0_nZ0^2) * sqrt(one(ContType) - pYZ0_nZ0^2.0)
-            p = denom_term == 0.0 ? 0.0 : (pXY_nZ0 - pXZ0_nZ0 * pYZ0_nZ0) / denom_term
+            p = denom_term == 0.0 ? 0.0 : enum_term / denom_term
         end
 
 
@@ -339,14 +314,14 @@ function adjust_df(marg_i::AbstractMatrix{T}, marg_j::AbstractMatrix{T}, levels_
     df
 end
 
-function offset_levels(levels_x::Integer, levels_y::Integer)
-    offset_x = levels_x > 2 ? 2 : 1
-    offset_y = levels_y > 2 ? 2 : 1
+function offset_levels(max_val_x::Integer, max_val_y::Integer)
+    offset_x = max_val_x > 1 ? 2 : 1
+    offset_y = max_val_y > 1 ? 2 : 1
     offset_x, offset_y
 end
 
-function nz_adjust_cont_tab(levels_x::Integer, levels_y::Integer, ctab::AbstractArray{<:Integer})
-    offset_x, offset_y = offset_levels(levels_x, levels_y)
+function nz_adjust_cont_tab(max_val_x::Integer, max_val_y::Integer, ctab::AbstractArray{<:Integer})
+    offset_x, offset_y = offset_levels(max_val_x, max_val_y)
 
     if ndims(ctab) == 2
         return @view ctab[offset_x:end, offset_y:end]

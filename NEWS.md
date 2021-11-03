@@ -1,6 +1,7 @@
 # master (unpublished)
 
-No changes
+- fix numerical edge case for recursive partial correlations, improve speed and edge case behaviour for non-recursive partial correlations
+- fix handling of variables with no absences when `heterogeneous=true`
 
 # v0.18.1 (latest)
 

@@ -33,9 +33,11 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     if isdiscrete(test_name)
         verbose && println("Computing levels")
         levels = get_levels(data)
+        max_vals = get_max_vals(data)
         cor_mat = zeros(cont_type, 0, 0)
     else
         levels = disc_type[]
+        max_vals = disc_type[]
 
         if dense_cor && !is_zero_adjusted(test_name)
             data_dense = issparse(data) ? Matrix(data) : data
@@ -71,12 +73,12 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         n_unrel > 0 && @warn "$n_unrel variables have insufficient observations (< $n_obs_min ('n_obs_min')) and will not be used for interaction prediction"
     end
 
-    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule
+    levels, max_vals, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule
 end
 
 
 function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String, alpha::AbstractFloat, hps::Integer,
-    n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
+    n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, max_vals::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
     correct_reliable_only::Bool, verbose::Bool,
     tmp_folder::AbstractString="") where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
@@ -85,7 +87,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps,
                                           n_obs_min=n_obs_min, FDR=FDR,
-                                          levels=levels, parallel=parallel, workers_local=workers_all_local(),
+                                          levels=levels, max_vals=max_vals, parallel=parallel, workers_local=workers_all_local(),
                                           cor_mat=cor_mat, correct_reliable_only=correct_reliable_only,
                                           tmp_folder=tmp_folder)
     var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
@@ -112,7 +114,7 @@ end
 
 
 function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMatrix{ElType},
-     all_univar_nbrs::Dict{Int,NbrStatDict}, levels::Vector{DiscType},
+     all_univar_nbrs::Dict{Int,NbrStatDict}, levels::Vector{DiscType}, max_vals::Vector{DiscType},
      cor_mat::AbstractMatrix{ContType}, parallel::String, nonsparse_cond::Bool, recursive_pcor::Bool,
      cont_type::DataType, verbose::Bool, hiton_kwargs::Dict{Symbol, Any},
       interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
@@ -129,17 +131,17 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
     end
 
     if parallel == "single"
-        nbr_results = HitonState{Int}[si_HITON_PC(x, data, levels, cor_mat; univar_nbrs=all_univar_nbrs[x], hiton_kwargs...) for x in target_vars]
+        nbr_results = HitonState{Int}[si_HITON_PC(x, data, levels, max_vals, cor_mat; univar_nbrs=all_univar_nbrs[x], hiton_kwargs...) for x in target_vars]
     else
         # embarassing parallelism
         if parallel == "multi_ep"
             nbr_results::Vector{HitonState{Int}} = @distributed (vcat) for x in target_vars
-                si_HITON_PC(x, data, levels, cor_mat; univar_nbrs=all_univar_nbrs[x], hiton_kwargs...)
+                si_HITON_PC(x, data, levels, max_vals, cor_mat; univar_nbrs=all_univar_nbrs[x], hiton_kwargs...)
             end
 
         # interleaved mode
         elseif endswith(parallel, "il")
-            il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, cor_mat, hiton_kwargs; parallel=parallel,
+            il_dict = interleaved_backend(target_vars, data, all_univar_nbrs, levels, max_vals, cor_mat, hiton_kwargs; parallel=parallel,
                                           nonsparse_cond=nonsparse_cond, verbose=verbose, interleaved_kwargs...)
             nbr_results = HitonState{Int}[il_dict[target_var] for target_var in target_vars]
         else
@@ -154,7 +156,7 @@ end
 
 function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{ElType},
     all_univar_nbrs::Dict{Int,NbrStatDict},
-    levels::Vector{DiscType}, cor_mat::AbstractMatrix{ContType}, parallel::String, recursive_pcor::Bool,
+    levels::Vector{DiscType}, max_vals::Vector{DiscType}, cor_mat::AbstractMatrix{ContType}, parallel::String, recursive_pcor::Bool,
     cont_type::DataType, time_limit::AbstractFloat, nonsparse_cond::Bool, verbose::Bool, track_rejections::Bool,
     hiton_kwargs::Dict{Symbol, Any}, interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
@@ -167,7 +169,7 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
 
     # else, run full conditioning
     else
-        nbr_results_dict = infer_conditional_neighbors(target_vars, data, all_univar_nbrs, levels, cor_mat, parallel,
+        nbr_results_dict = infer_conditional_neighbors(target_vars, data, all_univar_nbrs, levels, max_vals, cor_mat, parallel,
                                                        nonsparse_cond, recursive_pcor, cont_type, verbose, hiton_kwargs,
                                                        interleaved_kwargs)
 
@@ -209,7 +211,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_il'
     """
-    levels, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule =
+    levels, max_vals, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule =
                                                                               prepare_lgl(data, test_name,
                                                                                           time_limit, parallel,
                                                                                           feed_forward, max_k,
@@ -227,7 +229,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
 
     if isnothing(all_univar_nbrs)
         target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min,
-                                                              FDR, levels, parallel, cor_mat,
+                                                              FDR, levels, max_vals, parallel, cor_mat,
                                                               correct_reliable_only, verbose,
                                                               tmp_folder)
     else
@@ -243,7 +245,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                               :kill_remote_workers => kill_remote_workers)
 
     nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data,
-                                                                      all_univar_nbrs, levels,
+                                                                      all_univar_nbrs, levels, max_vals,
                                                                       cor_mat, parallel,
                                                                       recursive_pcor,
                                                                       cont_type, time_limit, nonsparse_cond,
@@ -251,7 +253,6 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                                                                       interleaved_kwargs)
 
     verbose && println("\nPostprocessing")
-
     weights_dict = Dict{Int,Dict{Int,Float64}}()
     for target_var in keys(nbr_dict)
         weights_dict[target_var] = make_weights(nbr_dict[target_var], all_univar_nbrs[target_var],
