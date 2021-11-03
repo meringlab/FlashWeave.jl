@@ -155,7 +155,7 @@ end
             for max_k in [0, 1]
                 @testset "max_k $(max_k)" begin
                     net = learn_network(otu_mat_full; sensitive=sensitive, heterogeneous=true, max_k=max_k, verbose=false, 
-                        meta_mask, normalize=false)
+                        meta_mask=meta_mask, normalize=false)
                     num_edges = SimpleWeightedGraphs.ne(graph(net))
                     if max_k == 0
                         @test num_edges == 3
