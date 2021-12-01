@@ -442,7 +442,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     if parallel_mode == "auto"
         parallel_mode = nprocs() > 1 ? "multi_il" : "single_il"
     else
-        valid_parallel_modes = ("multi_il", "single_il", "auto")
+        valid_parallel_modes = ("multi_il", "single_il", "single", "auto")
         if !(parallel_mode in valid_parallel_modes)
             error("\"$(parallel_mode)\" not a valid parallelization mode, choose one of $(valid_parallel_modes)")
         end

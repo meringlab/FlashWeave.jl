@@ -372,6 +372,11 @@ function preprocess_data(data::AbstractMatrix, norm::String; clr_pseudo_count::A
 
     has_meta = any(meta_mask)
 
+    # assure that all stored entries in sparse data are non-zero
+    if issparse(data) && any(iszero.(nonzeros(data)))
+        dropzeros!(data)
+    end
+
     if has_meta
         meta_data = data[:, meta_mask]
         nometa_mask = .!meta_mask
