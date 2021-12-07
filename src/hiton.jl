@@ -95,7 +95,7 @@ function check_candidate!(candidate::Int, T::Int, data::AbstractMatrix{ElType}, 
         end
         itr = BNBIterator(T, candidate, accepted, data_prep, TestType, cut_test_branches,
                           test_params, test_args)
-        test_result, lowest_sig_Zs, num_tests = test_subsets(itr, alpha; n_obs_min=n_obs_min, max_tests=max_tests)
+        test_result, lowest_sig_Zs, num_tests = test_subsets(itr, alpha; n_obs_min=n_obs_min, max_tests=max_tests, test_obj=test_obj)
         frac_tests = NaN
     else
         test_result, lowest_sig_Zs, num_tests, frac_tests = test_subsets(T, candidate, accepted, data_prep, test_obj,
@@ -116,10 +116,6 @@ function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMa
     z::Vector{DiscType}=Int[], phase::Char='I'; fast_elim::Bool=true, no_red_tests::Bool=false,
     support_dict::NbrStatDict=NbrStatDict(), kwargs...) where {ElType<:Real, DiscType<:Integer}
     phase != 'I' && phase != 'E' && error("'phase' must be 'I' or 'E'")
-
-    nz = is_zero_adjusted(test_obj)
-    is_discrete = isdiscrete(test_obj)
-    is_dense = !issparse(data)
 
     candidates, accepted_dict = init_candidates(prev_accepted_dict, candidates, candidates_unchecked)
     accepted = phase == 'E' ? copy(candidates) : Int[]
@@ -150,9 +146,7 @@ function hiton_backend(T::Int, candidates::AbstractVector{Int}, data::AbstractMa
 end
 
 
-function interleaving_phase(args...; add_initial_candidate::Bool=true,
-    univar_nbrs::NbrStatDict=NbrStatDict(), kwargs...)::Tuple{NbrStatDict,Vector{Int}}
-
+function interleaving_phase(args...; univar_nbrs::NbrStatDict=NbrStatDict(), kwargs...)::Tuple{NbrStatDict,Vector{Int}}
     TPC_dict, candidates_unchecked = hiton_backend(args..., 'I'; support_dict=univar_nbrs, kwargs...)
     TPC_dict, candidates_unchecked
 end
@@ -216,6 +210,7 @@ function prepare_interleaving_phase(prev_state::HitonState{Int}, rej_dict::RejDi
         candidates_unchecked = Int[]
         prev_TPC_dict = NbrStatDict()
     end
+
     candidates, candidates_unchecked, prev_TPC_dict, rej_dict
 end
 
@@ -270,9 +265,6 @@ function make_final_HitonState(prev_state::HitonState{Int}, PC_dict::NbrStatDict
         state_rejections = rej_dict
     end
 
-    state_results = PC_dict
-    inter_results = TPC_dict
-
     HitonState(phase, PC_dict, TPC_dict, unchecked_vars, state_rejections)
 end
 
@@ -283,8 +275,7 @@ end
 function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscType}, max_vals::Vector{DiscType}, 
         cor_mat::Matrix{ContType};
         test_name::String="mi", max_k::Int=3, alpha::Float64=0.01, hps::Int=5, n_obs_min::Int=0, max_tests::Int=Int(1.5e9),
-        fast_elim::Bool=true, no_red_tests::Bool=false, FDR::Bool=true, weight_type::String="cond_stat",
-        whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
+        fast_elim::Bool=true, no_red_tests::Bool=false, whitelist::Set{Int}=Set{Int}(), blacklist::Set{Int}=Set{Int}(),
         univar_nbrs::NbrStatDict=NbrStatDict(),
         prev_state::HitonState{Int}=HitonState{Int}('S', OrderedDict(), OrderedDict(), [], Dict()),
         debug::Int=0, time_limit::Float64=0.0, track_rejections::Bool=false,
@@ -325,7 +316,8 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
             if prev_state.phase == 'I' || prev_state.phase == 'S'
 
-                candidates, candidates_unchecked, prev_TPC_dict, rej_dict = prepare_interleaving_phase(prev_state, rej_dict, univar_nbrs, track_rejections)
+                candidates, candidates_unchecked, prev_TPC_dict, rej_dict = prepare_interleaving_phase(prev_state, rej_dict, 
+                                                                                                       univar_nbrs, track_rejections)
 
                 if debug > 0
                     println("\tnumber of candidates:", length(candidates), candidates[1:min(length(candidates), 20)])
@@ -341,7 +333,6 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
                                                                     prev_TPC_dict, candidates_unchecked,
                                                                     time_limit, start_time, debug, whitelist,
                                                                     blacklist, rej_dict, track_rejections, z;
-                                                                    add_initial_candidate=prev_state.phase=='S',
                                                                     univar_nbrs=univar_nbrs, kwargs...)
 
                 if !isempty(candidates_unchecked)

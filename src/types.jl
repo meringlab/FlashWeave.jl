@@ -248,7 +248,7 @@ function show(io::IO, result::FWResult{T}) where T<:Integer
     if isempty(params)
         println(io, "unknown\n")
     else
-        println(io, mode_string([params[key] for key in [:heterogeneous, :sensitive, :max_k]]...), "\n")
+        println(io, make_mode_string([params[key] for key in [:heterogeneous, :sensitive, :max_k]]...), "\n")
     end
 
     println(io, "Network:")

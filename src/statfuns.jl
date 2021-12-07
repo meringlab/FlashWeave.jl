@@ -37,11 +37,16 @@ function pcor_rec(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, cor_mat:
             pXY = cor_mat[X, Y]
             pXZ = cor_mat[X, Z]
             pYZ = cor_mat[Y, Z]
-            enum_term = pXY - pXZ * pYZ
-            enum_term = round(enum_term, digits=5) # account for numeric instability of cor with Float32
-            denom_term = (sqrt(one(ContType) - pXZ^2) * sqrt(one(ContType) - pYZ^2))
-            p = denom_term == 0.0 ? 0.0 : enum_term / denom_term
-
+            if isnan(pXY)
+                p = 0.0
+            elseif isnan(pXZ) || isnan(pYZ)
+                p = NaN
+            else
+                enum_term = pXY - pXZ * pYZ
+                enum_term = round(enum_term, digits=5) # account for numeric instability of cor with Float32
+                denom_term = (sqrt(one(ContType) - pXZ^2) * sqrt(one(ContType) - pYZ^2))
+                p = denom_term == 0.0 ? 0.0 : enum_term / denom_term
+            end
         else
             Zs_nZ0 = Zs[1:end-1]
             Z0 = Zs[end]
@@ -49,18 +54,24 @@ function pcor_rec(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, cor_mat:
             pXY_nZ0 = pcor_rec(X, Y, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
             pXZ0_nZ0 = pcor_rec(X, Z0, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
             pYZ0_nZ0 = pcor_rec(Y, Z0, Zs_nZ0, cor_mat, pcor_set_dict, cache_result)
-            enum_term = pXY_nZ0 - pXZ0_nZ0 * pYZ0_nZ0
-            enum_term = round(enum_term, digits=5) # account for numeric instability of cor with Float32
-            denom_term = sqrt(one(ContType) - pXZ0_nZ0^2) * sqrt(one(ContType) - pYZ0_nZ0^2.0)
-            p = denom_term == 0.0 ? 0.0 : enum_term / denom_term
+            if isnan(pXY_nZ0) || isnan(pXZ0_nZ0) || isnan(pYZ0_nZ0)
+                p = NaN
+            else
+                enum_term = pXY_nZ0 - pXZ0_nZ0 * pYZ0_nZ0
+                enum_term = round(enum_term, digits=5) # account for numeric instability of cor with Float32
+                denom_term = sqrt(one(ContType) - pXZ0_nZ0^2) * sqrt(one(ContType) - pYZ0_nZ0^2.0)
+                p = denom_term == 0.0 ? 0.0 : enum_term / denom_term
+            end
         end
 
 
         # make sure partial correlation coeff stays within bounds
-        if p < -1.0
-            p = -1.0
-        elseif p >= 1.0
-            p = 1.0
+        if ! isnan(p)
+            if p < -1.0
+                p = -1.0
+            elseif p >= 1.0
+                p = 1.0
+            end
         end
 
 

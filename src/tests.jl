@@ -1,5 +1,10 @@
-function issig(test_res::TestResult, alpha::AbstractFloat)
-    test_res.pval < alpha && test_res.suff_power == true
+function issig(test_res::TestResult, alpha::AbstractFloat; test_obj=nothing)
+    # special case for fz_nz (returns NaN pvalues if any Z has zero variance, such cases should not lead to rejection)
+    if isa(test_obj, FzTestCond) && is_zero_adjusted(test_obj) && isnan(test_res.pval)
+        true
+    else
+        test_res.pval < alpha && test_res.suff_power == true
+    end
 end
 
 sufficient_power(levels_x::Integer, levels_y::Integer, n_obs::Integer, hps::Integer) = (n_obs / (levels_x * levels_y)) > hps
@@ -66,10 +71,6 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
             df = adjust_df(test_obj.marg_i, test_obj.marg_j, levels_x, levels_y)
             pval = mi_pval(abs(mi_stat), df, n_obs)
             suff_power = true
-
-            # use oddsratio of 2x2 contingency table to determine edge sign
-            #mi_sign = oddsratio(sub_ctab) < 1.0 ? -1.0 : 1.0
-            #mi_stat *= mi_sign
         end
     end
 
@@ -322,7 +323,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
 
             debug > 2 && println("\t subset ", Zs, " : ", test_result)
 
-            if !issig(test_result, alpha) || (max_tests > 0 && num_tests >= max_tests)
+            if !issig(test_result, alpha; test_obj=test_obj) || (max_tests > 0 && num_tests >= max_tests)
                 if subset_size > 1
                     for remaining_subset_size in subset_size-1:-1:1
                         num_tests_total += length(combinations(Z_total, remaining_subset_size))
@@ -345,7 +346,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
 end
 
 
-function test_subsets(itr::BNBIterator, alpha::AbstractFloat; n_obs_min::Integer=0, max_tests::Integer=1e9)
+function test_subsets(itr::BNBIterator, alpha::AbstractFloat; n_obs_min::Integer=0, max_tests::Integer=1e9, test_obj::AbstractTest)
     num_tests = 0
     if n_obs_min > size(itr.data, 1)
         return TestResult(0.0, 1.0, 0.0, false), (), num_tests
@@ -354,7 +355,7 @@ function test_subsets(itr::BNBIterator, alpha::AbstractFloat; n_obs_min::Integer
         ret_Zs = ()
         for (test_res, Zs) in itr
             num_tests += 1
-            if !issig(test_res, alpha) || (max_tests > 0 && num_tests >= max_tests)
+            if !issig(test_res, alpha; test_obj=test_obj) || (max_tests > 0 && num_tests >= max_tests)
                 return test_res, Zs, num_tests
             elseif test_res.pval > ret_test_res.pval
                 ret_test_res = test_res
@@ -456,7 +457,7 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
 
     nz = is_zero_adjusted(test_obj)
 
-    if pmap_batch_size == nothing
+    if isnothing(pmap_batch_size)
         pmap_batch_size = Int(ceil(n_vars / (nprocs() * 3)))
     end
 
@@ -527,4 +528,58 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
     end
 
     condensed_stats_to_dict(n_vars, pvals, stats, alpha)
+end
+
+function _trim_mutual_kernel(X, Y, Z, data, test_obj, alpha, hps, z, n_obs_min)
+    if needs_nz_view(X, data, test_obj)
+        data = prepare_nzdata(X, data, test_obj)
+    end
+
+    if needs_nz_view(Y, data, test_obj)
+        data = prepare_nzdata(Y, data, test_obj)
+    end
+
+    test_res = if isdiscrete(test_obj)
+        test(X, Y, (Z,), data, test_obj, hps, z)
+    else
+        test(X, Y, (Z,), data, test_obj, n_obs_min)
+    end
+    if X == 10 && Y == 11
+        println(test_res, " " , Z, " ", size(data))
+    end
+    !issig(test_res, alpha; test_obj=test_obj)
+end
+
+function trim_mutual_discards!(all_univar_nbrs::Dict{Int,NbrStatDict}, data::AbstractMatrix, test_name::String; parallel::String="single_il", 
+    alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, z::Vector{<:Integer}=Int[], 
+    cache_pcor::Bool=true, levels, max_vals, cor_mat)
+    test_triplets_set = Set{Tuple{Int, Int, Int}}()
+    for (X, nbr_dict) in all_univar_nbrs
+        Ys = collect(keys(nbr_dict))
+        n = length(Ys)
+        for (i, Y1) in enumerate(Ys[1:n-1])
+            k1 = X < Y1 ? (X, Y1) : (Y1, X)
+            for Y2 in Ys[i+1:end]
+                k2 = X < Y2 ? (X, Y2) : (Y2, X)
+                k_fwd = (k1..., Y2)
+                k_rev = (k2..., Y1)
+                push!(test_triplets_set, k_fwd)
+                push!(test_triplets_set, k_rev)
+            end
+        end
+    end
+    
+    test_triplets = collect(test_triplets_set)
+    test_obj = make_test_object(test_name, true, max_k=1, levels=levels, max_vals=max_vals, cor_mat=cor_mat, cache_pcor=cache_pcor)
+    tests_nonsig = if startswith(parallel, "single")
+        map(trip->_trim_mutual_kernel(trip..., data, test_obj, alpha, hps, z, n_obs_min), test_triplets)
+    else
+        wp = CachingPool(workers())
+        pmap(trip->_trim_mutual_kernel(trip..., data, test_obj, alpha, hps, z, n_obs_min), wp, test_triplets)
+    end
+
+    for (X_nonsig, Y_nonsig) in test_triplets[tests_nonsig]
+        delete!(all_univar_nbrs[X_nonsig], Y_nonsig)
+        delete!(all_univar_nbrs[Y_nonsig], X_nonsig)
+    end
 end

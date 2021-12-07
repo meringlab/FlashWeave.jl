@@ -47,8 +47,6 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
         edge_rule::String="OR", edge_merge_fun=maxweight, nonsparse_cond::Bool=false, verbose::Bool=true,
         workers_local::Bool=true, feed_forward::Bool=true, kill_remote_workers::Bool=true) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
-    test_name = GLL_args[:test_name]
-    weight_type = GLL_args[:weight_type]
     jobs_total = length(target_vars)
 
     if startswith(parallel, "multi") || startswith(parallel, "threads")

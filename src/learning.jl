@@ -206,7 +206,8 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
     header=nothing, meta_variable_mask=nothing, dense_cor::Bool=true, recursive_pcor::Bool=true,
     cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, all_univar_nbrs=nothing, kill_remote_workers::Bool=true, kwargs...)
+    track_rejections::Bool=false, all_univar_nbrs=nothing, kill_remote_workers::Bool=true, 
+    trim_mutual::Bool=false, kwargs...)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_il'
@@ -223,8 +224,8 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
 
     hiton_kwargs = Dict(:test_name => test_name, :max_k => max_k, :alpha => alpha,
                         :hps => hps, :n_obs_min => n_obs_min, :max_tests => max_tests,
-                        :fast_elim => fast_elim, :no_red_tests => no_red_tests, :FDR => FDR,
-                        :weight_type => weight_type, :debug => debug, :time_limit => time_limit,
+                        :fast_elim => fast_elim, :no_red_tests => no_red_tests,
+                        :debug => debug, :time_limit => time_limit,
                         :track_rejections => track_rejections, :cache_pcor => cache_pcor, kwargs...)
 
     if isnothing(all_univar_nbrs)
@@ -234,6 +235,14 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                                                               tmp_folder)
     else
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
+    end
+
+    if trim_mutual
+        verbose && println("\nTrimming mutual discards")
+        z = issparse(data) ? eltype(levels)[] : zeros(eltype(levels), size(data, 1))
+        nbr_dict = trim_mutual_discards!(all_univar_nbrs, data, test_name; parallel=parallel, 
+            alpha=alpha, hps=hps, n_obs_min=n_obs_min, z=z, 
+            cache_pcor=cache_pcor, levels=levels, max_vals=max_vals, cor_mat=cor_mat)   
     end
 
     interleaved_kwargs = Dict(:update_interval => update_interval,
@@ -342,10 +351,7 @@ end
 Works like learn_network(data_path::AbstractString, meta_data_path::AbstractString), but takes paths to multiple data sets (independent sequencing experiments (e.g. 16S + ITS) for the same biological samples) which are normalized independently.
 """
 function learn_network(all_data_paths::AbstractVector{<:AbstractString}, meta_data_path::StrOrNoth=nothing;
-    otu_data_key::StrOrNoth="otu_data",
-    otu_header_key::StrOrNoth="otu_header", meta_data_key::StrOrNoth="meta_data",
-    meta_header_key::StrOrNoth="meta_header", verbose::Bool=true,
-    transposed::Bool=false, kwargs...)
+    otu_data_key::StrOrNoth="otu_data", otu_header_key::StrOrNoth="otu_header", transposed::Bool=false, kwargs...)
 
     data_path = all_data_paths[1]
     if length(all_data_paths) > 1
@@ -430,9 +436,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,
     cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0, parallel_mode="auto",
-    extra_data::Union{AbstractVector,Nothing}=nothing)
-
-    start_time = time()
+    extra_data::Union{AbstractVector,Nothing}=nothing, trim_mutual::Bool=false)
 
     cont_mode = sensitive ? "fz" : "mi"
     het_mode = heterogeneous ? "_nz" : ""
@@ -488,6 +492,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
             input_data, header, meta_mask = normalize_data(data, extra_data, test_name=test_name, header=header, meta_mask=meta_mask, 
                 prec=prec, verbose=verbose, make_sparse=make_sparse, make_onehot=make_onehot)
         end
+        @assert !isempty(input_data) "Unusual data set: all variables removed after variance filtering and normalization."
         verbose && println()
     else
         @warn "Skipping normalization, only experts should choose this option"
@@ -513,20 +518,26 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
                        :header=>header,
                        :max_tests=>max_tests, :hps=>hps, :FDR=>FDR, :n_obs_min=>n_obs_min,
                        :cache_pcor=>cache_pcor, :time_limit=>time_limit,
-                       :update_interval=>update_interval)
+                       :update_interval=>update_interval, :trim_mutual=>trim_mutual)
 
     verbose && println("### Learning interactions ###\n")
 
     n_mvs = sum(meta_mask)
+    if startswith(parallel_mode, "single")
+        display_workers = 1
+    else
+        display_workers = nworkers()
+    end
+
     if verbose
-        println("""Inferring network with $(mode_string(heterogeneous, sensitive, max_k))\n
+        println("""Inferring network with $(make_mode_string(heterogeneous, sensitive, max_k))\n
         \tRun information:
         \tsensitive - $sensitive
         \theterogeneous - $heterogeneous
         \tmax_k - $(max_k)
         \talpha - $alpha
         \tsparse - $(issparse(input_data))
-        \tworkers - $(length(workers()))
+        \tworkers - $(display_workers)
         \tOTUs - $(size(input_data, 2) - n_mvs)
         \tMVs - $(n_mvs)\n""")
     end

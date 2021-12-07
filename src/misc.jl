@@ -1,7 +1,7 @@
 const inf_weight = 708.3964185322641
 
 
-function mode_string(heterogeneous, sensitive, max_k)
+function make_mode_string(heterogeneous, sensitive, max_k)
     het_str = heterogeneous ? "HE" : ""
     sens_str = sensitive ? "sensitive" : "fast"
     cond_str = max_k == 0 ? "univariate" : "conditional"
