@@ -240,9 +240,14 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     if trim_mutual
         verbose && println("\nTrimming mutual discards")
         z = issparse(data) ? eltype(levels)[] : zeros(eltype(levels), size(data, 1))
-        nbr_dict = trim_mutual_discards!(all_univar_nbrs, data, test_name; parallel=parallel, 
+        nbrs_pretrim = sum(length.(values(all_univar_nbrs)))
+        trim_mutual_discards!(all_univar_nbrs, data, test_name; parallel=parallel, 
             alpha=alpha, hps=hps, n_obs_min=n_obs_min, z=z, 
-            cache_pcor=cache_pcor, levels=levels, max_vals=max_vals, cor_mat=cor_mat)   
+            cache_pcor=cache_pcor, levels=levels, max_vals=max_vals, cor_mat=cor_mat)
+        nbrs_posttrim = sum(length.(values(all_univar_nbrs)))
+        nbrs_trimmed = nbrs_pretrim - nbrs_posttrim
+        nbrs_trimmed_frac = nbrs_pretrim > 0 ? round(nbrs_trimmed / nbrs_pretrim, digits=2) : 0.0
+        verbose && println("\t -> trimmed $(nbrs_trimmed) neighbors ($(Int(round(nbrs_trimmed_frac * 100)))%)")
     end
 
     interleaved_kwargs = Dict(:update_interval => update_interval,
