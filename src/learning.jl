@@ -42,6 +42,8 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         if dense_cor && !is_zero_adjusted(test_name)
             data_dense = issparse(data) ? Matrix(data) : data
             cor_mat = convert(Matrix{cont_type}, cor(data_dense))
+        elseif is_zero_adjusted(test_name) && recursive_pcor
+            cor_mat = zeros(cont_type, size(data, 2), size(data, 2))
         else
             cor_mat = zeros(cont_type, 0, 0)
         end
@@ -112,6 +114,19 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
     target_vars, all_univar_nbrs
 end
 
+function perform_mutual_trimming!(all_univar_nbrs, data, test_name; parallel,
+    verbose, alpha, hps, n_obs_min, cache_pcor, levels, max_vals, cor_mat, recursive_pcor)
+    verbose && println("\nTrimming mutual discards")
+    z = issparse(data) ? eltype(levels)[] : zeros(eltype(levels), size(data, 1))
+    nbrs_pretrim = sum(length.(values(all_univar_nbrs)))
+    trim_mutual_discards!(all_univar_nbrs, data, test_name; parallel=parallel, 
+        alpha=alpha, hps=hps, n_obs_min=n_obs_min, z=z, 
+        cache_pcor=cache_pcor, levels=levels, max_vals=max_vals, cor_mat=cor_mat)
+    nbrs_posttrim = sum(length.(values(all_univar_nbrs)))
+    nbrs_trimmed = nbrs_pretrim - nbrs_posttrim
+    nbrs_trimmed_frac = nbrs_pretrim > 0 ? round(nbrs_trimmed / nbrs_pretrim, digits=2) : 0.0
+    verbose && println("\t -> trimmed $(nbrs_trimmed) neighbors ($(Int(round(nbrs_trimmed_frac * 100)))%)")
+end
 
 function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMatrix{ElType},
      all_univar_nbrs::Dict{Int,NbrStatDict}, levels::Vector{DiscType}, max_vals::Vector{DiscType},
@@ -120,9 +135,9 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
       interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # pre-allocate correlation matrix
-    if recursive_pcor && is_zero_adjusted(hiton_kwargs[:test_name]) && iscontinuous(hiton_kwargs[:test_name])
-        cor_mat = zeros(cont_type, size(data, 2), size(data, 2))
-    end
+    #if recursive_pcor && is_zero_adjusted(hiton_kwargs[:test_name]) && iscontinuous(hiton_kwargs[:test_name])
+    #    cor_mat = zeros(cont_type, size(data, 2), size(data, 2))
+    #end
 
     verbose && println("\nStarting conditioning search")
 
@@ -237,17 +252,10 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
     end
 
-    if trim_mutual
-        verbose && println("\nTrimming mutual discards")
-        z = issparse(data) ? eltype(levels)[] : zeros(eltype(levels), size(data, 1))
-        nbrs_pretrim = sum(length.(values(all_univar_nbrs)))
-        trim_mutual_discards!(all_univar_nbrs, data, test_name; parallel=parallel, 
-            alpha=alpha, hps=hps, n_obs_min=n_obs_min, z=z, 
-            cache_pcor=cache_pcor, levels=levels, max_vals=max_vals, cor_mat=cor_mat)
-        nbrs_posttrim = sum(length.(values(all_univar_nbrs)))
-        nbrs_trimmed = nbrs_pretrim - nbrs_posttrim
-        nbrs_trimmed_frac = nbrs_pretrim > 0 ? round(nbrs_trimmed / nbrs_pretrim, digits=2) : 0.0
-        verbose && println("\t -> trimmed $(nbrs_trimmed) neighbors ($(Int(round(nbrs_trimmed_frac * 100)))%)")
+    if trim_mutual && max_k > 0 # only trim if conditioning is active
+        perform_mutual_trimming!(all_univar_nbrs, data, test_name; parallel=parallel,
+            verbose=verbose, alpha=alpha, hps=hps, n_obs_min=n_obs_min, cache_pcor=cache_pcor,
+            levels=levels, max_vals=max_vals, cor_mat=cor_mat, recursive_pcor=recursive_pcor)
     end
 
     interleaved_kwargs = Dict(:update_interval => update_interval,

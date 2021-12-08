@@ -22,8 +22,7 @@ data = Matrix{Float64}(readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_smal
 
 
 @testset "correlation" begin
-    data_clr, mask = FlashWeave.preprocess_data_default(data, "fz", verbose=false,
-    prec=64)
+    data_clr, mask = FlashWeave.preprocess_data_default(data, "fz", verbose=false, prec=64)
     exp_pcor_Z1 = -0.16393307352649356
     cor_mat = cor(data_clr)
     @testset "pcor_Z1" begin

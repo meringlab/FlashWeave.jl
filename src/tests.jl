@@ -117,7 +117,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Real}, test_obj::FzTest,
     else
         nz = is_zero_adjusted(test_obj)
 
-        @inbounds if isempty(test_obj.cor_mat)
+        @inbounds if isempty(test_obj.cor_mat) || nz
             if issparse(data)
                 p_stat, n_obs = cor(X, Y, data, nz)
 
@@ -150,7 +150,6 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Real}, test_obj::FzTest,
         else
             n_obs = size(data, 1)
             p_stat = n_obs >= n_obs_min ? test_obj.cor_mat[X, Y] : 0.0
-
         end
 
         df = 0
@@ -295,6 +294,7 @@ function test_subsets(X::Int, Y::Int, Z_total::AbstractVector{Int}, data::Abstra
             return TestResult(0.0, 1.0, 0.0, false), lowest_sig_Zs, num_tests, 0.0
         end
 
+        # reset cached partial correlations since they depend on X and Y
         if test_obj.cache_pcor
             empty!(test_obj.pcor_set_dict)
         end
@@ -455,8 +455,6 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
     n_vars = length(target_vars)
     n_pairs = convert(Int, n_vars * (n_vars - 1) / 2)
 
-    nz = is_zero_adjusted(test_obj)
-
     if isnothing(pmap_batch_size)
         pmap_batch_size = Int(ceil(n_vars / (nprocs() * 3)))
     end
@@ -530,6 +528,7 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
     condensed_stats_to_dict(n_vars, pvals, stats, alpha)
 end
 
+
 function _trim_mutual_kernel(X, Y, Z, data, test_obj, alpha, hps, z, n_obs_min)
     if needs_nz_view(X, data, test_obj)
         data = prepare_nzdata(X, data, test_obj)
@@ -539,15 +538,17 @@ function _trim_mutual_kernel(X, Y, Z, data, test_obj, alpha, hps, z, n_obs_min)
         data = prepare_nzdata(Y, data, test_obj)
     end
 
+    if is_zero_adjusted(test_obj) && !isempty(test_obj.cor_mat)
+        cor_subset!(data, test_obj.cor_mat, [X, Y, Z])
+    end
+
     test_res = if isdiscrete(test_obj)
         test(X, Y, (Z,), data, test_obj, hps, z)
     else
         test(X, Y, (Z,), data, test_obj, n_obs_min)
     end
-    if X == 10 && Y == 11
-        println(test_res, " " , Z, " ", size(data))
-    end
-    !issig(test_res, alpha; test_obj=test_obj)
+    
+    return !issig(test_res, alpha; test_obj=test_obj)
 end
 
 function trim_mutual_discards!(all_univar_nbrs::Dict{Int,NbrStatDict}, data::AbstractMatrix, test_name::String; parallel::String="single_il", 

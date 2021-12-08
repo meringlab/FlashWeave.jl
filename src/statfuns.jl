@@ -18,7 +18,10 @@ end
 
 
 function pcor(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Real})
-    @views partialcor(data[:, X], data[:, Y], data[:, collect(Zs)])
+    # hack to circumvent bug related to views + partialcor
+    Z_mat = @views length(Zs) == 1 ? data[:, first(Zs)] : data[:, collect(Zs)]
+    
+    @views partialcor(data[:, X], data[:, Y], Z_mat)
 end
 
 
