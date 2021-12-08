@@ -538,7 +538,7 @@ function _trim_mutual_kernel(X, Y, Z, data, test_obj, alpha, hps, z, n_obs_min)
         data = prepare_nzdata(Y, data, test_obj)
     end
 
-    if is_zero_adjusted(test_obj) && !isempty(test_obj.cor_mat)
+    if iscontinuous(test_obj) && is_zero_adjusted(test_obj) && !isempty(test_obj.cor_mat)
         cor_subset!(data, test_obj.cor_mat, [X, Y, Z])
     end
 

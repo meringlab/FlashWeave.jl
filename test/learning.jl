@@ -5,6 +5,9 @@ using LightGraphs
 using SparseArrays, DelimitedFiles, Statistics, Distributed, Logging
 import SimpleWeightedGraphs: nv, edges, ne, vertices, neighbors
 
+nprocs() == 1 && addprocs(1)
+@everywhere using FlashWeave
+
 data_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv")
 data = Matrix{Float64}(readdlm(data_path, '\t')[2:end, 2:end])
 data_sp = sparse(data)
@@ -101,14 +104,22 @@ function compare_graph_results(g1::SimpleWeightedGraph, g2::SimpleWeightedGraph;
     end
 end
 
+function compare_trim_mutual_edges(v1::AbstractVector; normalize=false, net_kws...)
+    vz = zeros(length(v1))
+    A = [v1 v1 v1 vz vz vz vz vz vz;
+         vz vz vz v1 v1 v1 vz vz vz
+         vz vz vz vz vz vz v1 v1 v1]
+    net_notrim, net_trim = [learn_network(A; verbose=false, normalize=normalize, net_kws..., trim_mutual=x) for x in (false, true)]
+    ne_notrim, ne_trim = [SimpleWeightedGraphs.ne(graph(net)) for net in (net_notrim, net_trim)]
+    (ne_notrim=ne_notrim, ne_trim=ne_trim, A=A)
+end
+
+
 T_var = 1
 T_nbrs = nothing
 data_bin = FlashWeave.preprocess_data_default(data, "mi", verbose=false,
                                               make_sparse=true, prec=64)[1]
 
-
-nprocs() == 1 && addprocs(1)
-@everywhere using FlashWeave
 
 @testset "univar nbrs" begin
     nbrs_single = nothing
@@ -412,6 +423,29 @@ end
                             @test isa(learn_network(A; sensitive=sensitive, heterogeneous=heterogeneous, max_k=max_k, verbose=false, normalize=true), FlashWeave.FWResult)
                         end
                     end
+                end
+            end
+        end
+    end
+end
+
+# test that trim mutual removes groups of inter-correlated associations
+@testset "trim_mutual" begin
+    rng = StableRNG(1234)
+    v1_cont = rand(rng, 1000)
+    v1_bin = rand(rng, 0:1, 1000)
+    vz = zeros(length(v1_cont))
+
+    for sens in [true, false]
+        for het in [true, false]
+            for parallel_mode in ["single", "auto"]
+                @testset "het_$het // sens_$sens // parallel_$(parallel_mode == "auto")" begin
+                    v1 = !sens && !het ? v1_bin : v1_cont
+                    norm = !sens && het # normalize only for mi_nz, based on v1_cont matrix
+                    ne_notrim, ne_trim = compare_trim_mutual_edges(v1; normalize=norm, sensitive=sens,
+                            heterogeneous=het, parallel_mode=parallel_mode)
+                    @test ne_notrim > 0
+                    @test ne_trim == 0
                 end
             end
         end
