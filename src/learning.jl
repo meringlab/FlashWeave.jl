@@ -114,14 +114,14 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
     target_vars, all_univar_nbrs
 end
 
-function perform_mutual_trimming!(all_univar_nbrs, data, test_name; parallel,
-    verbose, alpha, hps, n_obs_min, cache_pcor, levels, max_vals, cor_mat, recursive_pcor)
+function perform_mutual_trimming!(nbr_dict, all_univar_nbrs, data, test_name; parallel,
+    verbose, alpha, hps, n_obs_min, cache_pcor, levels, max_vals, cor_mat, track_rejections)
     verbose && println("\nTrimming mutual discards")
     z = issparse(data) ? eltype(levels)[] : zeros(eltype(levels), size(data, 1))
     nbrs_pretrim = sum(length.(values(all_univar_nbrs)))
-    trim_mutual_discards!(all_univar_nbrs, data, test_name; parallel=parallel, 
+    trim_mutual_discards!(nbr_dict, all_univar_nbrs, data, test_name; parallel=parallel, 
         alpha=alpha, hps=hps, n_obs_min=n_obs_min, z=z, 
-        cache_pcor=cache_pcor, levels=levels, max_vals=max_vals, cor_mat=cor_mat)
+        cache_pcor=cache_pcor, levels=levels, max_vals=max_vals, cor_mat=cor_mat, track_rejections=track_rejections)
     nbrs_posttrim = sum(length.(values(all_univar_nbrs)))
     nbrs_trimmed = nbrs_pretrim - nbrs_posttrim
     nbrs_trimmed_frac = nbrs_pretrim > 0 ? round(nbrs_trimmed / nbrs_pretrim, digits=2) : 0.0
@@ -129,15 +129,10 @@ function perform_mutual_trimming!(all_univar_nbrs, data, test_name; parallel,
 end
 
 function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMatrix{ElType},
-     all_univar_nbrs::Dict{Int,NbrStatDict}, levels::Vector{DiscType}, max_vals::Vector{DiscType},
-     cor_mat::AbstractMatrix{ContType}, parallel::String, nonsparse_cond::Bool, recursive_pcor::Bool,
-     cont_type::DataType, verbose::Bool, hiton_kwargs::Dict{Symbol, Any},
-      interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
-
-    # pre-allocate correlation matrix
-    #if recursive_pcor && is_zero_adjusted(hiton_kwargs[:test_name]) && iscontinuous(hiton_kwargs[:test_name])
-    #    cor_mat = zeros(cont_type, size(data, 2), size(data, 2))
-    #end
+    all_univar_nbrs::Dict{Int,NbrStatDict}, levels::Vector{DiscType}, max_vals::Vector{DiscType},
+    cor_mat::AbstractMatrix{ContType}, parallel::String, nonsparse_cond::Bool,
+    trim_mutual::Bool, cont_type::DataType, verbose::Bool, hiton_kwargs::Dict{Symbol, Any},
+    interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     verbose && println("\nStarting conditioning search")
 
@@ -165,14 +160,23 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
 
     end
 
-    Dict{Int,HitonState{Int}}(zip(target_vars, nbr_results))
+    nbr_dict = Dict{Int,HitonState{Int}}(zip(target_vars, nbr_results))
+
+    if trim_mutual
+        perform_mutual_trimming!(nbr_dict, all_univar_nbrs, data, hiton_kwargs[:test_name]; parallel=parallel,
+            verbose=verbose, alpha=hiton_kwargs[:alpha], hps=hiton_kwargs[:hps], n_obs_min=hiton_kwargs[:n_obs_min], 
+            cache_pcor=hiton_kwargs[:cache_pcor], levels=levels, max_vals=max_vals, cor_mat=cor_mat,
+            track_rejections=hiton_kwargs[:track_rejections])
+    end
+
+    return nbr_dict
 end
 
 
 function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{ElType},
     all_univar_nbrs::Dict{Int,NbrStatDict},
     levels::Vector{DiscType}, max_vals::Vector{DiscType}, cor_mat::AbstractMatrix{ContType}, parallel::String, recursive_pcor::Bool,
-    cont_type::DataType, time_limit::AbstractFloat, nonsparse_cond::Bool, verbose::Bool, track_rejections::Bool,
+    trim_mutual::Bool, cont_type::DataType, time_limit::AbstractFloat, nonsparse_cond::Bool, verbose::Bool, track_rejections::Bool,
     hiton_kwargs::Dict{Symbol, Any}, interleaved_kwargs::Dict{Symbol, Any}) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     rej_dict = Dict{Int, RejDict{Int}}()
@@ -185,7 +189,7 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
     # else, run full conditioning
     else
         nbr_results_dict = infer_conditional_neighbors(target_vars, data, all_univar_nbrs, levels, max_vals, cor_mat, parallel,
-                                                       nonsparse_cond, recursive_pcor, cont_type, verbose, hiton_kwargs,
+                                                       nonsparse_cond, trim_mutual, cont_type, verbose, hiton_kwargs,
                                                        interleaved_kwargs)
 
         nbr_dict = Dict{Int,NbrStatDict}([(target_var, nbr_state.state_results) for (target_var, nbr_state) in nbr_results_dict])
@@ -252,12 +256,6 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
     end
 
-    if trim_mutual && max_k > 0 # only trim if conditioning is active
-        perform_mutual_trimming!(all_univar_nbrs, data, test_name; parallel=parallel,
-            verbose=verbose, alpha=alpha, hps=hps, n_obs_min=n_obs_min, cache_pcor=cache_pcor,
-            levels=levels, max_vals=max_vals, cor_mat=cor_mat, recursive_pcor=recursive_pcor)
-    end
-
     interleaved_kwargs = Dict(:update_interval => update_interval,
                               :convergence_threshold => convergence_threshold,
                               :feed_forward => feed_forward, :edge_rule => edge_rule,
@@ -269,7 +267,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     nbr_dict, unfinished_state_dict, rej_dict = learn_graph_structure(target_vars, data,
                                                                       all_univar_nbrs, levels, max_vals,
                                                                       cor_mat, parallel,
-                                                                      recursive_pcor,
+                                                                      recursive_pcor, trim_mutual,
                                                                       cont_type, time_limit, nonsparse_cond,
                                                                       verbose, track_rejections, hiton_kwargs,
                                                                       interleaved_kwargs)

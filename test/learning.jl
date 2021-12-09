@@ -443,7 +443,7 @@ end
                     v1 = !sens && !het ? v1_bin : v1_cont
                     norm = !sens && het # normalize only for mi_nz, based on v1_cont matrix
                     ne_notrim, ne_trim = compare_trim_mutual_edges(v1; normalize=norm, sensitive=sens,
-                            heterogeneous=het, parallel_mode=parallel_mode)
+                            heterogeneous=het, parallel_mode=parallel_mode, track_rejections=true)
                     @test ne_notrim > 0
                     @test ne_trim == 0
                 end
@@ -452,6 +452,28 @@ end
     end
 end
 
+# test that trim mutual removes groups of inter-correlated associations
+@testset "trim_mutual" begin
+    rng = StableRNG(1234)
+    v1_cont = rand(rng, 1000)
+    v1_bin = rand(rng, 0:1, 1000)
+    vz = zeros(length(v1_cont))
+
+    for sens in [true, false]
+        for het in [true, false]
+            for parallel_mode in ["single", "auto"]
+                @testset "het_$het // sens_$sens // parallel_$(parallel_mode == "auto")" begin
+                    v1 = !sens && !het ? v1_bin : v1_cont
+                    norm = !sens && het # normalize only for mi_nz, based on v1_cont matrix
+                    ne_notrim, ne_trim = compare_trim_mutual_edges(v1; normalize=norm, sensitive=sens,
+                            heterogeneous=het, parallel_mode=parallel_mode, track_rejections=true)
+                    @test ne_notrim > 0
+                    @test ne_trim == 0
+                end
+            end
+        end
+    end
+end
 
 # to create expected output
 

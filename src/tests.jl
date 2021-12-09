@@ -170,7 +170,7 @@ function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFl
     map(Y -> test(X, Y, data, test_obj, n_obs_min, false), Ys)::Vector{TestResult}
 end
 
-#convenience wrapper
+# convenience wrapper
 function test(X::Int, Ys::AbstractVector{Int}, data::AbstractMatrix{<:AbstractFloat},
         test_name::String, n_obs_min::Integer=0)
     test_obj = make_test_object(test_name, false, max_k=0, levels=Int[], max_vals=Int[], cor_mat=zeros(Float64, 0, 0))
@@ -180,6 +180,8 @@ end
 ###################
 ### CONDITIONAL ###
 ###################
+
+### discrete
 
 function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer}, test_obj::MiTestCond, hps::Integer, z::AbstractVector{<:Integer}=Int[])
     """Test association between X and Y"""
@@ -219,16 +221,12 @@ function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::Abstra
         df = adjust_df(test_obj.marg_i, test_obj.marg_j, levels_x, levels_y, levels_z)
         pval = mi_pval(abs(mi_stat), df, n_obs)
         suff_power = true
-
-        # use oddsratio of 2x2 contingency table to determine edge sign
-        #mi_sign = oddsratio(sub_ctab) < 1.0 ? -1.0 : 1.0
-        #mi_stat *= mi_sign
     end
 
     TestResult(mi_stat, pval, df, suff_power)
 end
 
-
+# convenience wrapper
 function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5, levels::Vector{<:Integer}=Int[])
     """Convenience function for module tests"""
     if isempty(levels) || isempty(max_vals)
@@ -244,7 +242,7 @@ end
 
 
 
-## CONTINUOUS ##
+### continuous
 
 function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:AbstractFloat},
     test_obj::FzTestCond, n_obs_min::Integer)
@@ -263,8 +261,7 @@ function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::Abstra
     TestResult(p_stat, pval, 0, suff_power)
 end
 
-# convenience function for module tests
-
+# convenience wrapper
 function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:AbstractFloat}, test_name::String;
      recursive::Bool=true, n_obs_min::Integer=0)
     """Convenience function for module tests"""
@@ -529,7 +526,7 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
 end
 
 
-function _trim_mutual_kernel(X, Y, Z, data, test_obj, alpha, hps, z, n_obs_min)
+function _trim_mutual_kernel(X, Y, Zs_total, data, test_obj, alpha, hps, z, n_obs_min)
     if needs_nz_view(X, data, test_obj)
         data = prepare_nzdata(X, data, test_obj)
     end
@@ -539,48 +536,76 @@ function _trim_mutual_kernel(X, Y, Z, data, test_obj, alpha, hps, z, n_obs_min)
     end
 
     if iscontinuous(test_obj) && is_zero_adjusted(test_obj) && !isempty(test_obj.cor_mat)
-        cor_subset!(data, test_obj.cor_mat, [X, Y, Z])
+        cor_subset!(data, test_obj.cor_mat, [X, Y, Zs_total...])
     end
 
-    test_res = if isdiscrete(test_obj)
-        test(X, Y, (Z,), data, test_obj, hps, z)
-    else
-        test(X, Y, (Z,), data, test_obj, n_obs_min)
+    all_test_res = Vector{TestResult}(undef, length(Zs_total))
+    for (i, Z) in enumerate(Zs_total)
+        test_res = if isdiscrete(test_obj)
+            test(X, Y, (Z,), data, test_obj, hps, z)
+        else
+            test(X, Y, (Z,), data, test_obj, n_obs_min)
+        end
+        all_test_res[i] = test_res
     end
     
-    return !issig(test_res, alpha; test_obj=test_obj)
+    return filter(((Z, test_res),)->!issig(test_res, alpha; test_obj=test_obj), collect(zip(Zs_total, all_test_res)))
 end
 
-function trim_mutual_discards!(all_univar_nbrs::Dict{Int,NbrStatDict}, data::AbstractMatrix, test_name::String; parallel::String="single_il", 
+function trim_mutual_discards!(nbr_dict::Dict{Int,HitonState{Int}}, all_univar_nbrs::Dict{Int,NbrStatDict}, data::AbstractMatrix, test_name::String; parallel::String="single_il", 
     alpha::AbstractFloat, hps::Integer=5, n_obs_min::Integer=0, z::Vector{<:Integer}=Int[], 
-    cache_pcor::Bool=true, levels, max_vals, cor_mat)
-    test_triplets_set = Set{Tuple{Int, Int, Int}}()
-    for (X, nbr_dict) in all_univar_nbrs
-        Ys = collect(keys(nbr_dict))
-        n = length(Ys)
-        for (i, Y1) in enumerate(Ys[1:n-1])
-            k1 = X < Y1 ? (X, Y1) : (Y1, X)
-            for Y2 in Ys[i+1:end]
-                k2 = X < Y2 ? (X, Y2) : (Y2, X)
-                k_fwd = (k1..., Y2)
-                k_rev = (k2..., Y1)
-                push!(test_triplets_set, k_fwd)
-                push!(test_triplets_set, k_rev)
+    cache_pcor::Bool=true, levels, max_vals, cor_mat, track_rejections)
+
+    test_pair_dict = Dict{Tuple{Int,Int},Set{Int}}() 
+    for (X, nbr_state) in nbr_dict
+        Ys_cond = Set(keys(nbr_state.state_results))
+        Ys_uni = setdiff(Set(keys(all_univar_nbrs[X])), Ys_cond)
+
+        for Y_cond in Ys_cond
+            test_pair = X < Y_cond ? (X, Y_cond) : (Y_cond, X)
+            if !haskey(test_pair_dict, test_pair)
+                test_pair_dict[test_pair] = Set{Int}()
+            end
+            test_candidates = test_pair_dict[test_pair]
+
+            for Y_uni in Ys_uni
+                push!(test_candidates, Y_uni)
             end
         end
     end
     
-    test_triplets = collect(test_triplets_set)
     test_obj = make_test_object(test_name, true, max_k=1, levels=levels, max_vals=max_vals, cor_mat=cor_mat, cache_pcor=cache_pcor)
+    work_units = [(XY, collect(Zs_total)) for (XY, Zs_total) in test_pair_dict]
     tests_nonsig = if startswith(parallel, "single")
-        map(trip->_trim_mutual_kernel(trip..., data, test_obj, alpha, hps, z, n_obs_min), test_triplets)
+        map(((XY, Zs_total),)->_trim_mutual_kernel(XY..., Zs_total, data, test_obj, alpha, hps, z, n_obs_min), work_units)
     else
         wp = CachingPool(workers())
-        pmap(trip->_trim_mutual_kernel(trip..., data, test_obj, alpha, hps, z, n_obs_min), wp, test_triplets)
+        pmap(((XY, Zs_total),)->_trim_mutual_kernel(XY..., Zs_total, data, test_obj, alpha, hps, z, n_obs_min), wp, work_units)
     end
 
-    for (X_nonsig, Y_nonsig) in test_triplets[tests_nonsig]
-        delete!(all_univar_nbrs[X_nonsig], Y_nonsig)
-        delete!(all_univar_nbrs[Y_nonsig], X_nonsig)
+    #@show tests_nonsig first.(work_units)
+
+    for ((X, Y), curr_tests_nonsig) in zip(first.(work_units), tests_nonsig)
+        for (Z_nonsig, test_res_nonsig) in curr_tests_nonsig
+            for (T1, T2) in [(X, Y), (Y, X)]
+                !haskey(nbr_dict, T1) && continue
+                nbr_state = nbr_dict[T1]
+                if haskey(nbr_state.state_results, T2)
+                    # remove partner
+                    delete!(nbr_state.state_results, T2)
+                    
+                    # add entry with rejection information for partner
+                    if track_rejections
+                        nbr_state.state_rejections[T2] = ((Z_nonsig,), test_res_nonsig, (0, 0.0))
+                    end
+
+                    # remove partner from unchecked variables
+                    ind = findfirst(==(T2), nbr_state.unchecked_vars)
+                    if !isnothing(ind)
+                        deleteat!(nbr_state.unchecked_vars, ind)
+                    end
+                end
+            end
+        end
     end
 end
