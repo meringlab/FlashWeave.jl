@@ -53,15 +53,8 @@ end
 
 function convert_to_target_prec(data::AbstractMatrix, prec, make_sparse; kwargs...)
     T = get_precision_type(prec; kwargs...)
-
-    # need two-step conversion because direct 64+Dense -> 32+sparse currently
-    # does not work
-    data_out = Matrix{T}(data)
-    if make_sparse
-        return sparse(data_out)
-    else
-        return data_out
-    end
+    MatType = make_sparse ? SparseMatrixCSC{T, Int64} : Matrix{T}
+    return convert(MatType, data)
 end
 
 function get_levels(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
