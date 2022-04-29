@@ -125,7 +125,7 @@ function perform_mutual_trimming!(nbr_dict, all_univar_nbrs, data, test_name; pa
     nbrs_posttrim = sum([length(x.state_results) for x in values(nbr_dict)])
     nbrs_trimmed = nbrs_pretrim - nbrs_posttrim
     nbrs_trimmed_frac = nbrs_pretrim > 0 ? round(nbrs_trimmed / nbrs_pretrim, digits=2) : 0.0
-    verbose && println("\t -> trimmed $(nbrs_trimmed) neighbors ($(Int(round(nbrs_trimmed_frac * 100)))%)")
+    verbose && println("\t -> trimmed $(nbrs_trimmed) edges ($(round(nbrs_trimmed_frac * 100, digits=3))%)")
 end
 
 function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMatrix{ElType},

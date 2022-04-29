@@ -52,16 +52,9 @@ function get_precision_type(prec; norm_mode=nothing, test_name=nothing)
 end
 
 function convert_to_target_prec(data::AbstractMatrix, prec, make_sparse; kwargs...)
-    T = get_precision_type(prec; kwargs...)
-
-    # need two-step conversion because direct 64+Dense -> 32+sparse currently
-    # does not work
-    data_out = Matrix{T}(data)
-    if make_sparse
-        return sparse(data_out)
-    else
-        return data_out
-    end
+    T = FlashWeave.get_precision_type(prec; kwargs...)
+    MatType = make_sparse ? SparseMatrixCSC{T, Int64} : Matrix{T}
+    return convert(MatType, data)
 end
 
 function get_levels(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
@@ -106,7 +99,7 @@ stop_reached(start_time::AbstractFloat, time_limit::AbstractFloat) = time_limit 
 
 function needs_nz_view(X::Int, data::AbstractMatrix{ElType}, test_obj::AbstractTest) where ElType
     nz = is_zero_adjusted(test_obj)
-    is_nz_var = iscontinuous(test_obj) || test_obj.levels[X] > 2
+    is_nz_var = iscontinuous(test_obj) || test_obj.max_vals[X] > 1
     nz && is_nz_var && (!issparse(data) || isa(test_obj, FzTestCond))
 end
 
