@@ -456,7 +456,7 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
 
     nz = is_zero_adjusted(test_obj)
 
-    if pmap_batch_size == nothing
+    if isnothing(pmap_batch_size)
         pmap_batch_size = Int(ceil(n_vars / (nprocs() * 3)))
     end
 

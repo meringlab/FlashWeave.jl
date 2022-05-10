@@ -236,6 +236,9 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
     end
 
+    # force gc to free up memory for next steps
+    @everywhere GC.gc()
+
     interleaved_kwargs = Dict(:update_interval => update_interval,
                               :convergence_threshold => convergence_threshold,
                               :feed_forward => feed_forward, :edge_rule => edge_rule,
@@ -251,6 +254,9 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                                                                       cont_type, time_limit, nonsparse_cond,
                                                                       verbose, track_rejections, hiton_kwargs,
                                                                       interleaved_kwargs)
+
+    # force gc to free up memory for next steps
+    @everywhere GC.gc()
 
     verbose && println("\nPostprocessing")
     weights_dict = Dict{Int,Dict{Int,Float64}}()
