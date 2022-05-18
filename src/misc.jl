@@ -57,7 +57,7 @@ function convert_to_target_prec(data::AbstractMatrix, prec, make_sparse; kwargs.
     return convert(MatType, data)
 end
 
-function get_levels(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
+function get_levels(x::Int, data::SparseArrays.AbstractSparseMatrixCSC{ElType}) where ElType <: Integer
     unique_vals = BitSet()
     for j in nzrange(data, x)
         push!(unique_vals, data.nzval[j])
@@ -78,7 +78,7 @@ function get_levels(data::AbstractMatrix{ElType}) where ElType <: Integer
 end
 
 
-function get_max_vals(x::Int, data::SparseMatrixCSC{ElType}) where ElType <: Integer
+function get_max_vals(x::Int, data::SparseArrays.AbstractSparseMatrixCSC{ElType}) where ElType <: Integer
     nz_itr = nzrange(data, x)
     isempty(nz_itr) ? zero(ElType) : maximum(data.nzval[j] for j in nz_itr)
 end
@@ -269,7 +269,7 @@ function make_symmetric_graph(weights_dict::Dict{Int,Dict{Int,Float64}}, edge_ru
 end
 
 
-function iter_apply_sparse_rows!(X::Int, Y::Int, data::SparseMatrixCSC{ElType},
+function iter_apply_sparse_rows!(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{ElType},
         red_fun, red_obj, x_nzadj=false, y_nzadj=false) where ElType <: Real
     n_rows, n_cols = size(data)
     num_out_of_bounds = 0

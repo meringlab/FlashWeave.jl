@@ -90,7 +90,7 @@ function update!(obj::PairCorObj, x_entry, y_entry)
     obj.var_y += y_entry_norm * y_entry_norm
 end
 
-function cor(X::Int, Y::Int, data::SparseMatrixCSC{<:Real},
+function cor(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Real},
     nz::Bool=false)
     p_mean_obj = PairMeanObj(0.0, 0.0, 0)
     @inbounds iter_apply_sparse_rows!(X, Y, data, update!, p_mean_obj, nz, nz)
@@ -125,7 +125,7 @@ function cor(X::Int, Y::Int, data::SparseMatrixCSC{<:Real},
 end
 
 
-function cor(data::SparseMatrixCSC{<:Real}, nz::Bool)
+function cor(data::SparseArrays.AbstractSparseMatrixCSC{<:Real}, nz::Bool)
     n_vars = size(data, 2)
     cor_mat = zeros(Float64, n_vars, n_vars)
     @inbounds Threads.@threads for X in 1:n_vars-1

@@ -76,7 +76,7 @@ function onehot(X::AbstractMatrix, vnames::AbstractVector{<:AbstractString}=Stri
 end
 
 
-function mapslices_sparse_nz(f, A::SparseMatrixCSC, dim::Integer=1)
+function mapslices_sparse_nz(f, A::SparseArrays.AbstractSparseMatrixCSC, dim::Integer=1)
     if dim == 1
         A = permutedims(A)
     end
@@ -134,7 +134,7 @@ function adaptive_pseudocount!(X::Matrix{ElType}) where ElType <: AbstractFloat
     X, pcount_nz_mask
 end
 
-function clr!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
+function clr!(X::SparseArrays.AbstractSparseMatrixCSC{ElType}) where ElType <: AbstractFloat
     """Specialized in-place version for sparse matrices that always excludes zero entries (thereby no need for pseudo counts)"""
     gmeans_vec = mapslices_sparse_nz(geomean, X, 1)
     rows = rowvals(X)
@@ -270,7 +270,7 @@ function discretize_meta!(meta_data::Matrix{ElType}, norm, n_bins) where ElType 
     end
 end
 
-function discretize_meta(meta_data::SparseMatrixCSC{ElType}, norm, n_bins) where ElType <: Real
+function discretize_meta(meta_data::SparseArrays.AbstractSparseMatrixCSC{ElType}, norm, n_bins) where ElType <: Real
     meta_data_dense = Matrix(meta_data)
     discretize_meta!(meta_data_dense, norm, n_bins)
     sparse(meta_data_dense)
@@ -302,7 +302,7 @@ end
 
 rownorm!(X::Matrix{ElType}) where ElType <: AbstractFloat = X ./= sum(X, dims=2)
 
-function rownorm!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
+function rownorm!(X::SparseArrays.AbstractSparseMatrixCSC{ElType}) where ElType <: AbstractFloat
     """Specialized in-place version for sparse matrices"""
     sum_vec = sum(X, dims=2)
     rows = rowvals(X)
@@ -316,7 +316,7 @@ function rownorm!(X::SparseMatrixCSC{ElType}) where ElType <: AbstractFloat
 end
 
 
-presabs_norm!(X::SparseMatrixCSC{ElType}) where ElType <: Real = map!(sign, X.nzval, X.nzval)
+presabs_norm!(X::SparseArrays.AbstractSparseMatrixCSC{ElType}) where ElType <: Real = map!(sign, X.nzval, X.nzval)
 presabs_norm!(X::Matrix{ElType}) where ElType <: Real = map!(sign, X, X)
 
 function filter_by_variance(data::AbstractMatrix, meta_data::Union{AbstractMatrix,Nothing}, header::Vector{String}, verbose::Bool;

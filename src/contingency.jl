@@ -39,7 +39,7 @@ function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}
 end
 
 ## convenience wrapper for two-way contingency tables
-function contingency_table(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer}, test_name::String, levels::Vector{<:Integer}=get_levels(data),
+function contingency_table(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer}, test_name::String, levels::Vector{<:Integer}=get_levels(data),
     max_vals::Vector{<:Integer}=get_max_vals(data))
     test_obj = make_test_object(test_name, false, max_k=0, levels=levels, max_vals=max_vals, cor_mat=zeros(Float64, 0, 0))
     contingency_table!(X, Y, data, test_obj)
@@ -67,7 +67,7 @@ end
 
 # SPARSE DATA
 
-function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer},
+function contingency_table!(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer},
         test_obj::ContTest2D)
 
     @inbounds if is_zero_adjusted(test_obj)
@@ -80,7 +80,7 @@ function contingency_table!(X::Int, Y::Int, data::SparseMatrixCSC{<:Integer},
     sparse_ctab_backend!((X, Y), data, test_obj, X_nz, Y_nz)
 end
 
-function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::SparseMatrixCSC{<:Integer},
+function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer},
         test_obj::ContTest3D)
     @inbounds if is_zero_adjusted(test_obj)
         X_nz = test_obj.levels[X] > 2
@@ -117,7 +117,7 @@ function make_zmap_expression(col_type::Type{NTuple{N,Int}}) where N
     end
 end
 
-@generated function sparse_ctab_backend!(cols::NTuple{N,Int}, data::SparseMatrixCSC{ElType},
+@generated function sparse_ctab_backend!(cols::NTuple{N,Int}, data::SparseArrays.AbstractSparseMatrixCSC{ElType},
         test_obj::TestType, X_nz::Bool, Y_nz::Bool) where {N, ElType<:Integer, S<:Integer, T<:AbstractNz, TestType<:AbstractContTest{S,T}}
 
     # general init
