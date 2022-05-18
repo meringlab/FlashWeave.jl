@@ -30,9 +30,10 @@ function interleaved_worker(data::AbstractMatrix{ElType}, levels, max_vals, cor_
             nbr_state = si_HITON_PC(target_var, data, levels, max_vals, cor_mat; univar_nbrs=univar_nbrs,
                                     prev_state=prev_state, blacklist=blacklist, whitelist=whitelist, GLL_args...)
             put!(shared_result_q, (target_var, nbr_state))
-        catch exc
-            put!(shared_result_q, (myid(), exc))
-            throw(exc)
+        catch e
+            bt = catch_backtrace()
+            put!(shared_result_q, (myid(), (e, bt)))
+            return
         end
 
     end
@@ -148,13 +149,16 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                 end
             end
         elseif isa(nbr_result, Int)
-            if !workers_local
+            if !workers_local && kill_remote_workers
                 rmprocs(nbr_result)
             end
             kill_confirms_rec += 1
-        elseif isa(nbr_result, Exception)
-            println("Excepion for worker $(target_var):")
-            throw(nbr_result)
+        elseif isa(nbr_result, Tuple{Exception, Any})
+            e, bt = nbr_result
+            println("\nException occurred on worker $(target_var):")
+            showerror(stdout, e, bt)
+            println("\n")
+            throw("Interleaved error (see stacktrace above)")
         else
             throw("Got unexpected 'nbr_result' of type $(typeof(nbr_result))")
         end

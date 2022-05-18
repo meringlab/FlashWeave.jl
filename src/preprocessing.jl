@@ -539,7 +539,7 @@ function check_convert_sparse(data, make_sparse, norm_str, prec)
     end
 
     if make_sparse && (norm_str == "clr_adapt"  || norm_str == "fz")
-        @warn "Adaptive CLR is inefficient with sparse data, using dense format"
+        @warn "Adaptive CLR is inefficient with sparse data, using dense format for normalization"
         make_sparse = false
     end
 
