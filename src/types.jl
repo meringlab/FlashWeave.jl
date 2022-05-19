@@ -383,3 +383,31 @@ function Base.iterate(itr::BNBIterator, state::BNBIteratorState)
     state = BNBIteratorState(i, qs, Zs, Z_pool, Z_pool_state, test_obj, ref_pval)
     return next_itr_val, state
 end
+
+######################
+## SPECIAL MATRICES ##
+######################
+import Base:size, show
+import SparseArrays: getcolptr, rowvals, nonzeros, nnz, AbstractSparseMatrixCSC
+
+struct SharedSparseMatrixCSC{Tv, Ti} <: AbstractSparseMatrixCSC{Tv, Ti}
+    m::Int
+    n::Int
+    colptr::SharedVector{Ti}
+    rowval::SharedVector{Ti}
+    nzval::SharedVector{Tv}
+end
+
+SharedSparseMatrixCSC(A::SparseMatrixCSC) = SharedSparseMatrixCSC(A.m, A.n, [SharedVector(getproperty(A, x)) for x in (:colptr, :rowval, :nzval)]...)
+
+size(A::SharedSparseMatrixCSC) = (A.m, A.n)
+getcolptr(A::SharedSparseMatrixCSC) = A.colptr
+getrowval(A::SharedSparseMatrixCSC) = rowvals(A)
+rowvals(A::SharedSparseMatrixCSC) = A.rowval
+nonzeros(A::SharedSparseMatrixCSC) = A.nzval
+nnz(A::SharedSparseMatrixCSC) = length(A.nzval)
+
+import SparseArrays:_checkbuffers, _goodbuffers
+
+_goodbuffers(S::AbstractSparseMatrixCSC) = _goodbuffers(size(S)..., getcolptr(S), getrowval(S), nonzeros(S))
+_checkbuffers(S::AbstractSparseMatrixCSC) = (@assert _goodbuffers(S); S)

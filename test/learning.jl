@@ -137,7 +137,7 @@ nprocs() == 1 && addprocs(1)
     global T_nbrs = nbrs_dicts[1][T_var]
 end
 
-# assure that including high-information meta variables leads to edge removal
+# assure that including high-information meta variables lead to edge removal
 @testset "meta conditioning" begin
     rng = StableRNG(1234)
     otu_mat_rand = rand(rng, 0:2, 100, 10)
@@ -410,6 +410,45 @@ end
                     for max_k in [0, 1]
                         @testset "max_k $(max_k)" begin
                             @test isa(learn_network(A; sensitive=sensitive, heterogeneous=heterogeneous, max_k=max_k, verbose=false, normalize=true), FlashWeave.FWResult)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+@testset "shared data" begin
+    approx_nbr_diff = 0
+    approx_weight_meandiff = 0.05
+
+    for make_sparse in [true, false]
+        @testset "sparse_$(make_sparse)" begin
+            for heterogeneous in [true, false]
+                for sensitive in [true, false]
+
+                    if !any([heterogeneous, sensitive])
+                        # skip mi test
+                        continue
+                    end
+
+                    @testset "het_$heterogeneous // sens_$sensitive" begin
+                        sens_str = sensitive ? "fz" : "mi"
+                        het_str = heterogeneous ? "_nz" : ""
+                        test_name = sens_str * het_str
+                        exp_graph = exp_dict["exp_$(test_name)_maxk3"]
+
+                        pred_netw = @silence_stdout begin
+                                        learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
+                                                    max_k=3, header=header, track_rejections=true, verbose=true, share_data=true)
+                                    end
+                        pred_graph = graph(pred_netw)
+
+                        @testset "edge_identity" begin
+                            @test compare_graph_results(exp_graph, pred_graph,
+                                                        approx=true,
+                                                        approx_nbr_diff=approx_nbr_diff,
+                                                        approx_weight_meandiff=approx_weight_meandiff)
                         end
                     end
                 end

@@ -79,7 +79,7 @@ end
 
 function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String, alpha::AbstractFloat, hps::Integer,
     n_obs_min::Integer, FDR::Bool, levels::Vector{DiscType}, max_vals::Vector{DiscType}, parallel::String, cor_mat::AbstractMatrix{ContType},
-    correct_reliable_only::Bool, verbose::Bool,
+    correct_reliable_only::Bool, verbose::Bool, workers_local::Bool,
     tmp_folder::AbstractString="") where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     # precompute univariate associations and sort variables (fewest neighbors first)
@@ -87,7 +87,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
 
     all_univar_nbrs = pw_univar_neighbors(data; test_name=test_name, alpha=alpha, hps=hps,
                                           n_obs_min=n_obs_min, FDR=FDR,
-                                          levels=levels, max_vals=max_vals, parallel=parallel, workers_local=workers_all_local(),
+                                          levels=levels, max_vals=max_vals, parallel=parallel, workers_local=workers_local,
                                           cor_mat=cor_mat, correct_reliable_only=correct_reliable_only,
                                           tmp_folder=tmp_folder)
     var_nbr_sizes = [(x, length(all_univar_nbrs[x])) for x in 1:size(data, 2)]
@@ -206,7 +206,8 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     tmp_folder::AbstractString="", debug::Integer=0, time_limit::AbstractFloat=-1.0,
     header=nothing, meta_variable_mask=nothing, dense_cor::Bool=true, recursive_pcor::Bool=true,
     cache_pcor::Bool=false, correct_reliable_only::Bool=true, feed_forward::Bool=true,
-    track_rejections::Bool=false, all_univar_nbrs=nothing, kill_remote_workers::Bool=true, kwargs...)
+    track_rejections::Bool=false, all_univar_nbrs=nothing, kill_remote_workers::Bool=true, 
+    workers_local = workers_all_local(), kwargs...)
     """
     time_limit: -1.0 set heuristically, 0.0 no time_limit, otherwise time limit in seconds
     parallel: 'single', 'single_il', 'multi_il'
@@ -230,7 +231,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
     if isnothing(all_univar_nbrs)
         target_vars, all_univar_nbrs = prepare_univar_results(data, test_name, alpha, hps, n_obs_min,
                                                               FDR, levels, max_vals, parallel, cor_mat,
-                                                              correct_reliable_only, verbose,
+                                                              correct_reliable_only, verbose, workers_local,
                                                               tmp_folder)
     else
         target_vars = Vector{Int}(collect(keys(all_univar_nbrs)))
@@ -243,7 +244,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
                               :convergence_threshold => convergence_threshold,
                               :feed_forward => feed_forward, :edge_rule => edge_rule,
                               :edge_merge_fun => edge_merge_fun,
-                              :workers_local => workers_all_local(),
+                              :workers_local => workers_local,
                               :variable_ids => header, :meta_variable_mask => meta_variable_mask,
                               :kill_remote_workers => kill_remote_workers)
 
@@ -428,6 +429,8 @@ Learn an interaction network from a data matrix (including OTUs and optionally m
 - `update_interval` - if `verbose=true`, determines the interval (seconds) at which network stat updates are printed
 
 - `extra_data` - tuples of the form (data, header) representing counts from additional sequencing experiments (e.g. 16S + ITS) for the same biological samples. These will be normalized independently.
+
+- `share_data` - if local parallel workers are detected, share input data (instead of copying)
 """
 function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
@@ -436,7 +439,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,
     cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0, parallel_mode="auto",
-    extra_data::Union{AbstractVector,Nothing}=nothing)
+    extra_data::Union{AbstractVector,Nothing}=nothing, share_data::Bool=true)
 
     start_time = time()
 
@@ -513,13 +516,24 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
 
     check_data(input_data, header, meta_mask=meta_mask)
 
+    workers_local = workers_all_local()
+    if startswith(parallel_mode, "multi") && share_data && workers_local
+        println("Sharing")
+        if issparse(input_data)
+            input_data = SharedSparseMatrixCSC(input_data)
+        else
+            input_data = SharedMatrix(input_data)
+        end
+        println("\t$(typeof(input_data))")
+    end
+
     params_dict = Dict(:test_name=>test_name, :parallel=>parallel_mode, :max_k=>max_k,
                        :alpha=>alpha, :convergence_threshold=>conv, :feed_forward=>feed_forward,
                        :fast_elim=>fast_elim, :track_rejections=>track_rejections, :verbose=>verbose,
                        :header=>header,
                        :max_tests=>max_tests, :hps=>hps, :FDR=>FDR, :n_obs_min=>n_obs_min,
                        :cache_pcor=>cache_pcor, :time_limit=>time_limit,
-                       :update_interval=>update_interval)
+                       :update_interval=>update_interval, :workers_local=>workers_local)
 
     verbose && println("### Learning interactions ###\n")
 
