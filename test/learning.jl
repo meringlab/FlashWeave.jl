@@ -1,7 +1,7 @@
 using FlashWeave
 using Test, Random, StableRNGs
 using SimpleWeightedGraphs
-using LightGraphs
+using Graphs
 using SparseArrays, DelimitedFiles, Statistics, Distributed, Logging
 import SimpleWeightedGraphs: nv, edges, ne, vertices, neighbors
 

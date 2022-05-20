@@ -2,19 +2,19 @@
 
 - no changes thus far
 
-# v0.18.2 (latest)
+# v0.19.0 (latest)
 
 ### general
 
 - add support for shared-memory OTU tables (sparse and dense), invoked via the `share_data` flag in `learn_network`
+- improve speed and edge case behaviour for non-recursive partial correlations
 - improve freeing of memory (in particular on parallel workers) between major network inference steps
 - improve error reporting on parallel workers
 
 ### bug fixes
 
-- fix numerical edge case for recursive partial correlations, improve speed and edge case behaviour for non-recursive partial correlations
+- fix numerical edge case for recursive partial correlations
 - fix handling of variables with no absences when `heterogeneous=true`
-
 
 # v0.18.1
 

@@ -14,11 +14,11 @@ To install Julia, please follow instructions on https://github.com/JuliaLang/jul
 In an interactive Julia session, you can then install FlashWeave after typing `]` via
 
 ```julia
-(v1.2) pkg> add FlashWeave
-# to run tests: (v1.2) pkg> test FlashWeave
+(@v1.6) pkg> add FlashWeave
+# to run tests: (@v1.6) pkg> test FlashWeave
 ```
 
-**Important note: from version 0.17, FlashWeave dropped support for Julia versions < 1.2. If you want to use FlashWeave with older Julia installations, make sure to install FlashWeave 0.16.0 (or lower) via `]` + `add FlashWeave@0.16.0`.**
+**Important note: from version 0.19, FlashWeave dropped support for Julia versions < 1.6 (the new LTS version). If you want to use FlashWeave with older Julia installations, make sure to install FlashWeave 0.18.1 (or lower) via `]` + `add FlashWeave@0.18`.**
 
 ## Latest changes ##
 

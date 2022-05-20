@@ -185,12 +185,12 @@ function level_map!(Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{E
 end
 
 
-function print_network_stats(graph::LightGraphs.Graph)
-    n_nodes = LightGraphs.nv(graph)
-    n_edges = LightGraphs.ne(graph)
+function print_network_stats(graph::Graphs.Graph)
+    n_nodes = Graphs.nv(graph)
+    n_edges = Graphs.ne(graph)
     println("Current nodes/edges: $n_nodes / $n_edges")
     println("Degree stats:")
-    deg = LightGraphs.degree(graph)
+    deg = Graphs.degree(graph)
     println(summarystats(deg))
     deg_median = median(deg)
     if deg_median > n_nodes/4

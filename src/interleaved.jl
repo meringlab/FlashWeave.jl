@@ -191,7 +191,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                 println("\nTime passed: ", Int(round(curr_time - start_time)), ". Finished nodes: ", length(target_vars) - remaining_jobs, ". Remaining nodes: ", remaining_jobs)
 
                 if check_convergence
-                    println("Convergence times: $last_conv_time $(curr_time - last_conv_time - start_time) $((curr_time - last_conv_time - start_time) / last_conv_time) $(LightGraphs.ne(graph) - last_conv_num_edges)")
+                    println("Convergence times: $last_conv_time $(curr_time - last_conv_time - start_time) $((curr_time - last_conv_time - start_time) / last_conv_time) $(Graphs.ne(graph) - last_conv_num_edges)")
                 end
 
                 print_network_stats(graph)
@@ -204,7 +204,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
             if !check_convergence && remaining_jobs / jobs_total <= conv_check_start
                 check_convergence = true
                 global last_conv_time = curr_time - start_time
-                global last_conv_num_edges = LightGraphs.ne(graph)
+                global last_conv_num_edges = Graphs.ne(graph)
 
                 verbose && println("Starting convergence checks at $last_conv_num_edges edges.")
 
@@ -212,7 +212,7 @@ function interleaved_backend(target_vars::AbstractVector{Int}, data::AbstractMat
                 delta_time = (curr_time - start_time - last_conv_time) / last_conv_time
 
                 if delta_time > conv_time_step
-                    new_num_edges = LightGraphs.ne(graph)
+                    new_num_edges = Graphs.ne(graph)
                     delta_num_edges = (new_num_edges - last_conv_num_edges) / last_conv_num_edges
                     conv_level = delta_num_edges / delta_time
 
