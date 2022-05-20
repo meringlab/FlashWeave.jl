@@ -481,12 +481,14 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
             shuffle!(work_items)
         end
 
+        wp = CachingPool(workers())
+
         # if worker processes are on the same machine, use local memory sharing via shared arrays
         if workers_local
             shared_pvals = SharedArray{Float64}(pvals)
             shared_stats = SharedArray{Float64}(stats)
 
-            wp = CachingPool(workers())
+           
             let data=data, test_obj=test_obj
                 pmap(work_item -> pw_univar_kernel!(work_item..., data, shared_stats,
                                                     shared_pvals, test_obj, hps,
@@ -501,7 +503,6 @@ function pw_univar_neighbors(data::AbstractMatrix{ElType};
         # otherwise make workers store test results remotely and gather them
         # in the end via network
         else
-            wp = CachingPool(workers())
             test_result_chunks = let data=data, test_obj=test_obj
                 pmap(work_item -> pw_univar_kernel(work_item..., data,
                                                    test_obj, hps, n_obs_min),

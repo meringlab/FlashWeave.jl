@@ -518,13 +518,11 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
 
     workers_local = workers_all_local()
     if startswith(parallel_mode, "multi") && share_data && workers_local
-        println("Sharing")
         if issparse(input_data)
             input_data = SharedSparseMatrixCSC(input_data)
         else
             input_data = SharedMatrix(input_data)
         end
-        println("\t$(typeof(input_data))")
     end
 
     params_dict = Dict(:test_name=>test_name, :parallel=>parallel_mode, :max_k=>max_k,
