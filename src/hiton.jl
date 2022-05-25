@@ -400,7 +400,9 @@ end
 
 ## convenience function for learning local neighborhoods
 function si_HITON_PC(T, data; test_name, levels=isdiscrete(test_name) ? get_levels(data) : Int[], 
-    max_vals=isdiscrete(test_name) ? get_max_vals(data) : Int[], cor_mat=zeros(Float32, 0, 0), kwargs...)
-univar_res = FlashWeave.pw_univar_neighbors(data, test_name=test_name, levels=levels, max_vals=max_vals, cor_mat=cor_mat)
-FlashWeave.si_HITON_PC(T, data, levels, max_vals, cor_mat; test_name=test_name, univar_nbrs=univar_res[T], kwargs...)
+    max_vals=isdiscrete(test_name) ? get_max_vals(data) : Int[], cor_mat=zeros(Float32, 0, 0), n_obs_min=0, kwargs...)
+    univar_res = pw_univar_neighbors(data, test_name=test_name, levels=levels, max_vals=max_vals, cor_mat=cor_mat, 
+        n_obs_min=n_obs_min)
+    si_HITON_PC(T, data, levels, max_vals, cor_mat; test_name=test_name, univar_nbrs=univar_res[T], n_obs_min=n_obs_min,
+        kwargs...)
 end
