@@ -51,9 +51,8 @@ end
 
 
 function update_sig_result!(test_result::TestResult, lowest_sig_Zs::NTuple{N,T} where {N,T<:Integer}, candidate::Int,
-     accepted::Vector{Int},
-     accepted_dict::NbrStatDict, alpha::AbstractFloat, debug::Integer, rej_dict::RejDict{Int}, track_rejections::Bool,
-     phase::Char, fast_elim::Bool, num_test_pair::Tuple{Int, Float64}, support_dict::NbrStatDict)
+     accepted::Vector{Int}, accepted_dict::NbrStatDict, alpha::AbstractFloat, debug::Integer, rej_dict::RejDict{Int}, 
+     track_rejections::Bool, phase::Char, fast_elim::Bool, num_test_pair::Tuple{Int, Float64}, support_dict::NbrStatDict)
 
      if isempty(accepted)
          push!(accepted, candidate)
@@ -273,7 +272,7 @@ function make_final_HitonState(prev_state::HitonState{Int}, PC_dict::NbrStatDict
     state_results = PC_dict
     inter_results = TPC_dict
 
-    HitonState(phase, PC_dict, TPC_dict, unchecked_vars, state_rejections)
+    HitonState(phase, state_results, inter_results, unchecked_vars, state_rejections)
 end
 
 ################################

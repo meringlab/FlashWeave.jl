@@ -187,11 +187,18 @@ end
 
                                     is_il = endswith(parallel, "_il")
                                     time_limit = is_il ? 30.0 : 0.0
-
+                                    
+                                    # assure compatibility with old automatic cutoff detection
+                                    if startswith(test_name, "mi") && max_k == 3
+                                        n_obs_min = 160
+                                    else
+                                        n_obs_min = -1
+                                    end
 
                                     pred_graph = @silence_stdout begin
                                                     make_network(data, test_name, make_sparse, 64,
-                                                                 max_k=max_k, parallel=parallel, time_limit=time_limit)
+                                                                 max_k=max_k, parallel=parallel, time_limit=time_limit, 
+                                                                 n_obs_min=n_obs_min)
                                                  end
 
                                     # special case for conditional mi
@@ -251,7 +258,8 @@ end
     for (test_name, make_sparse) in [("mi_nz", true), ("fz", false)]
         for make_sparse in [true, false]
             @testset "$(test_name)_$(make_sparse)_single" begin
-                pred_graph = @silence_stdout make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single_il", time_limit=0.0)
+                pred_graph = @silence_stdout make_network(data, test_name, make_sparse, 32, max_k=3, parallel="single_il", 
+                    time_limit=0.0, n_obs_min=160)
                 exp_graph = exp_dict["exp_$(test_name)_maxk3"]
                 @test compare_graph_results(exp_graph, pred_graph, rtol=1e-2, atol=0.0)
             end
@@ -279,9 +287,12 @@ end
                 test_name = sens_str * het_str
                 exp_graph = exp_dict["exp_$(test_name)_maxk3"]
 
+                # assure compatibility with old automatic cutoff detection
+                n_obs_min = sensitive ? -1 : 160
+
                 pred_netw = @silence_stdout begin
                                 learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
-                                            max_k=3, header=header, track_rejections=true, verbose=true)
+                                            max_k=3, header=header, track_rejections=true, verbose=true, n_obs_min=n_obs_min)
                             end
                 pred_graph = graph(pred_netw)
 
@@ -386,9 +397,14 @@ end
         for make_sparse in [true, false]
             for cb in [true, false]
                 @testset "$(test_name)_$(make_sparse)_cb$(cb)_single" begin
+
+                    # assure compatibility with old automatic cutoff detection
+                    n_obs_min = startswith(test_name, "mi") ? 160 : -1
+
                     pred_graph = @silence_stdout begin
                         make_network(data, test_name, make_sparse, 64, max_k=3,
-                        parallel="single", time_limit=0.0; bnb=true, cut_test_branches=cb)
+                        parallel="single", time_limit=0.0; bnb=true, cut_test_branches=cb,
+                        n_obs_min=n_obs_min)
                     end
                     @test isa(pred_graph, SimpleWeightedGraph)
                 end
@@ -408,8 +424,17 @@ end
             for heterogeneous in [true, false]
                 @testset "heterogeneous $heterogeneous" begin
                     for max_k in [0, 1]
+                        
+                        # assure compatibility with old automatic cutoff detection
+                        if heterogeneous && max_k == 1
+                            n_obs_min = 40
+                        else
+                            n_obs_min = -1
+                        end
+
                         @testset "max_k $(max_k)" begin
-                            @test isa(learn_network(A; sensitive=sensitive, heterogeneous=heterogeneous, max_k=max_k, verbose=false, normalize=true), FlashWeave.FWResult)
+                            @test isa(learn_network(A; sensitive=sensitive, heterogeneous=heterogeneous, max_k=max_k, 
+                                verbose=false, normalize=true, n_obs_min=n_obs_min), FlashWeave.FWResult)
                         end
                     end
                 end
@@ -438,9 +463,13 @@ end
                         test_name = sens_str * het_str
                         exp_graph = exp_dict["exp_$(test_name)_maxk3"]
 
+                        # assure compatibility with old automatic cutoff detection
+                        n_obs_min = sensitive ? -1 : 160
+
                         pred_netw = @silence_stdout begin
                                         learn_network(data, sensitive=sensitive, heterogeneous=heterogeneous,
-                                                    max_k=3, header=header, track_rejections=true, verbose=true, share_data=true)
+                                                    max_k=3, header=header, track_rejections=true, verbose=true, 
+                                                    share_data=true, n_obs_min=n_obs_min)
                                     end
                         pred_graph = graph(pred_netw)
 

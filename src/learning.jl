@@ -50,8 +50,12 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
 
     if n_obs_min < 0 & is_zero_adjusted(test_name)
         if isdiscrete(test_name)
-            max_levels = maximum(levels) - 1
-            n_obs_min = hps * max_levels^(max_k+2) + 1
+            max_level = maximum(levels)
+            n_strata = min(max_level^max_k, 8) # conservatively assume 8 sub-tables at most,
+                                               # trades off computational efficiency and sensitivity
+            n_obs_min = hps * 2 * 2 * n_strata # 2 * 2 corresponds to size of marginal 
+                                                      # contingency table which is always 4
+                                                      # (binary or 0-1-2 discretized /wo zeros)
         else
             n_obs_min = 20
         end
