@@ -1,6 +1,6 @@
 # master (unpublished)
 
-- no changes thus far
+- expose experimental keyword arguments within `learn_network` for easier testing (subject to change, syntax/functionality should not be relied upon)
 
 # v0.19.0 (latest)
 

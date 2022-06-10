@@ -54,8 +54,8 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
             n_strata = min(max_level^max_k, 8) # conservatively assume 8 sub-tables at most,
                                                # trades off computational efficiency and sensitivity
             n_obs_min = hps * 2 * 2 * n_strata # 2 * 2 corresponds to size of marginal 
-                                                      # contingency table which is always 4
-                                                      # (binary or 0-1-2 discretized /wo zeros)
+                                               # contingency table which is always 4
+                                               # (binary or 0-1-2 discretized /wo zeros)
         else
             n_obs_min = 20
         end
@@ -435,6 +435,8 @@ Learn an interaction network from a data matrix (including OTUs and optionally m
 - `extra_data` - tuples of the form (data, header) representing counts from additional sequencing experiments (e.g. 16S + ITS) for the same biological samples. These will be normalized independently.
 
 - `share_data` - if local parallel workers are detected, share input data (instead of copying)
+
+- `experimental_kwargs` - experimental keyword arguments that are directly passed to the underlying inference engine
 """
 function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     heterogeneous::Bool=false, max_k::Integer=3, alpha::AbstractFloat=0.01,
@@ -443,7 +445,7 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     transposed::Bool=false, prec::Integer=32, make_sparse::Bool=!sensitive || heterogeneous,
     make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,
     cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0, parallel_mode="auto",
-    extra_data::Union{AbstractVector,Nothing}=nothing, share_data::Bool=true)
+    extra_data::Union{AbstractVector,Nothing}=nothing, share_data::Bool=true, experimental_kwargs...)
 
     start_time = time()
 
@@ -535,7 +537,8 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
                        :header=>header,
                        :max_tests=>max_tests, :hps=>hps, :FDR=>FDR, :n_obs_min=>n_obs_min,
                        :cache_pcor=>cache_pcor, :time_limit=>time_limit,
-                       :update_interval=>update_interval, :workers_local=>workers_local)
+                       :update_interval=>update_interval, :workers_local=>workers_local,
+                       experimental_kwargs...)
 
     verbose && println("### Learning interactions ###\n")
 

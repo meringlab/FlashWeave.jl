@@ -413,6 +413,15 @@ end
     end
 end
 
+# smoke test experimental kwargs
+@testset "experimental kwargs" begin
+    net = @silence_stdout begin
+        learn_network(data; bnb=true)
+    end
+
+    @test isa(net, FlashWeave.FWResult)
+end
+
 # assure that tables with variables that are observed everywhere are handled correctly
 @testset "non-zero variables" begin
     rng = StableRNG(1234)
