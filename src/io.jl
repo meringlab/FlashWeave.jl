@@ -207,9 +207,15 @@ end
 
 function load_biom_hdf5(data_path)
     f = h5open(data_path, "r")
-    # use either 'attrs' or 'attributes' (depends on HDF5 version)
+    # use either 'attrs' or 'attributes' and parse accordingly (depends on HDF5 version)
     attr_fun = isdefined(HDF5, :attrs) ? attrs : attributes
-    m, n = read(attr_fun(f)["shape"])
+    mn_field = attr_fun(f)["shape"]
+    if isa(mn_field, HDF5.Attribute)
+        m, n = read(mn_field)
+    else
+        m, n = mn_field
+    end
+
     colptr, rowval, nzval = [read(f, "sample/matrix/$key") for key in ["indptr", "indices", "data"]]
     otu_table = permutedims(SparseMatrixCSC(m, n, colptr .+ 1, rowval .+ 1, Vector{Int}(nzval)))
     header = read(f, "observation/ids")
