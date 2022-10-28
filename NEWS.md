@@ -1,8 +1,18 @@
 # master (unpublished)
 
+- no documented changes
+
+# v0.19.1 (latest)
+
+### general
+
 - expose experimental keyword arguments within `learn_network` for easier testing (subject to change, syntax/functionality should not be relied upon)
 
-# v0.19.0 (latest)
+### bug fixes
+
+- fix dependency issue with HDF5.jl@v0.16
+
+# v0.19.0
 
 ### general
 
