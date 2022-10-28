@@ -16,11 +16,9 @@ function fz_pval(stat::AbstractFloat, n::Int, len_z::Int)
     pval
 end
 
-
 function pcor(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Real})
     @views partialcor(data[:, X], data[:, Y], data[:, collect(Zs)])
 end
-
 
 function pcor_rec(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, cor_mat::AbstractMatrix{ContType},
      pcor_set_dict::Dict{String,Dict{String,ContType}}, cache_result::Bool=true) where ContType<:AbstractFloat
@@ -124,7 +122,6 @@ function cor(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Real},
     p, n_obs
 end
 
-
 function cor(data::SparseArrays.AbstractSparseMatrixCSC{<:Real}, nz::Bool)
     n_vars = size(data, 2)
     cor_mat = zeros(Float64, n_vars, n_vars)
@@ -137,7 +134,6 @@ function cor(data::SparseArrays.AbstractSparseMatrixCSC{<:Real}, nz::Bool)
     end
     cor_mat
 end
-
 
 function cor_subset!(data::AbstractMatrix{<:Real}, cor_mat::AbstractMatrix{<:AbstractFloat}, vars::AbstractVector{Int})
     n_vars = length(vars)
@@ -158,13 +154,11 @@ function cor_subset!(data::AbstractMatrix{<:Real}, cor_mat::AbstractMatrix{<:Abs
     end
 end
 
-
 function mi_pval(mi::AbstractFloat, df::Integer, n_obs::Integer)
     g_stat = 2.0 * mi * n_obs
     pval = df > 0 ? ccdf(Chisq(df), g_stat) : 1.0
     pval
 end
-
 
 function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer, levels_y::Integer,
         levels_z::Integer, marg_i::AbstractMatrix{<:Integer}, marg_j::AbstractMatrix{<:Integer},
@@ -211,7 +205,6 @@ function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer
 
     mi_stat
 end
-
 
 function mutual_information(ctab::AbstractMatrix{<:Integer}, levels_x::Integer, levels_y::Integer,
         marg_i::AbstractVector{<:Integer}, marg_j::AbstractVector{<:Integer}; signed::Bool=true)
@@ -285,8 +278,6 @@ function mutual_information(ctab::AbstractArray{T, 3}) where T<:Integer
     mutual_information(ctab, levels_x, levels_y, levels_z, ni, nj, nk)
 end
 
-
-
 function adjust_df(marg_i::AbstractVector{T}, marg_j::AbstractVector{T}, levels_x::Integer, levels_y::Integer) where T<:Integer
     alx = 0
     aly = 0
@@ -304,7 +295,6 @@ function adjust_df(marg_i::AbstractVector{T}, marg_j::AbstractVector{T}, levels_
 
     df
 end
-
 
 function adjust_df(marg_i::AbstractMatrix{T}, marg_j::AbstractMatrix{T}, levels_x::Integer, levels_y::Integer, levels_z::Integer) where T<:Integer
     df = 0
@@ -331,7 +321,6 @@ function nz_adjust_cont_tab(max_val_x::Integer, max_val_y::Integer, ctab::Abstra
         error("ctab must have 2 or 3 dimensions (found $(ndims(ctab)) )")
     end
 end
-
 
 """Accelerated version of that found in MultipleTesting.jl"""
 function benjamini_hochberg!(pvals::AbstractVector{T}; alpha::AbstractFloat=0.01,
