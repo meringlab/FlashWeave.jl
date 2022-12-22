@@ -117,6 +117,20 @@ function make_zmap_expression(col_type::Type{NTuple{N,Int}}) where N
     end
 end
 
+function make_break_expression(T::Type{<:AbstractNz}, i)
+    if T <: Nz && i < 3
+        adj_name = i == 1 ? Symbol("X_nz") : Symbol("Y_nz")
+        break_expr = quote
+            if $(adj_name)
+                break_loop = true
+            end
+        end
+    else
+        break_expr = quote end
+    end
+    return break_expr
+end
+
 @generated function sparse_ctab_backend!(cols::NTuple{N,Int}, data::SparseArrays.AbstractSparseMatrixCSC{ElType},
         test_obj::TestType, X_nz::Bool, Y_nz::Bool) where {N, ElType<:Integer, S<:Integer, T<:AbstractNz, TestType<:AbstractContTest{S,T}}
 
@@ -144,6 +158,8 @@ end
         varsymb_dict[i] = (Symbol("col$i"), Symbol("i$i"), Symbol("rowind$i"), Symbol("val$i"), Symbol("bound$i"))
         col_var, i_var, rowind_var, val_var, bound_var = varsymb_dict[i]
 
+        break_expr = make_break_expression(T, i)
+
         # <<----------------
         init_expr = quote
             $(col_var) = cols[$(i)]
@@ -157,6 +173,7 @@ end
                     min_ind = $(rowind_var)
                 end
             else
+                $(break_expr)
                 $(rowind_var) = n_rows + 1
                 n_out_of_bounds += 1
             end
@@ -183,16 +200,7 @@ end
             skip_expr = quote end
         end
 
-        if T <: Nz && i < 3
-            adj_name = i == 1 ? Symbol("X_nz") : Symbol("Y_nz")
-            break_expr = quote
-                if $(adj_name)
-                    break_loop = true
-                end
-            end
-        else
-            break_expr = quote end
-        end
+        break_expr = make_break_expression(T, i)
 
         # <<----------------
         i_sparse_expr = quote

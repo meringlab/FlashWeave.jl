@@ -229,7 +229,8 @@ function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::Abstra
 end
 
 
-function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5, levels::Vector{<:Integer}=Int[])
+function test(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{<:Integer}, test_name::String, hps::Integer=5, 
+    levels::Vector{<:Integer}=Int[], max_vals::Vector{<:Integer}=Int[])
     """Convenience function for module tests"""
     if isempty(levels) || isempty(max_vals)
         levels = get_levels(data)

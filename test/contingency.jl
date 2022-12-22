@@ -67,3 +67,18 @@ for sparsity_mode in ["dense", "sparse"]
         end
     end
 end
+
+@testset "sparse_ctab all-zero Y /w Nz" begin
+    v = vcat(ones(Int, 25), fill(2, 25))
+    A = [v zeros(Int, 50) v]
+
+    A_sp = SparseMatrixCSC{Int}(A)
+    test_obj = FlashWeave.make_test_object("mi_nz", true, max_k=1, levels=[2, 2, 3], max_vals=[2, 2, 2], 
+                cor_mat=zeros(0,0), cache_pcor=false)
+
+    t = @async FlashWeave.sparse_ctab_backend!((1, 2, 3), A_sp, test_obj, false, true)
+    sleep(2.0)
+
+    @test istaskdone(t) # test that this does not hang
+end
+

@@ -209,7 +209,7 @@ function maxweight(weight1::Float64, weight2::Float64, e1::Int, e2::Int, header=
         sign2 = sign(weight2)
 
         if sign1 * sign2 < 0
-            e1w, e2w = header != nothing ? (e1, e2) : (header[e1], header[e2])
+            e1w, e2w = !isnothing(header) ? (e1, e2) : (header[e1], header[e2])
             @warn "Opposite signs for edge $e1w <-> $e2w detected. Arbitarily choosing one."
             return weight1
         else

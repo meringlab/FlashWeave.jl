@@ -1,6 +1,9 @@
 # master (unpublished)
 
-- no documented changes
+### bug fixes
+
+- force `si_HITON_PC` to remove non-significant univariate candidates earlier
+- fix edge case where direct usage of the unexposed sparse processing engine could lead to infinite loops
 
 # v0.19.1 (latest)
 

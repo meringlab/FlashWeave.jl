@@ -169,7 +169,7 @@ function make_stopped_HitonState()
 end
 
 function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, levels::Vector{DiscType}, max_vals::Vector{DiscType}, max_k::Integer,
-     cor_mat::AbstractMatrix{ContType}, cache_pcor::Bool) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
+     cor_mat::AbstractMatrix{ContType}, cache_pcor::Bool, univar_nbrs::NbrStatDict=NbrStatDict()) where {ElType<:Real, DiscType<:Integer, ContType<:AbstractFloat}
 
     stop_hiton = false
 
@@ -191,7 +191,7 @@ function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, 
 
     test_obj = make_test_object(test_name, true, max_k=max_k, levels=levels, max_vals=max_vals, cor_mat=cor_mat, cache_pcor=cache_pcor)
     data_prep = prepare_nzdata(T, data, test_obj)
-    test_variables = filter(x -> x != T, 1:size(data, 2))
+    test_variables = filter(x -> x != T && haskey(univar_nbrs, x), 1:size(data, 2))
 
     data_prep, levels, max_vals, z, test_obj, test_variables, stop_hiton
 end
@@ -293,7 +293,8 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
     rej_dict = RejDict{Int}()
 
-    data_prep, levels, max_vals, z, test_obj, test_variables, stop_hiton = init_hiton_pc(T, data, test_name, levels, max_vals, max_k, cor_mat, cache_pcor)
+    data_prep, levels, max_vals, z, test_obj, test_variables, stop_hiton = init_hiton_pc(T, data, test_name, levels, max_vals, max_k, cor_mat, 
+        cache_pcor, univar_nbrs)
 
     if stop_hiton
         return make_stopped_HitonState()
@@ -303,8 +304,8 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
     if debug > 0
         println("UNIVARIATE")
-        uni_printinf = collect(zip(test_variables, univar_nbrs))
-        println("\tFirst up to 200 neighbors:", uni_printinf[1:min(200, length(uni_printinf))])
+        uni_printinf = collect(zip(test_variables, [univar_nbrs[x]  for x in test_variables]))
+        println("\tFirst up to 200 candidates (out of $(length(test_variables))): ", uni_printinf[1:min(200, length(uni_printinf))])
     end
 
     # if conditioning should be performed
@@ -327,7 +328,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
                 candidates, candidates_unchecked, prev_TPC_dict, rej_dict = prepare_interleaving_phase(prev_state, rej_dict, univar_nbrs, track_rejections)
 
                 if debug > 0
-                    println("\tnumber of candidates:", length(candidates), candidates[1:min(length(candidates), 20)])
+                    println("\tnumber of candidates: ", length(candidates), " ", candidates[1:min(length(candidates), 20)])
                     println("\nINTERLEAVING\n")
                 end
 
