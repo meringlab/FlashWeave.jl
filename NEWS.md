@@ -1,11 +1,16 @@
 # master (unpublished)
 
+No changes
+
+# v0.19.2 (latest)
+
 ### bug fixes
 
 - force `si_HITON_PC` to remove non-significant univariate candidates earlier
 - fix edge case where direct usage of the unexposed sparse processing engine could lead to infinite loops
+- fix SparseArrays incompatibility (surfaced by julia v1.9)
 
-# v0.19.1 (latest)
+# v0.19.1
 
 ### general
 
