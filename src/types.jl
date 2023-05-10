@@ -402,12 +402,12 @@ SharedSparseMatrixCSC(A::SparseMatrixCSC) = SharedSparseMatrixCSC(A.m, A.n, [Sha
 
 size(A::SharedSparseMatrixCSC) = (A.m, A.n)
 getcolptr(A::SharedSparseMatrixCSC) = A.colptr
-getrowval(A::SharedSparseMatrixCSC) = rowvals(A)
+#getrowval(A::SharedSparseMatrixCSC) = rowvals(A)
 rowvals(A::SharedSparseMatrixCSC) = A.rowval
 nonzeros(A::SharedSparseMatrixCSC) = A.nzval
 nnz(A::SharedSparseMatrixCSC) = length(A.nzval)
 
 import SparseArrays:_checkbuffers, _goodbuffers
 
-_goodbuffers(S::AbstractSparseMatrixCSC) = _goodbuffers(size(S)..., getcolptr(S), getrowval(S), nonzeros(S))
-_checkbuffers(S::AbstractSparseMatrixCSC) = (@assert _goodbuffers(S); S)
+_goodbuffers(S::SharedSparseMatrixCSC) = _goodbuffers(size(S)..., getcolptr(S), rowvals(S), nonzeros(S))
+_checkbuffers(S::SharedSparseMatrixCSC) = (@assert _goodbuffers(S); S)

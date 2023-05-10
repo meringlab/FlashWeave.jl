@@ -3,7 +3,8 @@ using Test, Random, StableRNGs
 using SimpleWeightedGraphs
 using Graphs
 using SparseArrays, DelimitedFiles, Statistics, Distributed, Logging
-import SimpleWeightedGraphs: nv, edges, ne, vertices, neighbors
+import SimpleWeightedGraphs: nv, edges, ne, vertices
+import Graphs: neighbors
 
 data_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv")
 data = Matrix{Float64}(readdlm(data_path, '\t')[2:end, 2:end])
