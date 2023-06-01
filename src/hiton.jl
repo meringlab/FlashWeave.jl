@@ -197,7 +197,7 @@ function init_hiton_pc(T::Int, data::AbstractMatrix{ElType}, test_name::String, 
 end
 
 function prepare_interleaving_phase(prev_state::HitonState{Int}, rej_dict::RejDict{Int},
-     univar_nbrs::NbrStatDict, track_rejections::Bool)
+     univar_nbrs::NbrStatDict, track_rejections::Bool, alpha::AbstractFloat)
 
     if prev_state.phase == 'I'
         prev_TPC_dict = prev_state.state_results
@@ -209,7 +209,8 @@ function prepare_interleaving_phase(prev_state::HitonState{Int}, rej_dict::RejDi
         end
     else
         # sort candidates
-        candidate_pval_pairs = Tuple{Int,Float64}[(candidate, univar_nbrs[candidate][2]) for candidate in keys(univar_nbrs)]
+        candidate_pval_pairs = Tuple{Int,Float64}[(candidate, univar_nbrs[candidate][2]) for candidate in keys(univar_nbrs)
+            if univar_nbrs[candidate][2] < alpha]
         sort!(candidate_pval_pairs, by=x -> x[2])
         candidates = map(x -> x[1], candidate_pval_pairs)
         candidates_unchecked = Int[]
@@ -325,7 +326,7 @@ function si_HITON_PC(T::Int, data::AbstractMatrix{ElType}, levels::Vector{DiscTy
 
             if prev_state.phase == 'I' || prev_state.phase == 'S'
 
-                candidates, candidates_unchecked, prev_TPC_dict, rej_dict = prepare_interleaving_phase(prev_state, rej_dict, univar_nbrs, track_rejections)
+                candidates, candidates_unchecked, prev_TPC_dict, rej_dict = prepare_interleaving_phase(prev_state, rej_dict, univar_nbrs, track_rejections, alpha)
 
                 if debug > 0
                     println("\tnumber of candidates: ", length(candidates), " ", candidates[1:min(length(candidates), 20)])

@@ -1,3 +1,13 @@
+function stack_or_hcat(vecs::AbstractVector{<:AbstractArray})
+    # use more efficient stack (introduced in Julia v1.9) if available
+    if isdefined(Base, :stack)
+        return stack(vecs)
+    else
+        return hcat(vecs...)
+    end
+end
+
+
 function factors_to_ints(x::AbstractVector)
     # need more complicated check because x can be AbstractVector{Any}
     if isa(x[1], AbstractString)
@@ -43,7 +53,7 @@ function onehot(x::AbstractVector, var_name="", check::Bool=true)
         cols_enc, vnames_enc = [factors_to_ints(x)], [var_name]
     end
 
-    hcat(cols_enc...), vnames_enc
+    stack_or_hcat(cols_enc), vnames_enc
 end
 
 
@@ -181,15 +191,18 @@ function discretize(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
             for j in 1:size(X, 2)
                 push!(disc_vecs, discretize_nz(X[:, j], n_bins, rank_method=rank_method, disc_method=disc_method))
             end
-            return hcat(disc_vecs...)
+            
+            return stack_or_hcat(disc_vecs)
         else
             disc_vecs = [discretize_nz(view(X, :, j), view(nz_mask, :, j), n_bins, rank_method=rank_method, disc_method=disc_method) for j in 1:size(X, 2)]
-            return hcat(disc_vecs...)
+            
+            return stack_or_hcat(disc_vecs)
         end
     else
         return mapslices(x -> discretize(x, n_bins, rank_method=rank_method, disc_method=disc_method), X, dims=1)
     end
 end
+
 
 function discretize(x_vec::Vector{ElType}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median") where ElType <: AbstractFloat
     if disc_method == "median"
@@ -231,6 +244,7 @@ function discretize_nz(x_vec::SparseVector{ElType}, n_bins::Integer=3;
     disc_nz_vec = discretize(x_vec.nzval, n_bins-1, rank_method=rank_method, disc_method=disc_method) .+ 1
     SparseVector(x_vec.n, x_vec.nzind, disc_nz_vec)
 end
+
 
 function discretize_nz(x_vec::AbstractVector{ElType}, nz_vec::AbstractVector{Bool}, n_bins::Integer=3; rank_method::String="tied", disc_method::String="median") where ElType <: AbstractFloat
     if any(nz_vec)

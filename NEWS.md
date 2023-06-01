@@ -1,6 +1,9 @@
 # master (unpublished)
 
-No changes
+### general
+
+- use the more compiler-friendly `stack` (introduced in Julia v1.9) instead of `hcat` for large numbers of columns (if available)
+- improve univariate pvalue filtering
 
 # v0.19.2 (latest)
 
