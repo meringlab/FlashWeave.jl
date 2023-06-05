@@ -299,7 +299,7 @@ end
 function adjust_df(marg_i::AbstractMatrix{T}, marg_j::AbstractMatrix{T}, levels_x::Integer, levels_y::Integer, levels_z::Integer) where T<:Integer
     df = 0
     @inbounds for k in 1:levels_z
-        df += adjust_df(marg_i[:, k], marg_j[:, k], levels_x, levels_y)
+        df += adjust_df(view(marg_i, :, k), view(marg_j, :, k), levels_x, levels_y)
     end
     df
 end

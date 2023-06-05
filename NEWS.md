@@ -4,6 +4,7 @@
 
 - use the more compiler-friendly `stack` (introduced in Julia v1.9) instead of `hcat` for large numbers of columns (if available)
 - improve univariate pvalue filtering
+- remove performance bottleneck in three-way `adjust_df`
 
 # v0.19.2 (latest)
 
