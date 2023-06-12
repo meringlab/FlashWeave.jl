@@ -122,7 +122,7 @@ function find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_next, A)
 end
 
 # Auxillary function for 3-way + max_k = 1 / heterogeneous = true special case
-function find_next_XY(row, ptr, ptr_end, A)
+function find_next_XorY(row, ptr, ptr_end, A)
     val = A.nzval[ptr] + 1
     ptr += 1
     row = ptr == ptr_end ? 0 : A.rowval[ptr]
@@ -134,7 +134,11 @@ end
 function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer},
     test_obj::MiTestCond{<:Integer, Nz})
     fill!(test_obj.ctab, 0)
-
+    # only reset the z_map elements that will be used 
+    # (corresponding to abundances 0, 1, 2)
+    fill!(view(test_obj.zmap.z_map_arr, 1:3), -1)
+    test_obj.zmap.levels_total = 0
+    
     # Get the pointers to the start and end of the non-zero elements in each column
     ptr_X, ptr_Y, ptr_Z = data.colptr[X], data.colptr[Y], data.colptr[Z]
     ptr_X_end, ptr_Y_end, ptr_Z_end = data.colptr[X + 1], data.colptr[Y + 1], data.colptr[Z + 1]
@@ -144,19 +148,24 @@ function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractS
     @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
         if row_X == row_Y
             val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data)
-            val_X, ptr_X, row_X = find_next_XY(row_X, ptr_X, ptr_X_end, data)
-            val_Y, ptr_Y, row_Y = find_next_XY(row_Y, ptr_Y, ptr_Y_end, data)
+            val_X, ptr_X, row_X = find_next_XorY(row_X, ptr_X, ptr_X_end, data)
+            val_Y, ptr_Y, row_Y = find_next_XorY(row_Y, ptr_Y, ptr_Y_end, data)
         elseif row_X < row_Y
             val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data)
-            val_X, ptr_X, row_X = find_next_XY(row_X, ptr_X, ptr_X_end, data)
+            val_X, ptr_X, row_X = find_next_XorY(row_X, ptr_X, ptr_X_end, data)
             val_Y = 1
         else
             val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_Y, data)
-            val_Y, ptr_Y, row_Y = find_next_XY(row_Y, ptr_Y, ptr_Y_end, data)
+            val_Y, ptr_Y, row_Y = find_next_XorY(row_Y, ptr_Y, ptr_Y_end, data)
             val_X = 1
         end
         
         test_obj.ctab[val_X, val_Y, val_Z] += 1
+
+        if test_obj.zmap.z_map_arr[val_Z] == -1
+            test_obj.zmap.levels_total += 1
+            test_obj.zmap.z_map_arr[val_Z] = 1
+        end
     end
 
     return nothing
