@@ -362,6 +362,22 @@ end
     end
 end
 
+@testset "sparse special optim (max_k 0 / 1, mi_nz)" begin
+    norm_res = FlashWeave.normalize_data(data, test_name="mi_nz", make_sparse=false)
+    A = norm_res.data
+    # make some variables binary to test Nz behaviour
+    A[.!iszero.(A[:, end-5:end])] .= 1
+    A_sp = sparse(A)
+
+    for max_k in [0, 1]
+        @testset "max_k $max_k" begin
+            net, net_sp = [learn_network(x; sensitive=false, heterogeneous=true, max_k, normalize=false, verbose=false, 
+            make_sparse=y) for (x, y) in [(A, false), (A_sp, true)]]
+            @test net == net_sp
+        end
+    end
+end
+
 # smoke test fast elimination heuristic
 @testset "fast_elim" begin
     @test isa(learn_network(data, sensitive=true, heterogeneous=false,

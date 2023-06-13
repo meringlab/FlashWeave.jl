@@ -44,7 +44,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
         else
             contingency_table!(X, Y, data, test_obj)
         end
-
+        
         if is_zero_adjusted(test_obj)
             sub_ctab = nz_adjust_cont_tab(max_val_x, max_val_y, test_obj.ctab)
             levels_x = size(sub_ctab, 1)
@@ -61,7 +61,14 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
             pval = 1.0
             suff_power = false
         else
-            mi_stat = mutual_information(sub_ctab, levels_x, levels_y, test_obj.marg_i, test_obj.marg_j)
+            try
+                mi_stat = mutual_information(sub_ctab, levels_x, levels_y, test_obj.marg_i, test_obj.marg_j)
+            catch DomainError
+                display(test_obj.ctab)
+                display(sub_ctab)
+                @show X Y test_obj.marg_i test_obj.marg_j levels_x levels_y n_obs
+                error("debug")
+            end
 
             df = adjust_df(test_obj.marg_i, test_obj.marg_j, levels_x, levels_y)
             pval = mi_pval(abs(mi_stat), df, n_obs)

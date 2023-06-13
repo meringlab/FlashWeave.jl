@@ -75,22 +75,48 @@ function contingency_table!(X::Int, Y::Int, data::SparseArrays.AbstractSparseMat
     # Get the pointers to the start and end of the non-zero elements in each column
     ptr_X, ptr_Y = data.colptr[X], data.colptr[Y]
     ptr_X_end, ptr_Y_end = data.colptr[X + 1], data.colptr[Y + 1]
+    row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
 
     # While there are non-zero elements remaining in either column
     @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
-        row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
+        #row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
         
         if row_X == row_Y
             val_X, val_Y = data.nzval[ptr_X] + 1, data.nzval[ptr_Y] + 1
-            test_obj.ctab[val_X, val_Y] += 1
             ptr_X += 1
             ptr_Y += 1
+            row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
         elseif row_X < row_Y
+            val_X = data.nzval[ptr_X] + 1
+            val_Y = 1
             ptr_X += 1
+            row_X = data.rowval[ptr_X]
         else
+            val_Y = data.nzval[ptr_Y] + 1
+            val_X = 1
             ptr_Y += 1
+            row_Y = data.rowval[ptr_Y]
         end
+
+        test_obj.ctab[val_X, val_Y] += 1
     end
+
+    # Finish zero / non-zero pairs at the tail of the
+    # columns
+    @inbounds while ptr_X < ptr_X_end
+        val_X = data.nzval[ptr_X] + 1
+        ptr_X += 1
+        test_obj.ctab[val_X, 1] += 1
+    end
+
+    @inbounds while ptr_Y < ptr_Y_end
+        val_Y = data.nzval[ptr_Y] + 1
+        ptr_Y += 1
+        test_obj.ctab[1, val_Y] += 1
+    end
+
+    # add double-zero entries
+    test_obj.ctab[1, 1] = size(data, 1) - sum(test_obj.ctab)
 
     return nothing
 end
@@ -114,10 +140,9 @@ function find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_next, A)
     while ptr_Z < (ptr_Z_end-1) && row_Z < row_next
         ptr_Z += 1
         row_Z = A.rowval[ptr_Z]
-    end
+    end    
     
     val_Z = row_Z == row_next ? A.nzval[ptr_Z] + 1 : 1
-    
     return (val_Z, ptr_Z, row_Z)
 end
 
@@ -125,7 +150,7 @@ end
 function find_next_XorY(row, ptr, ptr_end, A)
     val = A.nzval[ptr] + 1
     ptr += 1
-    row = ptr == ptr_end ? 0 : A.rowval[ptr]
+    row = ptr == ptr_end ? (size(A, 1) + 1) : A.rowval[ptr]
     
     return (val, ptr, row)
 end
@@ -133,6 +158,8 @@ end
 # 3-way, optimized for max_k = 1 and heterogeneous = true
 function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer},
     test_obj::MiTestCond{<:Integer, Nz})
+    """Not implemented for binary variables (for which zeros have to be recorded) since
+    slowdown may be too big"""
     fill!(test_obj.ctab, 0)
     # only reset the z_map elements that will be used 
     # (corresponding to abundances 0, 1, 2)
@@ -143,9 +170,14 @@ function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractS
     ptr_X, ptr_Y, ptr_Z = data.colptr[X], data.colptr[Y], data.colptr[Z]
     ptr_X_end, ptr_Y_end, ptr_Z_end = data.colptr[X + 1], data.colptr[Y + 1], data.colptr[Z + 1]
     row_X, row_Y, row_Z = data.rowval[ptr_X], data.rowval[ptr_Y], data.rowval[ptr_Z]
-    
+    #@show row_X row_Y row_Z ptr_X ptr_Y ptr_Z
     # While there are non-zero elements remaining in either column
-    @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
+    #rows_checked = Set()
+    @inbounds while ptr_X < ptr_X_end || ptr_Y < ptr_Y_end
+        #min_row = min(row_X, row_Y)
+        #push!(rows_checked, min_row)
+        #cmp_trip = Tuple(data[min_row, [X, Y, Z]] .+ 1)
+
         if row_X == row_Y
             val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data)
             val_X, ptr_X, row_X = find_next_XorY(row_X, ptr_X, ptr_X_end, data)
@@ -159,6 +191,13 @@ function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractS
             val_Y, ptr_Y, row_Y = find_next_XorY(row_Y, ptr_Y, ptr_Y_end, data)
             val_X = 1
         end
+
+        #val_trip = (val_X, val_Y, val_Z) 
+        #@show row_X row_Y row_Z val_trip cmp_trip ptr_X ptr_Y ptr_Z
+        #if val_trip != cmp_trip
+        #    @show row_X row_Y row_Z val_trip cmp_trip ptr_X ptr_Y ptr_Z
+        #    error()
+        #end
         
         test_obj.ctab[val_X, val_Y, val_Z] += 1
 
@@ -168,13 +207,64 @@ function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractS
         end
     end
 
+    #@show row_X row_Y row_Z ptr_X ptr_X_end ptr_Y ptr_Y_end ptr_Z ptr_Z_end
+
+    #=
+    # Finish zero / non-zero pairs at the tail of the X or Y
+    # column
+    @inbounds while ptr_X < ptr_X_end
+        push!(rows_checked, row_X)
+        val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data)
+        val_X, ptr_X, row_X = find_next_XorY(row_X, ptr_X, ptr_X_end, data)
+        test_obj.ctab[val_X, 1, val_Z] += 1
+
+        if test_obj.zmap.z_map_arr[val_Z] == -1
+            test_obj.zmap.levels_total += 1
+            test_obj.zmap.z_map_arr[val_Z] = 1
+        end
+    end
+
+    @inbounds while ptr_Y < ptr_Y_end
+        push!(rows_checked, row_Y)
+        val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_Y, data)
+        val_Y, ptr_Y, row_Y = find_next_XorY(row_Y, ptr_Y, ptr_Y_end, data)
+        
+        test_obj.ctab[1, val_Y, val_Z] += 1
+
+        if test_obj.zmap.z_map_arr[val_Z] == -1
+            test_obj.zmap.levels_total += 1
+            test_obj.zmap.z_map_arr[val_Z] = 1
+        end
+    end
+    =#
+    #=
+    # go to the first Z row beyond Y (if there is any)
+    val_Z, ptr_Z, row_Z = find_next_XorY(row_Z, ptr_Z, ptr_Z_end, data)    
+
+    @inbounds while ptr_Z < ptr_Z_end
+        val_Z, ptr_Z, row_Z = find_next_XorY(row_Z, ptr_Z, ptr_Z_end, data)
+        test_obj.ctab[1, 1, val_Z] += 1
+
+        if test_obj.zmap.z_map_arr[val_Z] == -1
+            test_obj.zmap.levels_total += 1
+            test_obj.zmap.z_map_arr[val_Z] = 1
+        end
+    end
+    =#
+
+    # add triple-zero entries
+    test_obj.ctab[1, 1, 1] = size(data, 1) - sum(test_obj.ctab)
+
+    #rows_nz = Set(findall(vec(any(.!iszero.(data[:, [X, Y, Z]]), dims=2))))
+    #@show length(rows_checked) length(rows_nz) setdiff(rows_checked, rows_nz) setdiff(rows_nz, rows_checked)
+
     return nothing
 end
 
 function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer},
         test_obj::ContTest3D)
-    # Special case: max_k = 1 / heterogeneous = true
-    if length(Zs) == 1 && is_zero_adjusted(test_obj)
+    # Special case: max_k = 1 / heterogeneous = true (not implemented for binary variables)
+    if length(Zs) == 1 && is_zero_adjusted(test_obj) && test_obj.max_vals[X] > 1 && test_obj.max_vals[Y] > 1
         contingency_table!(X, Y, Zs[1], data, test_obj)
     # Otherwise use flexible general-purpose backend
     else
