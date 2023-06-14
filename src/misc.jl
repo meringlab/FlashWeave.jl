@@ -72,10 +72,9 @@ function get_levels(x::Int, data::SparseArrays.AbstractSparseMatrixCSC{ElType}) 
 end
 
 
-function get_levels(x::Int, data::Matrix{ElType}) where ElType <: Integer
+function get_levels(x::Int, data::AbstractMatrix{ElType}) where ElType <: Integer
     ElType(length(unique(@view data[:, x])))
 end
-
 
 function get_levels(data::AbstractMatrix{ElType}) where ElType <: Integer
     map(x -> get_levels(x, data), 1:size(data, 2))
@@ -88,7 +87,7 @@ function get_max_vals(x::Int, data::SparseArrays.AbstractSparseMatrixCSC{ElType}
 end
 
 
-function get_max_vals(x::Int, data::Matrix{ElType}) where ElType <: Integer
+function get_max_vals(x::Int, data::AbstractMatrix{ElType}) where ElType <: Integer
     maximum(@view data[:, x])
 end
 

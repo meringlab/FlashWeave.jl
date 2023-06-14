@@ -155,13 +155,17 @@ end
         @testset "sensitive $sensitive" begin
             for max_k in [0, 1]
                 @testset "max_k $(max_k)" begin
-                    net = learn_network(otu_mat_full; sensitive=sensitive, heterogeneous=true, max_k=max_k, verbose=false, 
-                        meta_mask=meta_mask, normalize=false)
-                    num_edges = SimpleWeightedGraphs.ne(graph(net))
-                    if max_k == 0
-                        @test num_edges == 3
-                    else # with conditioning, one of the three edges is explained away (the others stay due to heuristic)
-                        @test num_edges == 2
+                    for make_sparse in (true, false)
+                        @testset "sparse $(make_sparse)" begin
+                            net = learn_network(otu_mat_full; sensitive=sensitive, heterogeneous=true, max_k=max_k, verbose=false, 
+                                meta_mask=meta_mask, normalize=false, make_sparse)
+                            num_edges = SimpleWeightedGraphs.ne(graph(net))
+                            if max_k == 0
+                                @test num_edges == 3
+                            else # with conditioning, one of the three edges is explained away (the others stay due to heuristic)
+                                @test num_edges == 2
+                            end
+                        end
                     end
                 end
             end
