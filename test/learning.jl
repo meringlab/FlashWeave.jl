@@ -367,10 +367,10 @@ end
 end
 
 @testset "sparse special optim (max_k 0 / 1, mi_nz)" begin
-    norm_res = FlashWeave.normalize_data(data, test_name="mi_nz", make_sparse=false)
+    norm_res = FlashWeave.normalize_data(data, test_name="mi_nz", make_sparse=false, verbose=false)
     A = norm_res.data
     # make some variables binary to test Nz behaviour
-    A[.!iszero.(A[:, end-5:end])] .= 1
+    A[:, end-5:end] .= iszero.(A[:, end-5:end])
     A_sp = sparse(A)
 
     for max_k in [0, 1]

@@ -1,3 +1,9 @@
+##############
+# DENSE DATA #
+##############
+
+### 2-way
+
 function contingency_table!(X::Int, Y::Int, data::AbstractMatrix{ElType}, cont_tab::Matrix{<:Integer}) where ElType <: Integer
     """2x2"""
     fill!(cont_tab, 0)
@@ -21,6 +27,17 @@ end
 
 contingency_table(X::Int, Y::Int, data::AbstractMatrix{<:Integer}) = contingency_table(X, Y, data, length(unique(data[:, X])), length(unique(data[:, Y])))
 
+## convenience wrapper for two-way contingency tables
+function contingency_table(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer}, test_name::String, levels::Vector{<:Integer}=get_levels(data),
+    max_vals::Vector{<:Integer}=get_max_vals(data))
+    test_obj = make_test_object(test_name, false, max_k=0, levels=levels, max_vals=max_vals, cor_mat=zeros(Float64, 0, 0))
+    contingency_table!(X, Y, data, test_obj)
+    test_obj.ctab::Matrix{Int}
+end
+
+contingency_table(X::Int, Y::Int, data::Matrix{<:Integer}, test_name::String) = contingency_table(X, Y, data)
+
+### 3-way
 
 function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::AbstractMatrix{ElType}, cont_tab::Array{<:Integer, 3},
     z::Vector{<:Integer}, cum_levels::Vector{<:Integer}, z_map_arr::Vector{<:Integer}) where ElType<:Integer
@@ -38,17 +55,6 @@ function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}
     levels_z
 end
 
-## convenience wrapper for two-way contingency tables
-function contingency_table(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer}, test_name::String, levels::Vector{<:Integer}=get_levels(data),
-    max_vals::Vector{<:Integer}=get_max_vals(data))
-    test_obj = make_test_object(test_name, false, max_k=0, levels=levels, max_vals=max_vals, cor_mat=zeros(Float64, 0, 0))
-    contingency_table!(X, Y, data, test_obj)
-    test_obj.ctab::Matrix{Int}
-end
-
-contingency_table(X::Int, Y::Int, data::Matrix{<:Integer}, test_name::String) = contingency_table(X, Y, data)
-
-
 ## convenience wrappers for three-way contingency tables
 function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}, data::Matrix{<:Integer},
     test_obj::ContTest3D)
@@ -63,9 +69,12 @@ function contingency_table(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer},
     test_obj.ctab::Array{Int,3}
 end
 
+###############
+# SPARSE DATA #
+###############
 
 
-# SPARSE DATA
+### 2-way
 
 # 2-way, optimized for heterogeneous = true
 function contingency_table_2d_optim!(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer}, test_obj::MiTest{<:Integer, Nz})
@@ -78,9 +87,7 @@ function contingency_table_2d_optim!(X::Int, Y::Int, data::SparseArrays.Abstract
     row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
 
     # While there are non-zero elements remaining in either column
-    @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
-        #row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
-        
+    @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end        
         if row_X == row_Y
             val_X, val_Y = data.nzval[ptr_X] + 1, data.nzval[ptr_Y] + 1
             ptr_X += 1
@@ -88,37 +95,13 @@ function contingency_table_2d_optim!(X::Int, Y::Int, data::SparseArrays.Abstract
             row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
             test_obj.ctab[val_X, val_Y] += 1
         elseif row_X < row_Y
-            #val_X = data.nzval[ptr_X] + 1
-            #val_Y = 1
             ptr_X += 1
             row_X = data.rowval[ptr_X]
         else
-            #val_Y = data.nzval[ptr_Y] + 1
-            #val_X = 1
             ptr_Y += 1
             row_Y = data.rowval[ptr_Y]
         end
-
-        #test_obj.ctab[val_X, val_Y] += 1
     end
-
-    #=
-    # Finish zero / non-zero pairs at the tail of the
-    # columns
-    @inbounds while ptr_X < ptr_X_end
-        val_X = data.nzval[ptr_X] + 1
-        ptr_X += 1
-        test_obj.ctab[val_X, 1] += 1
-    end
-
-    @inbounds while ptr_Y < ptr_Y_end
-        val_Y = data.nzval[ptr_Y] + 1
-        ptr_Y += 1
-        test_obj.ctab[1, val_Y] += 1
-    end
-    =#
-    # add double-zero entries
-    #test_obj.ctab[1, 1] = size(data, 1) - sum(test_obj.ctab)
 
     return nothing
 end
@@ -140,8 +123,10 @@ function contingency_table!(X::Int, Y::Int, data::SparseArrays.AbstractSparseMat
     end
 end
 
+### 3-way
+
 # Auxillary function for 3-way + max_k = 1 / heterogeneous = true special case
-function find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_next, A)
+function find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_next, A::SparseArrays.AbstractSparseMatrixCSC{<:Integer})
     while ptr_Z < (ptr_Z_end-1) && row_Z < row_next
         ptr_Z += 1
         row_Z = A.rowval[ptr_Z]
@@ -152,7 +137,7 @@ function find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_next, A)
 end
 
 # Auxillary function for 3-way + max_k = 1 / heterogeneous = true special case
-function find_next_XorY(row, ptr, ptr_end, A)
+function find_next_XorY(ptr, ptr_end, A::SparseArrays.AbstractSparseMatrixCSC{<:Integer})
     val = A.nzval[ptr] + 1
     ptr += 1
     row = ptr == ptr_end ? (size(A, 1) + 1) : A.rowval[ptr]
@@ -167,111 +152,33 @@ function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractS
     slowdown may be too big"""
     fill!(test_obj.ctab, 0)
     levels_z = 0
-    # only reset the z_map elements that will be used 
-    # (corresponding to abundances 0, 1, 2)
-    #fill!(view(test_obj.zmap.z_map_arr, 1:3), -1)
-    
-    #test_obj.zmap.levels_total = 0
     
     # Get the pointers to the start and end of the non-zero elements in each column
     ptr_X, ptr_Y, ptr_Z = data.colptr[X], data.colptr[Y], data.colptr[Z]
     ptr_X_end, ptr_Y_end, ptr_Z_end = data.colptr[X + 1], data.colptr[Y + 1], data.colptr[Z + 1]
     row_X, row_Y, row_Z = data.rowval[ptr_X], data.rowval[ptr_Y], data.rowval[ptr_Z]
-    #@show row_X row_Y row_Z ptr_X ptr_Y ptr_Z
-    # While there are non-zero elements remaining in either column
-    #rows_checked = Set()
-    @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
-        #min_row = min(row_X, row_Y)
-        #push!(rows_checked, min_row)
-        #cmp_trip = Tuple(data[min_row, [X, Y, Z]] .+ 1)
 
+    # While there are non-zero elements remaining in either column
+    @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
         if row_X == row_Y
             val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data)
-            val_X, ptr_X, row_X = find_next_XorY(row_X, ptr_X, ptr_X_end, data)
-            val_Y, ptr_Y, row_Y = find_next_XorY(row_Y, ptr_Y, ptr_Y_end, data)
+            val_X, ptr_X, row_X = find_next_XorY(ptr_X, ptr_X_end, data)
+            val_Y, ptr_Y, row_Y = find_next_XorY(ptr_Y, ptr_Y_end, data)
 
             test_obj.ctab[val_X, val_Y, val_Z] += 1
             if val_Z > levels_z
                 levels_z = val_Z
             end
-
-            #if test_obj.zmap.z_map_arr[val_Z] == -1
-            #    test_obj.zmap.levels_total += 1
-            #    test_obj.zmap.z_map_arr[val_Z] = 1
-            #end
         elseif row_X < row_Y
-            #val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data)
-            #val_X, ptr_X, row_X = find_next_XorY(row_X, ptr_X, ptr_X_end, data)
-            #val_Y = 1
             ptr_X += 1
             row_X = data.rowval[ptr_X]
         else
-            #val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_Y, data)
-            #val_Y, ptr_Y, row_Y = find_next_XorY(row_Y, ptr_Y, ptr_Y_end, data)
-            #val_X = 1
             ptr_Y += 1
             row_Y = data.rowval[ptr_Y]
         end
-
-        #val_trip = (val_X, val_Y, val_Z) 
-        #@show row_X row_Y row_Z val_trip cmp_trip ptr_X ptr_Y ptr_Z
-        #if val_trip != cmp_trip
-        #    @show row_X row_Y row_Z val_trip cmp_trip ptr_X ptr_Y ptr_Z
-        #    error()
-        #end
     end
 
     test_obj.zmap.levels_total = levels_z
-    #@show row_X row_Y row_Z ptr_X ptr_X_end ptr_Y ptr_Y_end ptr_Z ptr_Z_end
-
-    #=
-    # Finish zero / non-zero pairs at the tail of the X or Y
-    # column
-    @inbounds while ptr_X < ptr_X_end
-        push!(rows_checked, row_X)
-        val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data)
-        val_X, ptr_X, row_X = find_next_XorY(row_X, ptr_X, ptr_X_end, data)
-        test_obj.ctab[val_X, 1, val_Z] += 1
-
-        if test_obj.zmap.z_map_arr[val_Z] == -1
-            test_obj.zmap.levels_total += 1
-            test_obj.zmap.z_map_arr[val_Z] = 1
-        end
-    end
-
-    @inbounds while ptr_Y < ptr_Y_end
-        push!(rows_checked, row_Y)
-        val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_Y, data)
-        val_Y, ptr_Y, row_Y = find_next_XorY(row_Y, ptr_Y, ptr_Y_end, data)
-        
-        test_obj.ctab[1, val_Y, val_Z] += 1
-
-        if test_obj.zmap.z_map_arr[val_Z] == -1
-            test_obj.zmap.levels_total += 1
-            test_obj.zmap.z_map_arr[val_Z] = 1
-        end
-    end
-    =#
-    #=
-    # go to the first Z row beyond Y (if there is any)
-    val_Z, ptr_Z, row_Z = find_next_XorY(row_Z, ptr_Z, ptr_Z_end, data)    
-
-    @inbounds while ptr_Z < ptr_Z_end
-        val_Z, ptr_Z, row_Z = find_next_XorY(row_Z, ptr_Z, ptr_Z_end, data)
-        test_obj.ctab[1, 1, val_Z] += 1
-
-        if test_obj.zmap.z_map_arr[val_Z] == -1
-            test_obj.zmap.levels_total += 1
-            test_obj.zmap.z_map_arr[val_Z] = 1
-        end
-    end
-    =#
-
-    # add triple-zero entries
-    #test_obj.ctab[1, 1, 1] = size(data, 1) - sum(test_obj.ctab)
-
-    #rows_nz = Set(findall(vec(any(.!iszero.(data[:, [X, Y, Z]]), dims=2))))
-    #@show length(rows_checked) length(rows_nz) setdiff(rows_checked, rows_nz) setdiff(rows_nz, rows_checked)
 
     return nothing
 end
@@ -286,7 +193,7 @@ function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}
     end
 
     # Special case: max_k = 1 / heterogeneous = true (not implemented for binary variables)
-    if length(Zs) == 1 && X_nz && Y_nz
+    if false#length(Zs) == 1 && X_nz && Y_nz
         contingency_table!(X, Y, Zs[1], data, test_obj)
     # Otherwise use flexible general-purpose backend
     else
@@ -294,6 +201,7 @@ function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}
     end
 end
 
+### generic, flexible 2-way / 3-way sparse backend functions
 
 function make_zmap_expression(col_type::Type{NTuple{N,Int}}) where N
     map_expr = quote
