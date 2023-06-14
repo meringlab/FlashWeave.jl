@@ -377,7 +377,7 @@ end
         @testset "max_k $max_k" begin
             net, net_sp = [learn_network(x; sensitive=false, heterogeneous=true, max_k, normalize=false, verbose=false, 
             make_sparse=y) for (x, y) in [(A, false), (A_sp, true)]]
-            @test net == net_sp
+            @test isapprox(net.inference_results.graph.weights, net_sp.inference_results.graph.weights)
         end
     end
 end

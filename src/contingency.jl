@@ -80,26 +80,28 @@ end
 function contingency_table_2d_optim!(X::Int, Y::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer}, test_obj::MiTest{<:Integer, Nz})
     # Initialize a 3x3 zero matrix to hold the contingency table
     fill!(test_obj.ctab, 0)
+    rvs = rowvals(data)
+    nzvs = nonzeros(data)
 
     # Get the pointers to the start and end of the non-zero elements in each column
     ptr_X, ptr_Y = data.colptr[X], data.colptr[Y]
     ptr_X_end, ptr_Y_end = data.colptr[X + 1], data.colptr[Y + 1]
-    row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
+    row_X, row_Y = rvs[ptr_X], rvs[ptr_Y]
 
     # While there are non-zero elements remaining in either column
     @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end        
         if row_X == row_Y
-            val_X, val_Y = data.nzval[ptr_X] + 1, data.nzval[ptr_Y] + 1
+            val_X, val_Y = nzvs[ptr_X] + 1, nzvs[ptr_Y] + 1
             ptr_X += 1
             ptr_Y += 1
-            row_X, row_Y = data.rowval[ptr_X], data.rowval[ptr_Y]
+            row_X, row_Y = rvs[ptr_X], rvs[ptr_Y]
             test_obj.ctab[val_X, val_Y] += 1
         elseif row_X < row_Y
             ptr_X += 1
-            row_X = data.rowval[ptr_X]
+            row_X = rvs[ptr_X]
         else
             ptr_Y += 1
-            row_Y = data.rowval[ptr_Y]
+            row_Y = rvs[ptr_Y]
         end
     end
 
@@ -126,21 +128,21 @@ end
 ### 3-way
 
 # Auxillary function for 3-way + max_k = 1 / heterogeneous = true special case
-function find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_next, A::SparseArrays.AbstractSparseMatrixCSC{<:Integer})
+function find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_next, A::SparseArrays.AbstractSparseMatrixCSC{<:Integer}, rvs, nzvs)
     while ptr_Z < (ptr_Z_end-1) && row_Z < row_next
         ptr_Z += 1
-        row_Z = A.rowval[ptr_Z]
+        row_Z = rvs[ptr_Z]
     end    
     
-    val_Z = row_Z == row_next ? A.nzval[ptr_Z] + 1 : 1
+    val_Z = row_Z == row_next ? nzvs[ptr_Z] + 1 : 1
     return (val_Z, ptr_Z, row_Z)
 end
 
 # Auxillary function for 3-way + max_k = 1 / heterogeneous = true special case
-function find_next_XorY(ptr, ptr_end, A::SparseArrays.AbstractSparseMatrixCSC{<:Integer})
-    val = A.nzval[ptr] + 1
+function find_next_XorY(ptr, ptr_end, A::SparseArrays.AbstractSparseMatrixCSC{<:Integer}, rvs, nzvs)
+    val = nzvs[ptr] + 1
     ptr += 1
-    row = ptr == ptr_end ? (size(A, 1) + 1) : A.rowval[ptr]
+    row = ptr == ptr_end ? (size(A, 1) + 1) : rvs[ptr]
     
     return (val, ptr, row)
 end
@@ -152,18 +154,20 @@ function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractS
     slowdown may be too big"""
     fill!(test_obj.ctab, 0)
     levels_z = 0
+    rvs = rowvals(data)
+    nzvs = nonzeros(data)
     
     # Get the pointers to the start and end of the non-zero elements in each column
     ptr_X, ptr_Y, ptr_Z = data.colptr[X], data.colptr[Y], data.colptr[Z]
     ptr_X_end, ptr_Y_end, ptr_Z_end = data.colptr[X + 1], data.colptr[Y + 1], data.colptr[Z + 1]
-    row_X, row_Y, row_Z = data.rowval[ptr_X], data.rowval[ptr_Y], data.rowval[ptr_Z]
+    row_X, row_Y, row_Z = rvs[ptr_X], rvs[ptr_Y], rvs[ptr_Z]
 
     # While there are non-zero elements remaining in either column
     @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
         if row_X == row_Y
-            val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data)
-            val_X, ptr_X, row_X = find_next_XorY(ptr_X, ptr_X_end, data)
-            val_Y, ptr_Y, row_Y = find_next_XorY(ptr_Y, ptr_Y_end, data)
+            val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data, rvs, nzvs)
+            val_X, ptr_X, row_X = find_next_XorY(ptr_X, ptr_X_end, data, rvs, nzvs)
+            val_Y, ptr_Y, row_Y = find_next_XorY(ptr_Y, ptr_Y_end, data, rvs, nzvs)
 
             test_obj.ctab[val_X, val_Y, val_Z] += 1
             if val_Z > levels_z
@@ -171,10 +175,10 @@ function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractS
             end
         elseif row_X < row_Y
             ptr_X += 1
-            row_X = data.rowval[ptr_X]
+            row_X = rvs[ptr_X]
         else
             ptr_Y += 1
-            row_Y = data.rowval[ptr_Y]
+            row_Y = rvs[ptr_Y]
         end
     end
 
@@ -193,7 +197,7 @@ function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}
     end
 
     # Special case: max_k = 1 / heterogeneous = true (not implemented for binary variables)
-    if false#length(Zs) == 1 && X_nz && Y_nz
+    if length(Zs) == 1 && X_nz && Y_nz
         contingency_table!(X, Y, Zs[1], data, test_obj)
     # Otherwise use flexible general-purpose backend
     else
