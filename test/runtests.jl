@@ -13,7 +13,7 @@ test_modules = [ "io.jl", "preprocessing.jl", "contingency.jl", "statfuns.jl", "
     @test Set(test_modules) == Set(filter(x -> endswith(x, ".jl") && x != "runtests.jl", readdir(pwd())))
 end
 
-for test_module in ["learning.jl"]#test_modules
+for test_module in test_modules
     println("\nTesting $test_module")
     if test_module == "learning.jl"
         println("(this can take a couple of minutes)")
