@@ -6,6 +6,8 @@ using SparseArrays, DelimitedFiles, Statistics, Distributed, Logging
 import SimpleWeightedGraphs: nv, edges, ne, vertices
 import Graphs: neighbors
 
+println(ENV["PATH"])
+
 data_path = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_small.tsv")
 data = Matrix{Float64}(readdlm(data_path, '\t')[2:end, 2:end])
 data_sp = sparse(data)
@@ -110,6 +112,49 @@ data_bin = FlashWeave.preprocess_data_default(data, "mi", verbose=false,
 
 nprocs() == 1 && addprocs(1)
 @everywhere using FlashWeave
+
+@testset "sparse_debug" begin
+    rng = StableRNG(1234)
+    otu_mat_rand = rand(rng, 0:2, 100, 10)
+    otu_target = rand(rng, 0:2, 100) # counts for two identical OTUs
+    
+    # meta variable identical to target OTUs, but without zeros
+    mv_target = copy(otu_target)
+    mv_target[mv_target .== 0] .= 1
+    
+    otu_mat_full = hcat(otu_mat_rand, otu_target, otu_target, mv_target)
+    meta_mask = vcat(falses(12), true)
+    
+    function prepare_conditioning(data, test_name; max_k, n_obs_min=-1, hps=5)
+       if FlashWeave.isdiscrete(test_name)
+           levels = FlashWeave.get_levels(data)
+           max_vals = FlashWeave.get_max_vals(data)
+           z = !issparse(data) ? fill(-one(Int), size(data, 1)) : Int[]
+       else
+           z = Int[]
+       end
+    
+       test_obj, test_obj_uni = [FlashWeave.make_test_object(test_name, x>0, max_k=x, levels=levels, max_vals=max_vals, 
+           cor_mat=zeros(0,0), cache_pcor=false) for x in (max_k, 0)]
+    
+       if n_obs_min < 0 & FlashWeave.is_zero_adjusted(test_name)
+           if FlashWeave.isdiscrete(test_name)
+               max_levels = maximum(levels) - 1
+               n_obs_min = hps * max_levels^(max_k+2) + 1
+           else
+               n_obs_min = 20
+           end
+       end
+    
+       return (;test_obj, test_obj_uni, z, n_obs_min)
+    end
+    
+    A_sp = sparse(otu_mat_full)
+    test_obj, test_obj_uni, z_cache, _ = prepare_conditioning(A_sp, "mi_nz"; max_k=1, n_obs_min=300, hps=5);
+    
+    X, Y = (5, 13)
+    FlashWeave.test(X, [Y], A_sp, "mi_nz")
+end
 
 @testset "univar nbrs" begin
     nbrs_single = nothing
