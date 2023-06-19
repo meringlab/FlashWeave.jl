@@ -92,9 +92,9 @@ function contingency_table_2d_optim!(X::Int, Y::Int, data::SparseArrays.Abstract
         row_X, row_Y = rvs[ptr_X], rvs[ptr_Y]        
         if row_X == row_Y
             val_X, val_Y = nzvs[ptr_X] + 1, nzvs[ptr_Y] + 1
+            test_obj.ctab[val_X, val_Y] += 1
             ptr_X += 1
             ptr_Y += 1
-            test_obj.ctab[val_X, val_Y] += 1
         elseif row_X < row_Y
             ptr_X += 1
         else
@@ -124,55 +124,119 @@ end
 
 ### 3-way
 
-# Auxillary function for 3-way + max_k = 1 / heterogeneous = true special case
-function find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_next, A::SparseArrays.AbstractSparseMatrixCSC{<:Integer}, rvs, nzvs)
-    while ptr_Z < (ptr_Z_end-1) && row_Z < row_next
-        ptr_Z += 1
-        row_Z = rvs[ptr_Z]
-    end    
-    
-    val_Z = row_Z == row_next ? nzvs[ptr_Z] + 1 : 1
-    return (val_Z, ptr_Z, row_Z)
+"""Make an expression that updates contingency table with zero-nonzero pairs"""
+function make_zeroupd_expression(var::Symbol)
+    var_other = var == :X ? :Y : :X
+    expr = quote
+        $(Symbol("val_$(var)")) = nzvs[$(Symbol("ptr_$(var)"))] + 1
+        $(Symbol("val_$(var_other)")) = 1
+        
+        $(make_Zupd_expression(var))
+
+        test_obj.ctab[val_X, val_Y, val_Z] += 1
+    end
+    return expr
 end
 
-# 3-way, optimized for max_k = 1 and heterogeneous = true
-function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer},
-    test_obj::MiTestCond{<:Integer, Nz})
-    """Not implemented for binary variables (for which zeros have to be recorded) since
-    slowdown may be too big"""
-    fill!(test_obj.ctab, 0)
-    levels_z = 0
-    rvs = rowvals(data)
-    nzvs = nonzeros(data)
-    
-    # Get the pointers to the start and end of the non-zero elements in each column
-    ptr_X, ptr_Y, ptr_Z = data.colptr[X], data.colptr[Y], data.colptr[Z]
-    ptr_X_end, ptr_Y_end, ptr_Z_end = data.colptr[X + 1], data.colptr[Y + 1], data.colptr[Z + 1]
-
-    # While there are non-zero elements remaining in either column
-    @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
-        row_X, row_Y, row_Z = rvs[ptr_X], rvs[ptr_Y], rvs[ptr_Z] 
-        if row_X == row_Y
-            val_X, val_Y = nzvs[ptr_X] + 1, nzvs[ptr_Y] + 1
-            val_Z, ptr_Z, row_Z = find_next_Z(row_Z, ptr_Z, ptr_Z_end, row_X, data, rvs, nzvs)
-                       
-            ptr_X += 1
-            ptr_Y += 1
-
+"""Make an expression that adds remaining zero-nonzero pairs to contingency table
+after main loop has finished"""
+function make_zfinish_expression(var::Symbol)
+    var_other = var == :X ? :Y : :X
+    #println(var == :X)
+    #println(var == :Y)
+    #println("Making finish expression for var $(var)")
+    expr = quote
+        $(Symbol("val_$(var_other)")) = 1
+        while $(Symbol("ptr_$(var)")) < $(Symbol("ptr_$(var)_end"))
+            $(Symbol("val_$(var)")) = nzvs[$(Symbol("ptr_$(var)"))] + 1
+            $(Symbol("row_$(var)")) = rvs[$(Symbol("ptr_$(var)"))]
+            
+            $(make_Zupd_expression(var))
+            
             test_obj.ctab[val_X, val_Y, val_Z] += 1
+            $(Symbol("ptr_$(var)")) += 1
+        end
+    end
+    return expr
+end
+
+"""Make expression for updating Z-related variables"""
+function make_Zupd_expression(var::Symbol)
+    expr = quote
+        while ptr_Z < (ptr_Z_end-1) && row_Z < $(Symbol("row_$(var)"))
+            ptr_Z += 1
+            row_Z = rvs[ptr_Z]
+        end
+
+        if row_Z == $(Symbol("row_$(var)"))
+            val_Z = nzvs[ptr_Z] + 1
+
             if val_Z > levels_z
                 levels_z = val_Z
             end
-        elseif row_X < row_Y
-            ptr_X += 1
         else
-            ptr_Y += 1
+            val_Z = 1
         end
     end
+    return expr
+end
 
-    test_obj.zmap.levels_total = levels_z
+# 3-way, optimized for max_k = 1 and heterogeneous = true
+@generated function contingency_table!(X::Int, Y::Int, Z::Int, data::SparseArrays.AbstractSparseMatrixCSC{<:Integer},
+    test_obj::MiTestCond{<:Integer, Nz}, X_nz::Type{TXnz}, Y_nz::Type{TYnz}) where {TXnz <: AbstractNz, TYnz <: AbstractNz}
+    expr = quote
+        fill!(test_obj.ctab, 0)
+        levels_z = 1
+        rvs = rowvals(data)
+        nzvs = nonzeros(data)
 
-    return nothing
+        # Get the pointers to the start and end of the non-zero elements in each column
+        ptr_X, ptr_Y, ptr_Z = data.colptr[X], data.colptr[Y], data.colptr[Z]
+        ptr_X_end, ptr_Y_end, ptr_Z_end = data.colptr[X + 1], data.colptr[Y + 1], data.colptr[Z + 1]
+        val_X = val_Y = val_Z = 1
+        row_Z = ptr_Z < ptr_Z_end ? rvs[ptr_Z] : size(data, 1)+1
+    end
+
+    # if the other variable is NoNz, insert zero-nonzero or nonzero-zero pairs
+    # into ctab
+    X_zeroupd_expr = TYnz <: NoNz ? make_zeroupd_expression(:X) : (:())
+    Y_zeroupd_expr = TXnz <: NoNz ? make_zeroupd_expression(:Y) : (:())
+    
+    main_loop_expr = quote
+        # While there are non-zero elements remaining in either column
+        @inbounds while ptr_X < ptr_X_end && ptr_Y < ptr_Y_end
+            row_X, row_Y = rvs[ptr_X], rvs[ptr_Y]
+            if row_X == row_Y
+                val_X, val_Y = nzvs[ptr_X] + 1, nzvs[ptr_Y] + 1
+                $(make_Zupd_expression(:X))
+                test_obj.ctab[val_X, val_Y, val_Z] += 1
+                ptr_X += 1
+                ptr_Y += 1                
+            elseif row_X < row_Y
+                $(X_zeroupd_expr)
+                ptr_X += 1
+            else
+                $(Y_zeroupd_expr)
+                ptr_Y += 1
+            end
+        end
+    end
+    append!(expr.args, main_loop_expr.args)
+    
+    X_zerofinish_expr = TYnz <: NoNz ? make_zfinish_expression(:X) : (:())
+    Y_zerofinish_expr = TXnz <: NoNz ? make_zfinish_expression(:Y) : (:())
+    finish_expr = quote
+        $(X_zerofinish_expr)
+        $(Y_zerofinish_expr)
+        
+        test_obj.zmap.levels_total = levels_z
+        
+        return nothing
+    end
+
+    append!(expr.args, finish_expr.args)
+
+    return expr
 end
 
 
@@ -185,9 +249,11 @@ function contingency_table!(X::Int, Y::Int, Zs::NTuple{N,T} where {N,T<:Integer}
         X_nz = Y_nz = false
     end
 
-    # Special case: max_k = 1 / heterogeneous = true (not implemented for binary variables)
-    if length(Zs) == 1 && X_nz && Y_nz
-        contingency_table!(X, Y, Zs[1], data, test_obj)
+    # Special case: max_k = 1 / heterogeneous = true (not applicable if both variables are binary)
+    if length(Zs) == 1 && (X_nz || Y_nz)
+        X_nz_type = X_nz ? Nz : NoNz
+        Y_nz_type = Y_nz ? Nz : NoNz
+        contingency_table!(X, Y, Zs[1], data, test_obj, X_nz_type, Y_nz_type)
     # Otherwise use flexible general-purpose backend
     else
         sparse_ctab_backend!((X, Y, Zs...), data, test_obj, X_nz, Y_nz)
