@@ -142,9 +142,6 @@ end
 after main loop has finished"""
 function make_zfinish_expression(var::Symbol)
     var_other = var == :X ? :Y : :X
-    #println(var == :X)
-    #println(var == :Y)
-    #println("Making finish expression for var $(var)")
     expr = quote
         $(Symbol("val_$(var_other)")) = 1
         while $(Symbol("ptr_$(var)")) < $(Symbol("ptr_$(var)_end"))
