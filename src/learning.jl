@@ -13,7 +13,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
 
 
     if time_limit == -1.0
-        if parallel == "multi_il"
+        if parallel == "multi_il" && max_k > 0
             time_limit = round(log2(size(data, 2)))
             verbose && println("Setting 'time_limit' to $time_limit s.")
         else

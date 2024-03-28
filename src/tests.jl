@@ -61,14 +61,7 @@ function test(X::Int, Y::Int, data::AbstractMatrix{<:Integer}, test_obj::Abstrac
             pval = 1.0
             suff_power = false
         else
-            try
-                mi_stat = mutual_information(sub_ctab, levels_x, levels_y, test_obj.marg_i, test_obj.marg_j)
-            catch DomainError
-                display(test_obj.ctab)
-                display(sub_ctab)
-                @show X Y test_obj.marg_i test_obj.marg_j levels_x levels_y n_obs
-                error("debug")
-            end
+            mi_stat = mutual_information(sub_ctab, levels_x, levels_y, test_obj.marg_i, test_obj.marg_j)
 
             df = adjust_df(test_obj.marg_i, test_obj.marg_j, levels_x, levels_y)
             pval = mi_pval(abs(mi_stat), df, n_obs)

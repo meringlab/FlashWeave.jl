@@ -133,7 +133,7 @@ BIOM 2.0 ([description](http://biom-format.org/documentation/format_versions/bio
 
 ### Meta data tables ###
 
-Meta data should generally be provided as delimited format (see for instance [example1](https://github.com/meringlab/FlashWeave.jl/blob/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_meta.tsv) or [example2](https://github.com/meringlab/FlashWeave.jl/blob/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_meta_oneHotTest.tsv)), separately from the OTU table. Notably, this implies that FlashWeave does not yet support reading meta data directly from BIOM files, but requires a separate delimited meta data file (support will be added in an upcoming version).
+Meta data should generally be provided as delimited format (see for instance [example1](https://github.com/meringlab/FlashWeave.jl/blob/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_meta.tsv) or [example2](https://github.com/meringlab/FlashWeave.jl/blob/master/test/data/HMP_SRA_gut/HMP_SRA_gut_tiny_meta_oneHotTest.tsv)), separately from the OTU table. Notably, this implies that FlashWeave does not yet support reading meta data directly from BIOM files, but requires a separate delimited meta data file (support will be added in an upcoming version). **NOTE: OTU table and metadata table must be aligned such that each row corresponds to the same sample in both files (i.e. sample 1 data is found in row 1 in both files, etc.).**
 
 For JLD2, however, you can already provide HDF5 keys linked to meta data tables (and optionally headers):
 
