@@ -298,7 +298,7 @@ end
 function make_table(data_path::AbstractString, meta_data_path::StrOrNoth=nothing;
     otu_data_key::StrOrNoth="otu_data", otu_header_key::StrOrNoth="otu_header", 
     meta_data_key::StrOrNoth="meta_data", meta_header_key::StrOrNoth="meta_header", 
-    verbose::Bool=true, transposed::Bool=false)
+    transposed::Bool=false)
     
     data, header, meta_data, meta_header = load_data(data_path, meta_data_path, otu_data_key=otu_data_key,
                                                      otu_header_key=otu_header_key, meta_data_key=meta_data_key,
@@ -315,6 +315,24 @@ function make_table(data_path::AbstractString, meta_data_path::StrOrNoth=nothing
 
     data, header, meta_mask
 end
+
+#learn_local_neighborhood(target_var::AbstractString, header, args...; kwargs...) =
+#    learn_local_neighborhood(findfirst(==(target_var), header), args...; kwargs...)
+#
+#function learn_local_neighborhood(target_var::Int, data_path::AbstractString, meta_data_path::StrOrNoth=nothing;
+#    otu_data_key::StrOrNoth="otu_data",
+#    otu_header_key::StrOrNoth="otu_header", meta_data_key::StrOrNoth="meta_data",
+#    meta_header_key::StrOrNoth="meta_header", verbose::Bool=true,
+#    transposed::Bool=false, kwargs...)
+#
+#    verbose && println("\n### Loading data ###\n")
+#    data, header, meta_mask = make_table(data_path, meta_data_path, otu_data_key=otu_data_key,
+#                                         otu_header_key=otu_header_key, meta_data_key=meta_data_key,
+#                                         meta_header_key=meta_header_key, transposed=transposed)
+#    
+#   
+#
+#end
 
 """
     learn_network(data_path::AbstractString, meta_data_path::AbstractString) -> FWResult{<:Integer}
@@ -339,6 +357,11 @@ function learn_network(data_path::AbstractString, meta_data_path::StrOrNoth=noth
     meta_header_key::StrOrNoth="meta_header", verbose::Bool=true,
     transposed::Bool=false, kwargs...)
 
+    # Catch incorrect usage of data_path/meta_data_path as keyword argument
+    for key in (:data_path, :meta_data_path)
+        @assert !(key in keys(kwargs)) "'$key' is a positional argument, please use 'learn_network(<data_path>, <meta_data_path>; <kwargs...>)'."
+    end
+
     verbose && println("\n### Loading data ###\n")
     data, header, meta_mask = make_table(data_path, meta_data_path, otu_data_key=otu_data_key,
                                          otu_header_key=otu_header_key, meta_data_key=meta_data_key,
@@ -353,10 +376,12 @@ end
 Works like learn_network(data_path::AbstractString, meta_data_path::AbstractString), but takes paths to multiple data sets (independent sequencing experiments (e.g. 16S + ITS) for the same biological samples) which are normalized independently.
 """
 function learn_network(all_data_paths::AbstractVector{<:AbstractString}, meta_data_path::StrOrNoth=nothing;
-    otu_data_key::StrOrNoth="otu_data",
-    otu_header_key::StrOrNoth="otu_header", meta_data_key::StrOrNoth="meta_data",
-    meta_header_key::StrOrNoth="meta_header", verbose::Bool=true,
-    transposed::Bool=false, kwargs...)
+    otu_data_key::StrOrNoth="otu_data", otu_header_key::StrOrNoth="otu_header", transposed::Bool=false, kwargs...)
+
+    # Catch incorrect usage of data_path/meta_data_path as keyword argument
+    for key in (:all_data_paths, :meta_data_path)
+        @assert !(key in keys(kwargs)) "'$key' is a positional argument, please use 'learn_network(<all_data_paths>, <meta_data_path>; <kwargs...>)'."
+    end
 
     data_path = all_data_paths[1]
     if length(all_data_paths) > 1
@@ -446,6 +471,9 @@ function learn_network(data::AbstractMatrix; sensitive::Bool=true,
     make_onehot::Bool=true, max_tests=Int(10e6), hps::Integer=5, FDR::Bool=true, n_obs_min::Integer=-1,
     cache_pcor::Bool=false, time_limit::AbstractFloat=-1.0, update_interval::AbstractFloat=30.0, parallel_mode="auto",
     extra_data::Union{AbstractVector,Nothing}=nothing, share_data::Bool=true, experimental_kwargs...)
+
+    @assert !(:meta_data_path in keys(experimental_kwargs)) "You provided a OTU matrix together with a meta data path, this is currently not supported. 
+    Use either 'learn_network(<otu_table_path>, <meta_data_path>; <kwargs...>)' or 'learn_network(<otu_matrix>; <kwargs...>)'."
 
     start_time = time()
 

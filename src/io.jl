@@ -52,7 +52,7 @@ function load_data(data_path::AbstractString, meta_path::StrOrNoth=nothing; tran
         end
         ld_results = load_jld(data_path, otu_data_key, otu_header_key, meta_data_key, meta_header_key, transposed=transposed)
     else
-        error("$(file_ext) not a valid output format. Choose one of $(valid_data_formats)")
+        error("$(file_ext) not a valid input format. Choose one of $(valid_data_formats)")
     end
 
     ld_results

@@ -3,9 +3,10 @@
 ### general
 
 - strongly speed-up contingency table computation for heterogeneous=true and max_k=0/1
-- use the more compiler-friendly `stack` (introduced in Julia v1.9) instead of `hcat` for large numbers of columns (if available)
+- use the more compiler-friendly `stack` (introduced in Julia v1.9) instead of `hcat` for large numbers of columns (if available), introduce fast method for sparse columns
 - improve univariate pvalue filtering
 - remove performance bottleneck in three-way `adjust_df`
+- catch incorrect usage of 'meta_data_path' as keyword argument
 
 # v0.19.2 (latest)
 

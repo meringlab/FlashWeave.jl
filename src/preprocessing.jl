@@ -1,10 +1,38 @@
+function _fast_stack_sparse(vecs::Vector{SparseVector{T1, T2}}) where {T1 <: Real, T2 <: Integer}
+    """Fast method for stacking sparse columns"""
+    n_rows = length(vecs[1])
+    @assert all(length(x) == n_rows for x in vecs)
+    
+    rids, cids, nzvals = Int[], Int[], T1[]
+
+    for (col_i, v) in enumerate(vecs)
+        n_val = nnz(v)
+
+        if n_val > 0
+            append!(rids, rowvals(v))
+            append!(cids, repeat([col_i], n_val))
+            append!(nzvals, nonzeros(v))
+        end
+    end
+
+    n_cols = length(vecs)
+    return sparse(rids, cids, nzvals, n_rows, n_cols)
+end
+
 function stack_or_hcat(vecs::AbstractVector{<:AbstractArray})
     # use more efficient stack (introduced in Julia v1.9) if available
-    if isdefined(Base, :stack)
-        return stack(vecs)
+    stacked_matrix = if isdefined(Base, :stack)
+        # use even faster custom implementation for sparse vectors
+        if isa(vecs, AbstractVector{<:SparseVector})
+            _fast_stack_sparse(vecs)
+        else
+            stack(vecs)
+        end
     else
-        return hcat(vecs...)
+        hcat(vecs...)
     end
+
+    return stacked_matrix
 end
 
 
@@ -187,7 +215,7 @@ function discretize(X::AbstractMatrix{ElType}; n_bins::Integer=3, nz::Bool=true,
         rank_method::String="tied", disc_method::String="median", nz_mask::BitMatrix=BitMatrix(undef, (0,0))) where ElType <: AbstractFloat
     if nz
         if issparse(X)
-            disc_vecs = SparseVector{Int}[]
+            disc_vecs = SparseVector{Int,Int}[]
             for j in 1:size(X, 2)
                 push!(disc_vecs, discretize_nz(X[:, j], n_bins, rank_method=rank_method, disc_method=disc_method))
             end
