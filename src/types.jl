@@ -80,14 +80,14 @@ struct MiTest{S<:Integer, T<:AbstractNz} <: ContTest2D{S, T}
     ctab::Matrix{Int}
     levels::Vector{S}
     max_vals::Vector{S}
-    marg_i::Vector{S}
-    marg_j::Vector{S}
+    marg_i::Vector{Int}
+    marg_j::Vector{Int}
     nz::T
 end
 
 function MiTest(levels::Vector{S}, nz::AbstractNz, max_vals::Vector{S}) where S<:Integer
     max_level = maximum(max_vals) + one(S)
-    MiTest(zeros(Int, max_level, max_level), levels, max_vals, zeros(S, max_level), zeros(S, max_level), nz)
+    MiTest(zeros(Int, max_level, max_level), levels, max_vals, zeros(Int, max_level), zeros(Int, max_level), nz)
 end
 
 reset!(test_obj::ContTest2D) = fill!(test_obj.ctab, 0)
@@ -100,9 +100,9 @@ struct MiTestCond{S<:Integer, T<:AbstractNz} <: ContTest3D{S, T}
     zmap::ZMapper{S}
     levels::Vector{S}
     max_vals::Vector{S}
-    marg_i::Matrix{S}
-    marg_j::Matrix{S}
-    marg_k::Vector{S}
+    marg_i::Matrix{Int}
+    marg_j::Matrix{Int}
+    marg_k::Vector{Int}
     nz::T
 end
 
@@ -110,9 +110,9 @@ function MiTestCond(levels::Vector{S}, nz::AbstractNz, max_k::Integer, max_vals:
     max_level = maximum(max_vals) + one(S)
     zmap = ZMapper(max_k, max_level)
     ctab = zeros(Int, (max_level, max_level, max_level^max_k))
-    marg_i = zeros(S, max_level, max_level^max_k)
+    marg_i = zeros(Int, max_level, max_level^max_k)
     marg_j = copy(marg_i)
-    marg_k = zeros(S, max_level^max_k)
+    marg_k = zeros(Int, max_level^max_k)
     MiTestCond(ctab, zmap, levels, max_vals, marg_i, marg_j, marg_k, nz)
 end
 
