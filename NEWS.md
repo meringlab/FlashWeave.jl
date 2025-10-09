@@ -7,6 +7,8 @@
 - improve univariate pvalue filtering
 - remove performance bottleneck in three-way `adjust_df`
 - catch incorrect usage of 'meta_data_path' as keyword argument
+- relax data types for marginal tables to prevent domain errors with very large OTU tables
+- removed JLD2 support (after long deprecation period) following julia v1.12 incompats
 
 # v0.19.2 (latest)
 

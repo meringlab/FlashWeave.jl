@@ -48,7 +48,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
     end
 
 
-    if n_obs_min < 0 & is_zero_adjusted(test_name)
+    if n_obs_min < 0 && is_zero_adjusted(test_name)
         if isdiscrete(test_name)
             max_level = maximum(levels)
             n_strata = min(max_level^max_k, 8) # conservatively assume 8 sub-tables at most,
@@ -77,7 +77,7 @@ function prepare_lgl(data::AbstractMatrix{ElType}, test_name::String, time_limit
         n_unrel > 0 && @warn "$n_unrel variables have insufficient observations (< $n_obs_min ('n_obs_min')) and will not be used for interaction prediction"
     end
 
-    levels, max_vals, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule
+    return levels, max_vals, cor_mat, time_limit, n_obs_min, fast_elim, disc_type, cont_type, tmp_folder, edge_rule
 end
 
 
@@ -113,7 +113,7 @@ function prepare_univar_results(data::AbstractMatrix{ElType}, test_name::String,
         end
     end
 
-    target_vars, all_univar_nbrs
+    return target_vars, all_univar_nbrs
 end
 
 
@@ -154,7 +154,7 @@ function infer_conditional_neighbors(target_vars::Vector{Int}, data::AbstractMat
 
     end
 
-    Dict{Int,HitonState{Int}}(zip(target_vars, nbr_results))
+    return Dict{Int,HitonState{Int}}(zip(target_vars, nbr_results))
 end
 
 
@@ -196,7 +196,7 @@ function learn_graph_structure(target_vars::Vector{Int}, data::AbstractMatrix{El
         end
     end
 
-    nbr_dict, unfinished_state_dict, rej_dict
+    return nbr_dict, unfinished_state_dict, rej_dict
 end
 
 
@@ -275,7 +275,7 @@ function LGL(data::AbstractMatrix; test_name::String="mi", max_k::Integer=3,
 
     verbose && println("Complete")
 
-    LGLResult{Int}(graph, rej_dict, unfinished_state_dict)
+    return LGLResult{Int}(graph, rej_dict, unfinished_state_dict)
 end
 
 function combine_data_with_meta(data::AbstractMatrix, header::AbstractVector{<:AbstractString}, meta_data::AbstractMatrix, 
@@ -292,17 +292,12 @@ function combine_data_with_meta(data::AbstractMatrix, header::AbstractVector{<:A
     n_meta = length(meta_header)
     meta_mask = vcat(falses(size(data_comb, 2) - n_meta), trues(n_meta))
     
-    data_comb, header_comb, meta_mask
+    return data_comb, header_comb, meta_mask
 end
 
-function make_table(data_path::AbstractString, meta_data_path::StrOrNoth=nothing;
-    otu_data_key::StrOrNoth="otu_data", otu_header_key::StrOrNoth="otu_header", 
-    meta_data_key::StrOrNoth="meta_data", meta_header_key::StrOrNoth="meta_header", 
-    transposed::Bool=false)
+function make_table(data_path::AbstractString, meta_data_path::StrOrNoth=nothing; transposed::Bool=false)
     
-    data, header, meta_data, meta_header = load_data(data_path, meta_data_path, otu_data_key=otu_data_key,
-                                                     otu_header_key=otu_header_key, meta_data_key=meta_data_key,
-                                                     meta_header_key=meta_header_key, transposed=transposed)
+    data, header, meta_data, meta_header = load_data(data_path, meta_data_path, transposed=transposed)
 
     if isnothing(meta_data)
         meta_mask = falses(length(header))
@@ -313,37 +308,17 @@ function make_table(data_path::AbstractString, meta_data_path::StrOrNoth=nothing
         data, header, meta_mask = combine_data_with_meta(data, header, meta_data, meta_header)
     end
 
-    data, header, meta_mask
+    return data, header, meta_mask
 end
-
-#learn_local_neighborhood(target_var::AbstractString, header, args...; kwargs...) =
-#    learn_local_neighborhood(findfirst(==(target_var), header), args...; kwargs...)
-#
-#function learn_local_neighborhood(target_var::Int, data_path::AbstractString, meta_data_path::StrOrNoth=nothing;
-#    otu_data_key::StrOrNoth="otu_data",
-#    otu_header_key::StrOrNoth="otu_header", meta_data_key::StrOrNoth="meta_data",
-#    meta_header_key::StrOrNoth="meta_header", verbose::Bool=true,
-#    transposed::Bool=false, kwargs...)
-#
-#    verbose && println("\n### Loading data ###\n")
-#    data, header, meta_mask = make_table(data_path, meta_data_path, otu_data_key=otu_data_key,
-#                                         otu_header_key=otu_header_key, meta_data_key=meta_data_key,
-#                                         meta_header_key=meta_header_key, transposed=transposed)
-#    
-#   
-#
-#end
 
 """
     learn_network(data_path::AbstractString, meta_data_path::AbstractString) -> FWResult{<:Integer}
 
 Works like learn_network(data::AbstractArray{<:Real, 2}), but instead of a data matrix takes file paths to an OTU table and optionally a meta data table as an input.
 
-- `data_path` - path to a file storing an OTU count matrix (and JLD2 meta data)
+- `data_path` - path to a file storing an OTU count matrix
 
 - `meta_data_path` - optional path to a file with meta data
-
-- `*_key`  - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file. If a data item is absent the corresponding key should be 'nothing'. See '?load_data' for additional information.
 
 - `verbose` - print progress information
 
@@ -351,10 +326,7 @@ Works like learn_network(data::AbstractArray{<:Real, 2}), but instead of a data 
 
 - `kwargs...` - additional keyword arguments passed to learn_network(data::AbstractArray{<:Real, 2})
 """
-function learn_network(data_path::AbstractString, meta_data_path::StrOrNoth=nothing;
-    otu_data_key::StrOrNoth="otu_data",
-    otu_header_key::StrOrNoth="otu_header", meta_data_key::StrOrNoth="meta_data",
-    meta_header_key::StrOrNoth="meta_header", verbose::Bool=true,
+function learn_network(data_path::AbstractString, meta_data_path::StrOrNoth=nothing; verbose::Bool=true,
     transposed::Bool=false, kwargs...)
 
     # Catch incorrect usage of data_path/meta_data_path as keyword argument
@@ -363,9 +335,7 @@ function learn_network(data_path::AbstractString, meta_data_path::StrOrNoth=noth
     end
 
     verbose && println("\n### Loading data ###\n")
-    data, header, meta_mask = make_table(data_path, meta_data_path, otu_data_key=otu_data_key,
-                                         otu_header_key=otu_header_key, meta_data_key=meta_data_key,
-                                         meta_header_key=meta_header_key, transposed=transposed)
+    data, header, meta_mask = make_table(data_path, meta_data_path, transposed=transposed)
 
     learn_network(data; header=header, meta_mask=meta_mask, verbose=verbose, kwargs...)
 end

@@ -185,6 +185,7 @@ function mutual_information(ctab::AbstractArray{<:Integer, 3}, levels_x::Integer
 
         if cell_value != 0 && marg_ik != 0 && marg_jk != 0
             inner_term = log((marg_k[k] * cell_value) / (marg_ik * marg_jk)) * cell_value
+            
             if i == j
                 mi_stat_pos += inner_term
                 n_obs_pos += cell_value

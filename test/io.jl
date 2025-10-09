@@ -3,7 +3,6 @@ using FlashWeave
 using SimpleWeightedGraphs, DataStructures
 using SparseArrays, DelimitedFiles, FileIO
 
-#net_result = load_network(joinpath("data", "io_expected_networks.jld2"))
 net_result = load_network(joinpath("data", "learning_expected", "exp_mi_maxk3.edgelist"))
 
 function compare_rejections(rej1, rej2; approx_kwargs...)
@@ -29,10 +28,7 @@ end
 @testset "networks" begin
     tmp_path = tempname()
 
-    for net_format in ["edgelist", "gml", "jld2"]
-
-        # skip jld2
-        net_format == "jld2" && continue
+    for net_format in ["edgelist", "gml"]
 
         @testset "$net_format" begin
             tmp_net_path = tmp_path * "." * net_format
@@ -75,23 +71,19 @@ data = Matrix{Int}(data[1:19, 2:20])
 header = Vector{String}(header[2:20])
 meta_data, meta_header = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny_meta.tsv"), '\t', Int, header=true)
 meta_header = Vector{String}(meta_header[:])
-meta_data_key = "meta_data"
-meta_header_key = "meta_header"
 meta_data_fact, meta_header_fact = readdlm(joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny_meta_oneHotTest.tsv"), '\t', header=true)
 meta_header_fact = meta_header_fact[:]
 
 
 @testset "table data" begin
-    for (data_format, data_suff, meta_suff) in zip(["tsv", "tsv_rownames", "csv", "biom_json", "biom_hdf5", "jld2"],
-                                                   [".tsv", "_ids.tsv", ".csv", "_json.biom", "_hdf5.biom", "_plus_meta.jld2"],
-                                                   ["_meta.tsv", "_meta.csv", "_meta.csv", "_meta.tsv", "_meta.tsv", ""])
-        # skip jld2
-        data_format == "jld2" && continue
+    for (data_format, data_suff, meta_suff) in zip(["tsv", "tsv_rownames", "csv", "biom_json", "biom_hdf5"],
+                                                   [".tsv", "_ids.tsv", ".csv", "_json.biom", "_hdf5.biom"],
+                                                   ["_meta.tsv", "_meta.csv", "_meta.csv", "_meta.tsv", "_meta.tsv"])
 
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             meta_path = isempty(meta_suff) ? nothing : meta_path
-            data_ld = load_data(data_path, meta_path, meta_data_key=meta_data_key, meta_header_key=meta_header_key)
+            data_ld = load_data(data_path, meta_path)
             @test data_ld[1] == data
             @test data_ld[2] == header
             @test data_ld[3] == meta_data
@@ -104,17 +96,14 @@ end
 @testset "transposed" begin
     tmp_path = tempname()
 
-    for (data_format, data_suff, meta_suff) in zip(["tsv", "jld2"],
-                                                   ["_ids_transposed.tsv", "_plus_meta_transposed.jld2"],
-                                                   ["_meta_transposed.tsv", ""])
-       # skip jld2
-       data_format == "jld2" && continue
+    for (data_format, data_suff, meta_suff) in zip(["tsv"],
+                                                   ["_ids_transposed.tsv"],
+                                                   ["_meta_transposed.tsv"])
 
         @testset "$data_format" begin
             data_path, meta_path = [joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny" * suff) for suff in [data_suff, meta_suff]]
             meta_path = isempty(meta_suff) ? nothing : meta_path
-            data_ld = load_data(data_path, meta_path, transposed=true, meta_data_key=meta_data_key,
-                                meta_header_key=meta_header_key)
+            data_ld = load_data(data_path, meta_path, transposed=true)
             @test data_ld[1] == data
             @test data_ld[2] == header
             @test data_ld[3] == meta_data
@@ -127,8 +116,7 @@ end
 @testset "string factors" begin
     path_prefix = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
     data_path, meta_path = [path_prefix * suff for suff in ("_ids.tsv", "_meta_oneHotTest.tsv")]
-    data_ld = load_data(data_path, meta_path, meta_data_key=meta_data_key,
-                        meta_header_key=meta_header_key)
+    data_ld = load_data(data_path, meta_path)
     @test data_ld[1] == data
     @test data_ld[2] == header
     @test data_ld[3] == meta_data_fact

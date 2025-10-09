@@ -1,11 +1,10 @@
 # note: needed lots of @eval and Base.invokelatest hacks for conditional
 # module loading
 
-const valid_net_formats = (".edgelist", ".gml", ".jld2")
-const valid_data_formats = (".tsv", ".csv", ".biom", ".jld2")
+const valid_net_formats = (".edgelist", ".gml")
+const valid_data_formats = (".tsv", ".csv", ".biom")
 const valid_dlm_formats = (".tsv", ".csv")
 
-isjld(ext::AbstractString) = ext == ".jld2"
 isdlm(ext::AbstractString) = ext in valid_dlm_formats
 isbiom(ext::AbstractString) = ext == ".biom"
 isedgelist(ext::AbstractString) = ext == ".edgelist"
@@ -16,21 +15,16 @@ isdefaultkey(key::AbstractString) = key in ("otu_data", "otu_header", "meta_data
 """
     load_data(data_path::AbstractString, meta_path::AbstractString) -> (AbstractArray{<:Real, 2}, Vector{String}, AbstractArray{<:Real, 2}, Vector{String})
 
-Load matrices with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv', '.biom' and '.jld2'.
+Load matrices with OTU count and optionally meta data from disc. Available formats are '.tsv', '.csv' and '.biom'.
 
 - `data_path` - path to a file storing an OTU count matrix
 
 - `meta_data_path` - optional path to a file with meta variable information
 
-- `*_key` - HDF5 keys to access data sets with OTU counts, Meta variables and variable names in a JLD2 file. If a data item is absent the corresponding key should be 'nothing'. See '?load_data' for additional information.
-
 - `transposed` - if `true`, rows of `data` are variables and columns are samples
 """
-function load_data(data_path::AbstractString, meta_path::StrOrNoth=nothing; transposed::Bool=false,
-     otu_data_key::StrOrNoth="otu_data", meta_data_key::StrOrNoth="meta_data",
-     otu_header_key::StrOrNoth="otu_header", meta_header_key::StrOrNoth="meta_header")
+function load_data(data_path::AbstractString, meta_path::StrOrNoth=nothing; transposed::Bool=false)
      """Load OTU tables and meta data from various formats.
-     -- Set jld2 keys you don't want to use to 'nothing'
      -- delimited formats must have headers (or row indices if transposed=true)"""
     file_ext = splitext(data_path)[2]
     transposed && file_ext == ".biom" && @warn("'transposed' cannot be used with .biom files")
@@ -44,13 +38,6 @@ function load_data(data_path::AbstractString, meta_path::StrOrNoth=nothing; tran
         ld_results = load_dlm(data_path, meta_path, transposed=transposed)
     elseif isbiom(file_ext)
         ld_results = load_biom(data_path, meta_path)
-    elseif isjld(file_ext)
-        @warn "jld2 support is deprecated and will be removed in future versions of FlashWeave"
-        !isnothing(meta_path) && @error "jld2 format not compatible with external meta data files, please add meta data directly to the jld2 file (default group key: 'meta_data')"
-        for (key, desc) in [(otu_data_key, "otu data"), (otu_header_key, "otu ids")]
-            @assert !isnothing(key) "must provide a key for $(desc)"
-        end
-        ld_results = load_jld(data_path, otu_data_key, otu_header_key, meta_data_key, meta_header_key, transposed=transposed)
     else
         error("$(file_ext) not a valid input format. Choose one of $(valid_data_formats)")
     end
@@ -62,7 +49,7 @@ end
 """
     save_network(net_path::AbstractString, net_result::FWResult) -> Void
 
-Save network results to disk. Available formats are '.edgelist', '.gml' and '.jld2'.
+Save network results to disk. Available formats are '.edgelist' and '.gml'
 
 - `net_path` - output path for the network
 
@@ -76,9 +63,6 @@ function save_network(net_path::AbstractString, net_result::FWResult; detailed::
         write_edgelist(net_path, net_result)
     elseif isgml(file_ext)
         write_gml(net_path, net_result)
-    elseif isjld(file_ext)
-        @warn "jld2 support is deprecated and will be removed in future versions of FlashWeave"
-        save(net_path, "results", net_result)
     else
         error("$(file_ext) not a valid output format. Choose one of $(valid_net_formats)")
     end
@@ -94,7 +78,7 @@ end
 """
     load_network(net_path::AbstractString) -> FWResult{Int}
 
-Load network results from disk. Available formats are '.edgelist', '.gml' and '.jld2'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded. FlashWeave parameters that were used for network inference are only available when loading from JLD2.
+Load network results from disk. Available formats are '.edgelist' and '.gml'. For GML, only files with structure identical to save_network('network.gml') output can currently be loaded.
 
 - `net_path` - path from which to load the network results
 """
@@ -104,8 +88,6 @@ function load_network(net_path::AbstractString)
         net_result = read_edgelist(net_path)
     elseif isgml(file_ext)
         net_result = read_gml(net_path)
-    elseif isjld(file_ext)
-        net_result = load(net_path, "results")
     else
         error("$(file_ext) not a valid network format. Valid formats are $(valid_net_formats)")
     end
@@ -115,38 +97,6 @@ end
 ######################
 ## Helper functions ##
 ######################
-
-function load_jld(data_path::AbstractString, otu_data_key::AbstractString, otu_header_key::AbstractString,
-     meta_data_key::StrOrNoth=nothing, meta_header_key::StrOrNoth=nothing; transposed::Bool=false)
-     d = load(data_path)
-
-     for (key, key_desc) in [(otu_data_key, "otu_data_key"),
-                             (otu_header_key, "otu_header_key"),
-                             (meta_data_key, "meta_data_key"),
-                             (meta_header_key, "meta_header_key")]
-         !isnothing(key) && !haskey(d, key) && !(key in ["meta_data_key", "meta_header_key"]) && error("key '$key' not found in input file. Please make sure to provide the appropriate $key_desc when using non-standard input files for FlashWeave or set $key_desc to 'nothing'. Keys present in input file: $(join(keys(d), ", "))")
-     end
-
-     data = d[otu_data_key]
-     header = d[otu_header_key]
-
-     if !isnothing(meta_data_key) && haskey(d, meta_data_key)
-         meta_data = d[meta_data_key]
-         meta_header = d[meta_header_key]
-     else
-         meta_data = meta_header = nothing
-     end
-
-     if transposed
-         data = data'
-         if !isnothing(meta_data)
-             meta_data = meta_data'
-         end
-     end
-
-     data, header, meta_data, meta_header
- end
-
 
 hasrowids(data::AbstractMatrix, header::AbstractVector) =
     header[1] == "" || (length(unique(data[:, 1])) == size(data, 1) && (isa(data[1, 1], String) || isa(data[1, 1], SubString)))

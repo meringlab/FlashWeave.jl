@@ -317,17 +317,11 @@ end
 
     @testset "from file" begin
         path_trunk = joinpath("data", "HMP_SRA_gut", "HMP_SRA_gut_tiny")
-        for (data_format, suff_pair, transp_suff_pair) in zip(["tsv", "jld2"],
-                                                        [(".tsv", "_ids_transposed.tsv"),
-                                                        ("_plus_meta.jld2", "_plus_meta_transposed.jld2")],
-                                                        [("_meta.tsv", "_meta_transposed.tsv"),("","")])
-            data_format == "jld2" && continue
+        for (data_format, suff_pair, transp_suff_pair) in zip(["tsv"],
+                                                        [(".tsv", "_ids_transposed.tsv")],
+                                                        [("_meta.tsv", "_meta_transposed.tsv")])
             @testset "$data_format" begin
                 path_pairs = [path_trunk * suff for suff in (suff_pair..., transp_suff_pair...)]
-
-                # skip jld2
-
-
                 pred_graphs = []
                 for (i, i_meta, transp) in [(1, 3, false), (2, 4, true)]
                     pred_netw = learn_network(path_pairs[i], path_pairs[i_meta],
